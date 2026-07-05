@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  background: #f7f2ea;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 243, 0.92), rgba(247, 242, 234, 0.98)),
+    #f7f2ea;
+  color: #221f1b;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.atelier-field {
+  @apply w-full rounded-md border border-atelier-taupe/30 bg-white/80 px-3 py-2 text-sm text-atelier-ink outline-none transition focus:border-atelier-charcoal focus:ring-2 focus:ring-atelier-brass/20;
+}
+
+.atelier-label {
+  @apply text-xs font-semibold uppercase tracking-[0.18em] text-atelier-taupe;
+}
+
+.atelier-card {
+  @apply rounded-md border border-atelier-taupe/20 bg-atelier-paper shadow-soft;
+}

@@ -1,0 +1,145 @@
+import { NextResponse } from "next/server";
+import { logAiRun } from "@/lib/ai/logging";
+import { createInteriorRenderImage, isOpenAiConfigured } from "@/lib/ai/openai";
+import { renderPromptDirector } from "@/lib/ai/services";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
+
+export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = await params;
+  const body = await request.json().catch(() => ({}));
+  const supabase = createServerSupabaseClient();
+  const { data: room, error: roomError } = await supabase.from("rooms").select("*").eq("id", roomId).single();
+
+  if (roomError) return NextResponse.json({ error: roomError.message }, { status: 404 });
+
+  const { data: selectedMoodBoard } = await supabase
+    .from("mood_boards")
+    .select("*")
+    .eq("room_id", roomId)
+    .eq("selected", true)
+    .maybeSingle();
+
+  if (!selectedMoodBoard) {
+    return NextResponse.json({ error: "Select a mood board before generating a render prompt." }, { status: 400 });
+  }
+
+  if (typeof body.source_photo_id !== "string") {
+    return NextResponse.json({ error: "Select a source photo before generating a render prompt." }, { status: 400 });
+  }
+
+  const { data: sourcePhoto } = typeof body.source_photo_id === "string"
+    ? await supabase.from("photos").select("*").eq("id", body.source_photo_id).eq("room_id", roomId).maybeSingle()
+    : { data: null };
+
+  if (!sourcePhoto) {
+    return NextResponse.json({ error: "The selected source photo was not found for this room." }, { status: 400 });
+  }
+
+  const { data: latestAnalysis } = await supabase
+    .from("room_analyses")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let plan;
+  try {
+    plan = await renderPromptDirector({
+      roomId,
+      sourcePhotoId: body.source_photo_id,
+      moodBoardId: selectedMoodBoard.id,
+      room,
+      analysis: latestAnalysis?.analysis,
+      selectedMoodBoard,
+      sourcePhoto
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Render prompt generation failed.";
+    await logAiRun({
+      roomId,
+      serviceName: "Render Prompt Director",
+      promptVersion: "render_director_v1",
+      inputPayload: { room, selected_mood_board: selectedMoodBoard, source_photo: sourcePhoto, body },
+      outputPayload: {},
+      status: "failed",
+      validationErrors: [message]
+    });
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  let fileUrl: string | null = null;
+
+  try {
+    const imageBase64 = await createInteriorRenderImage({
+      prompt: plan.render_prompt,
+      sourceImageUrl: sourcePhoto?.file_url
+    });
+
+    if (isOpenAiConfigured() && !imageBase64) {
+      throw new Error("OpenAI image generation returned no image output.");
+    }
+
+    if (imageBase64) {
+      const serviceSupabase = createServiceSupabaseClient();
+      const storagePath = `${roomId}/renders/${crypto.randomUUID()}.png`;
+      const imageBytes = Uint8Array.from(atob(imageBase64), (char) => char.charCodeAt(0));
+      const { error: uploadError } = await serviceSupabase.storage.from("room-photos").upload(storagePath, imageBytes, {
+        contentType: "image/png",
+        cacheControl: "3600",
+        upsert: false
+      });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = serviceSupabase.storage.from("room-photos").getPublicUrl(storagePath);
+      fileUrl = publicUrlData.publicUrl;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Render image generation failed.";
+    await logAiRun({
+      roomId,
+      serviceName: "Render Image Generator",
+      promptVersion: "render_image_v1",
+      inputPayload: { prompt: plan.render_prompt, source_photo: sourcePhoto },
+      outputPayload: {},
+      status: "failed",
+      validationErrors: [message]
+    });
+
+    if (isOpenAiConfigured()) {
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("renders")
+    .insert({
+      room_id: roomId,
+      mood_board_id: selectedMoodBoard?.id,
+      source_photo_id: body.source_photo_id,
+      file_url: fileUrl,
+      prompt: plan.render_prompt,
+      preservation_constraints: plan.preservation_constraints,
+      transformation_instructions: plan.transformation_instructions,
+      negative_instructions: plan.negative_instructions,
+      critique: plan.critique,
+      quality_score: plan.quality_score
+    })
+    .select("*")
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await supabase.from("rooms").update({ status: "renders" }).eq("id", roomId);
+  await logAiRun({
+    roomId,
+    serviceName: "Render Prompt Director",
+    promptVersion: "render_director_v1",
+    inputPayload: { room, selected_mood_board: selectedMoodBoard, source_photo: sourcePhoto, body },
+    outputPayload: plan,
+    qualityScore: plan.quality_score
+  });
+
+  return NextResponse.json({ render: data });
+}

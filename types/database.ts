@@ -1,0 +1,339 @@
+﻿export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export type Database = {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string;
+          email: string | null;
+          name: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          email?: string | null;
+          name?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          email?: string | null;
+          name?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      homes: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          region: string | null;
+          home_type: string | null;
+          style_notes: string | null;
+          whole_home_palette: Json;
+          whole_home_constraints: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          region?: string | null;
+          home_type?: string | null;
+          style_notes?: string | null;
+          whole_home_palette?: Json;
+          whole_home_constraints?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["homes"]["Insert"]>;
+        Relationships: [];
+      };
+      rooms: {
+        Row: {
+          id: string;
+          home_id: string;
+          name: string;
+          room_type: string | null;
+          purpose: string | null;
+          dimensions: Json;
+          ceiling_height: number | null;
+          budget_range: string | null;
+          style_preferences: Json;
+          color_preferences: Json;
+          constraints: Json;
+          existing_items: Json;
+          design_brief: string | null;
+          status: string;
+          selected_mood_board_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          home_id: string;
+          name: string;
+          room_type?: string | null;
+          purpose?: string | null;
+          dimensions?: Json;
+          ceiling_height?: number | null;
+          budget_range?: string | null;
+          style_preferences?: Json;
+          color_preferences?: Json;
+          constraints?: Json;
+          existing_items?: Json;
+          design_brief?: string | null;
+          status?: string;
+          selected_mood_board_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["rooms"]["Insert"]>;
+        Relationships: [];
+      };
+      photos: {
+        Row: {
+          id: string;
+          room_id: string;
+          file_url: string;
+          storage_path: string;
+          label: string | null;
+          angle_type: string | null;
+          ai_caption: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          file_url: string;
+          storage_path: string;
+          label?: string | null;
+          angle_type?: string | null;
+          ai_caption?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["photos"]["Insert"]>;
+        Relationships: [];
+      };
+      room_analyses: {
+        Row: {
+          id: string;
+          room_id: string;
+          analysis: Json;
+          quality_score: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          analysis: Json;
+          quality_score?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["room_analyses"]["Insert"]>;
+        Relationships: [];
+      };
+      mood_boards: {
+        Row: {
+          id: string;
+          room_id: string;
+          concept_name: string;
+          concept_data: Json;
+          selected: boolean;
+          quality_score: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          concept_name: string;
+          concept_data: Json;
+          selected?: boolean;
+          quality_score?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["mood_boards"]["Insert"]>;
+        Relationships: [];
+      };
+      products: {
+        Row: {
+          id: string;
+          room_id: string;
+          mood_board_id: string | null;
+          category: string;
+          name: string;
+          retailer: string | null;
+          url: string | null;
+          image_url: string | null;
+          price: number | null;
+          dimensions: Json;
+          material: string | null;
+          finish: string | null;
+          scores: Json;
+          reason_selected: string | null;
+          risks: Json;
+          alternatives: Json;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          mood_board_id?: string | null;
+          category: string;
+          name: string;
+          retailer?: string | null;
+          url?: string | null;
+          image_url?: string | null;
+          price?: number | null;
+          dimensions?: Json;
+          material?: string | null;
+          finish?: string | null;
+          scores?: Json;
+          reason_selected?: string | null;
+          risks?: Json;
+          alternatives?: Json;
+          status?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;
+        Relationships: [];
+      };
+      renders: {
+        Row: {
+          id: string;
+          room_id: string;
+          mood_board_id: string | null;
+          source_photo_id: string | null;
+          file_url: string | null;
+          prompt: string;
+          preservation_constraints: Json;
+          transformation_instructions: Json;
+          negative_instructions: Json;
+          critique: Json;
+          quality_score: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          mood_board_id?: string | null;
+          source_photo_id?: string | null;
+          file_url?: string | null;
+          prompt: string;
+          preservation_constraints?: Json;
+          transformation_instructions?: Json;
+          negative_instructions?: Json;
+          critique?: Json;
+          quality_score?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["renders"]["Insert"]>;
+        Relationships: [];
+      };
+      revisions: {
+        Row: {
+          id: string;
+          room_id: string;
+          user_message: string;
+          assistant_response: string;
+          revision_type: string;
+          state_before: Json;
+          state_after: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          user_message: string;
+          assistant_response: string;
+          revision_type: string;
+          state_before?: Json;
+          state_after?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["revisions"]["Insert"]>;
+        Relationships: [];
+      };
+      design_memories: {
+        Row: {
+          id: string;
+          scope: string;
+          scope_id: string;
+          memory_type: string;
+          content: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          scope: string;
+          scope_id: string;
+          memory_type: string;
+          content: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["design_memories"]["Insert"]>;
+        Relationships: [];
+      };
+      ai_runs: {
+        Row: {
+          id: string;
+          room_id: string | null;
+          service_name: string;
+          prompt_version: string;
+          model_name: string | null;
+          status: string;
+          input_payload: Json;
+          output_payload: Json;
+          validation_errors: Json;
+          quality_score: number | null;
+          token_estimate: number | null;
+          cost_estimate: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id?: string | null;
+          service_name: string;
+          prompt_version: string;
+          model_name?: string | null;
+          status?: string;
+          input_payload?: Json;
+          output_payload?: Json;
+          validation_errors?: Json;
+          quality_score?: number | null;
+          token_estimate?: number | null;
+          cost_estimate?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ai_runs"]["Insert"]>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+};
+
+export type Home = Database["public"]["Tables"]["homes"]["Row"];
+export type Room = Database["public"]["Tables"]["rooms"]["Row"];
+export type Photo = Database["public"]["Tables"]["photos"]["Row"];
+export type MoodBoard = Database["public"]["Tables"]["mood_boards"]["Row"];
+export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type Render = Database["public"]["Tables"]["renders"]["Row"];
