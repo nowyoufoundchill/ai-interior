@@ -20,6 +20,13 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
 
   if (photoError) return NextResponse.json({ error: photoError.message }, { status: 500 });
 
+  const { data: existingAnalyses } = await supabase
+    .from("room_analyses")
+    .select("version")
+    .eq("room_id", roomId)
+    .order("version", { ascending: false })
+    .limit(1);
+
   let analysis;
   try {
     analysis = await roomVisionAnalyst({
@@ -42,9 +49,22 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
+  await supabase.from("room_analyses").update({ status: "stale" }).eq("room_id", roomId).eq("status", "current");
+
   const { data, error } = await supabase
     .from("room_analyses")
-    .insert({ room_id: roomId, analysis, quality_score: 82 })
+    .insert({
+      room_id: roomId,
+      analysis,
+      version: (existingAnalyses?.[0]?.version ?? 0) + 1,
+      status: "current",
+      source_photo_ids: (photos ?? []).map((photo) => photo.id),
+      brief_snapshot: {
+        design_brief: room.design_brief,
+        dimensions: room.dimensions
+      },
+      quality_score: 82
+    })
     .select("*")
     .single();
 
@@ -61,7 +81,13 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  await supabase.from("rooms").update({ status: "analyzed" }).eq("id", roomId);
+  await supabase
+    .from("mood_boards")
+    .update({ status: "stale", selected: false })
+    .eq("room_id", roomId)
+    .in("status", ["draft", "locked", "unlocked"]);
+
+  await supabase.from("rooms").update({ status: "analyzed", current_stage: "diagnosed", selected_mood_board_id: null }).eq("id", roomId);
   await logAiRun({
     roomId,
     serviceName: "Room Vision Analyst",

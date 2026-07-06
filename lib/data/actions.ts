@@ -61,7 +61,8 @@ export async function createRoomAction(homeId: string, formData: FormData) {
       constraints: commaList(formText(formData, "constraints")),
       existing_items: commaList(formText(formData, "existing_items")),
       design_brief: formText(formData, "design_brief"),
-      status: "intake"
+      status: "intake",
+      current_stage: "empty"
     })
     .select("id")
     .single();

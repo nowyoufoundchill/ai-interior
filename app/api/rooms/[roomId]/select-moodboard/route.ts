@@ -22,12 +22,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: targetError?.message ?? "Mood board was not found for this room." }, { status: 404 });
   }
 
-  const { error: clearError } = await supabase.from("mood_boards").update({ selected: false }).eq("room_id", roomId);
+  const { error: clearError } = await supabase
+    .from("mood_boards")
+    .update({ selected: false, status: "stale" })
+    .eq("room_id", roomId)
+    .eq("selected", true);
   if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 });
 
   const { data, error } = await supabase
     .from("mood_boards")
-    .update({ selected: true })
+    .update({ selected: true, status: "locked" })
     .eq("id", moodBoardId)
     .eq("room_id", roomId)
     .select("*")
@@ -35,6 +39,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await supabase.from("rooms").update({ selected_mood_board_id: moodBoardId, status: "selected" }).eq("id", roomId);
+  await supabase.from("products").update({ status: "stale" }).eq("room_id", roomId).neq("status", "rejected");
+  await supabase.from("renders").update({ status: "stale" }).eq("room_id", roomId).neq("status", "rejected");
+  await supabase
+    .from("rooms")
+    .update({ selected_mood_board_id: moodBoardId, status: "selected", current_stage: "concept_locked" })
+    .eq("id", roomId);
   return NextResponse.json({ mood_board: data });
 }

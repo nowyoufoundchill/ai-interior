@@ -16,7 +16,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
-    .order("created_at", { ascending: false })
+    .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -41,13 +41,24 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
+  const { data: latestVersionRows } = await supabase
+    .from("mood_boards")
+    .select("version")
+    .eq("room_id", roomId)
+    .order("version", { ascending: false })
+    .limit(1);
+
   const { data, error } = await supabase
     .from("mood_boards")
     .insert(
-      concepts.map((concept) => ({
+      concepts.map((concept, index) => ({
         room_id: roomId,
         concept_name: concept.concept_name,
         concept_data: concept,
+        version: (latestVersionRows?.[0]?.version ?? 0) + index + 1,
+        origin: "generated",
+        status: "draft",
+        selected: false,
         quality_score: concept.quality_score
       }))
     )
@@ -66,12 +77,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const insertedIds = (data ?? []).map((board) => board.id);
-  if (insertedIds.length) {
-    await supabase.from("mood_boards").delete().eq("room_id", roomId).not("id", "in", `(${insertedIds.join(",")})`);
-  }
-
-  await supabase.from("rooms").update({ status: "concepts", selected_mood_board_id: null }).eq("id", roomId);
+  await supabase.from("rooms").update({ status: "concepts", current_stage: "concepts", selected_mood_board_id: null }).eq("id", roomId);
   await logAiRun({
     roomId,
     serviceName: "Mood Board Generator",

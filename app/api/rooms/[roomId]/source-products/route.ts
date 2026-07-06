@@ -16,7 +16,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .from("mood_boards")
     .select("*")
     .eq("room_id", roomId)
-    .eq("selected", true)
+    .eq("status", "locked")
     .maybeSingle();
 
   if (!selectedMoodBoard) {
@@ -27,7 +27,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
-    .order("created_at", { ascending: false })
+    .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -59,6 +59,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
       products.map((product) => ({
         room_id: roomId,
         mood_board_id: selectedMoodBoard?.id,
+        mood_board_version: selectedMoodBoard?.version ?? null,
         category: product.category,
         name: product.name,
         retailer: product.retailer,
@@ -72,7 +73,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
         reason_selected: product.reason_selected,
         risks: product.risks,
         alternatives: product.alternatives,
-        status: "candidate"
+        status: "suggested"
       }))
     )
     .select("*");
@@ -90,12 +91,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const insertedIds = (data ?? []).map((product) => product.id);
-  if (insertedIds.length) {
-    await supabase.from("products").delete().eq("room_id", roomId).not("id", "in", `(${insertedIds.join(",")})`);
-  }
-
-  await supabase.from("rooms").update({ status: "products" }).eq("id", roomId);
+  await supabase.from("rooms").update({ status: "products", current_stage: "executing" }).eq("id", roomId);
   await logAiRun({
     roomId,
     serviceName: "Product Sourcing Agent",

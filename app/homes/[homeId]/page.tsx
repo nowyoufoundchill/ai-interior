@@ -70,7 +70,7 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
                   </div>
                   <p className="text-sm leading-6 text-atelier-charcoal">{room.purpose || "Add a purpose and design brief."}</p>
                   <span className="w-fit rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
-                    {statusLabel(room.status)}
+                    {statusLabel(room.current_stage || room.status)}
                   </span>
                 </Link>
               ))}

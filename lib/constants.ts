@@ -14,20 +14,23 @@ export const PHOTO_LABELS = [
 ] as const;
 
 export const ROOM_TABS = [
-  "Photos",
+  "Photos & Brief",
   "Diagnosis",
-  "Mood Boards",
+  "Concepts",
   "Products",
   "Renders",
-  "Chat",
-  "Memory"
+  "Chat"
 ] as const;
 
 export const ROOM_STATUSES = {
+  empty: "Ready for intake",
+  photos: "Photos and dimensions added",
+  diagnosed: "Diagnosis ready",
+  concepts: "Concepts generated",
+  concept_locked: "Concept locked",
+  executing: "Execution in progress",
   intake: "Intake",
-  photos: "Photos added",
   analyzed: "Diagnosis ready",
-  concepts: "Concepts ready",
   selected: "Concept selected",
   products: "Products planned",
   renders: "Mockups ready"

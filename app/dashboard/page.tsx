@@ -93,7 +93,7 @@ export default async function DashboardPage() {
                               <Home className="h-4 w-4" />
                               {room.name}
                             </span>
-                            <span className="text-xs text-atelier-taupe">{statusLabel(room.status)}</span>
+                            <span className="text-xs text-atelier-taupe">{statusLabel(room.current_stage || room.status)}</span>
                           </div>
                         ))
                       )}

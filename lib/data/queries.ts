@@ -14,7 +14,7 @@ type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type AiRun = Database["public"]["Tables"]["ai_runs"]["Row"];
 
 export type HomeSummary = Home & {
-  rooms: Pick<Room, "id" | "name" | "room_type" | "status" | "created_at">[];
+  rooms: Pick<Room, "id" | "name" | "room_type" | "status" | "current_stage" | "created_at">[];
 };
 
 export type HomeDetail = Home & {
@@ -40,7 +40,7 @@ export async function getHomes() {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("homes")
-    .select("*, rooms(id, name, room_type, status, created_at)")
+    .select("*, rooms(id, name, room_type, status, current_stage, created_at)")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -82,8 +82,8 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     aiRuns
   ] = await Promise.all([
     supabase.from("photos").select("*").eq("room_id", roomId).order("created_at", { ascending: false }),
-    supabase.from("room_analyses").select("*").eq("room_id", roomId).order("created_at", { ascending: false }),
-    supabase.from("mood_boards").select("*").eq("room_id", roomId).order("created_at", { ascending: true }),
+    supabase.from("room_analyses").select("*").eq("room_id", roomId).order("version", { ascending: false }).order("created_at", { ascending: false }),
+    supabase.from("mood_boards").select("*").eq("room_id", roomId).order("version", { ascending: false }).order("created_at", { ascending: false }),
     supabase.from("products").select("*").eq("room_id", roomId).order("created_at", { ascending: true }),
     supabase.from("renders").select("*").eq("room_id", roomId).order("created_at", { ascending: false }),
     supabase.from("revisions").select("*").eq("room_id", roomId).order("created_at", { ascending: false }),

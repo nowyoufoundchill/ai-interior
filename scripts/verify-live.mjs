@@ -22,6 +22,8 @@ const tables = [
   "renders",
   "revisions",
   "design_memories",
+  "design_preferences",
+  "chat_messages",
   "ai_runs"
 ];
 

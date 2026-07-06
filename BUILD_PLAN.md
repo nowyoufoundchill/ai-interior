@@ -1,54 +1,78 @@
-﻿# Build Plan
+# Build Plan
 
-## Phase 1: Stabilize Foundation
-- [x] Confirm project structure and architecture.
-- [x] Make app folder its own Git repo.
-- [x] Add GitHub origin.
-- [x] Create local Supabase env file.
-- [x] Fix TypeScript build blockers.
-- [x] Verify typecheck and production build.
-- [ ] Verify live Supabase schema and storage bucket. Corrected live read check indicates all public tables are missing from the PostgREST schema until migrations are applied; `room-photos` bucket has been created.
-- [ ] Run local dev server and test the app flow manually after migration.
-- [ ] Review agent: foundation reviewer verifies schema, env handling, local app flow, storage upload path, and Git hygiene.
-- [ ] Failure gate: do not enter Phase 2 unless `npm.cmd run typecheck`, `npm.cmd run build`, Supabase tables, `room-photos` bucket, server photo upload/delete, and dashboard -> home -> room navigation all pass.
-- [ ] Commit current stable foundation.
-- [ ] Push `main` to GitHub.
+## Current Directive
+PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/AI_Interior_Atelier_PRD_v2.md) supersedes all earlier planning. The build must now move toward:
 
-## Phase 2: Real Room Diagnosis
-- [x] Add OpenAI env contract.
-- [x] Choose room analysis model and image input format.
-- [x] Implement real `roomVisionAnalyst` behind the existing service boundary.
-- [x] Include uploaded room photo URLs in analysis input.
-- [x] Validate model output with `roomAnalysisSchema`.
-- [ ] Persist diagnosis in `room_analyses`.
-- [ ] Log prompt/input/output metadata to `ai_runs`.
-- [ ] Add user-facing error states for failed analysis.
-- [ ] Test with at least one real room and complete photo set.
-- [ ] Review agent: AI diagnosis reviewer verifies prompt shape, image inputs, Zod validation, fallback behavior, persistence, and user-facing failure states.
-- [ ] Failure gate: do not enter Phase 3 unless mock fallback still works without `OPENAI_API_KEY`, real analysis works with valid credentials/photos, invalid model output is rejected safely, `ai_runs` logs success/failure metadata, and typecheck/build pass.
+- append-only artifacts
+- locked concept as the design contract
+- room stages of `empty -> photos -> diagnosed -> concepts -> concept_locked -> executing`
+- hidden `/debug` prompt workbench
+- eventual provider routing through a single AI gateway with versioned prompt files
 
-## Phase 3: Concepts and Product Plan
-- [x] Replace mock mood board generator with real structured concept generation.
-- [x] Use room analysis, whole-home context, and design brief as inputs.
-- [x] Improve mood board UI with stronger visual concept assets.
-- [x] Replace placeholder products with real product sourcing strategy.
-- [x] Add product filtering by budget, dimensions, retailer, and risk.
-- [ ] Review agent: concept/product reviewer verifies concept distinctness, whole-home consistency, product rationale, filtering correctness, and source-risk disclosure.
-- [ ] Failure gate: do not enter Phase 4 unless three validated concepts generate from real room context, selected concepts persist correctly, product plans include dimensions/budget/risk data, filtering does not hide required items incorrectly, and typecheck/build pass.
+## Completed Alignment Work
+- [x] Audited the current build against PRD v2 and identified v1 carryovers.
+- [x] Updated the room workflow to use `current_stage` semantics in the UI.
+- [x] Changed concept selection behavior to locked-concept behavior.
+- [x] Stopped destructive replacement of mood boards, products, and renders in API routes.
+- [x] Added stale/current status handling for diagnoses, concepts, products, and renders.
+- [x] Added a hidden `/debug` page backed by `ai_runs`.
+- [x] Added additive schema migration `003_prd_v2_foundation_alignment.sql` for v2-aligned columns and tables.
 
-## Phase 4: Render Workflow
-- [x] Generate render prompts from selected source photo and mood board.
-- [x] Connect image generation or external render workflow.
-- [x] Store render output URL and critique.
-- [ ] Add revision loop for render changes.
-- [ ] Review agent: render workflow reviewer verifies prompt preservation constraints, source-photo selection, output storage, critique scoring, and revision loop behavior.
-- [ ] Failure gate: do not enter Phase 5 unless render prompts preserve room architecture/camera constraints, generated or external outputs are stored and displayed, critique data is persisted, revision requests update the render workflow predictably, and typecheck/build pass.
+## Phase 0: Intelligence Spike
+- [ ] Create `/spike` workflow for diagnosis, concepts, products, render prompt composition, and image edit validation.
+- [ ] Test Anthropic reasoning plus web search against real owner room photos and typed dimensions.
+- [ ] Test OpenAI image edit rendering from real source photos.
+- [ ] Test Tavily image/page extraction for product sourcing support.
+- [ ] Promote approved prompts into `/prompts/**` as versioned files only after owner sign-off.
+- [ ] Failure gate: do not treat any production AI output as final-quality until spike outputs are judged good enough by the owner.
 
-## Phase 5: Memory and Auth
-- [x] Convert chat revisions into durable design memories.
-- [x] Add memory controls for edit/delete/confirm.
-- [ ] Add Supabase Auth if multi-user access is needed.
-- [ ] Add RLS policies before any public or multi-user deployment. Hardening migration exists but live application is pending database credentials.
-- [ ] Review agent: memory/auth reviewer verifies memory extraction quality, user controls, Auth boundary decisions, RLS policy coverage, and no private data leakage.
-- [ ] Failure gate: do not consider the app release-ready unless memory edits/deletes are auditable, Auth is either intentionally deferred or fully wired, RLS policies protect all user-scoped data before multi-user/public use, and typecheck/build pass.
+## Phase 1: Foundation
+- [x] Next.js + Supabase + Tailwind project foundation exists.
+- [x] Homes, rooms, photos, room workspace, and private single-household flow exist.
+- [x] Additive v2 schema alignment migration has been authored locally.
+- [x] Hidden `/debug` route exists.
+- [ ] Apply migration `003_prd_v2_foundation_alignment.sql` to the live Supabase project.
+- [ ] Regenerate `types/database.ts` from the live Supabase schema after migration application.
+- [ ] Create `/lib/schemas/` as the single domain-schema source of truth and migrate imports away from `lib/ai/schemas.ts`.
+- [ ] Create `/lib/ai/gateway.ts` and route all provider calls through it.
+- [ ] Move prompt text out of service files into `/prompts/{service}/{name}.v{N}.md`.
+- [ ] Add provider-aware `ai_runs` logging from the gateway: provider, model, raw input/output, latency, validation errors, token and cost estimates.
+- [ ] Failure gate: do not start real multi-provider service wiring until migration, generated types, gateway, prompt files, and debug logging all pass `npm.cmd run typecheck` and `npm.cmd run build`.
 
+## Phase 2: Diagnosis + Concepts
+- [x] Diagnosis and concept routes now preserve history instead of replacing prior artifacts.
+- [x] Concept locking now invalidates downstream products and renders by marking them stale.
+- [ ] Replace `room_analyses` naming and surrounding app language with diagnosis-first terminology where practical.
+- [ ] Build concept editing, unlock, and re-harmonize flows on top of the new mood board version/status fields.
+- [ ] Surface stale badges and rerun affordances more consistently across the room UI.
+- [ ] Failure gate: diagnosis reruns must mark concepts stale only; concepts must be lockable without destructive deletes; locked concept must be the only concept used for downstream generation.
+
+## Phase 3: Renders
+- [x] Render records are now append-only and mark older same-photo renders stale on regeneration.
+- [ ] Replace generic render generation copy with photo-edit language throughout the UI and routes.
+- [ ] Add explicit regeneration instructions input in the Renders tab.
+- [ ] Add before/after comparison UI.
+- [ ] Persist preservation constraints, user instructions, and critic notes in a clearer render history view.
+- [ ] Failure gate: renders must always be generated from a locked concept and a real source photo, never concept-free text generation.
+
+## Phase 4: Products
+- [x] Product records are now append-only and tied to mood board version where available.
+- [ ] Add cached product image storage path handling rather than relying on hotlinked images alone.
+- [ ] Introduce approved/rejected product controls and stale badges in the UI.
+- [ ] Shift product sourcing prompts and logic toward rationale-first, typed-dimension-aware outputs.
+- [ ] Failure gate: product generation must always bind to the locked concept version and keep stale history visible.
+
+## Phase 5: Design Chat + Preferences
+- [x] Chat messages now also persist to a dedicated `chat_messages` table.
+- [x] Additive `design_preferences` table exists in migration for home-level taste records.
+- [ ] Move room workspace away from `design_memories` as the primary taste model.
+- [ ] Add home-level preferences UI backed by `design_preferences`.
+- [ ] Ensure chat proposes reruns and preference updates without silently mutating design state.
+- [ ] Failure gate: chat must explain rationale from stored artifacts and require explicit user confirmation for rerun-causing actions.
+
+## Phase 6: Hardening
+- [ ] Apply the latest schema through the documented GitHub -> Supabase workflow.
+- [ ] Verify live tables and storage buckets with `npm.cmd run verify:live`.
+- [ ] Re-run `npm.cmd run typecheck` and `npm.cmd run build` after the live schema catches up.
+- [ ] Audit RLS/API exposure against current Supabase guidance before any broader deployment.
+- [ ] Failure gate: no release-ready claim until docs, schema, runtime behavior, and debug visibility all match PRD v2.

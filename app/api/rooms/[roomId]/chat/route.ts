@@ -20,14 +20,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
-    .order("created_at", { ascending: false })
+    .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
   const { data: selectedMoodBoard } = await supabase
     .from("mood_boards")
     .select("*")
     .eq("room_id", roomId)
-    .eq("selected", true)
+    .eq("status", "locked")
     .maybeSingle();
   const { data: products } = await supabase.from("products").select("*").eq("room_id", roomId).order("created_at", { ascending: true });
   const { data: renders } = await supabase.from("renders").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(5);
@@ -76,6 +76,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await supabase.from("chat_messages").insert([
+    {
+      room_id: roomId,
+      role: "user",
+      content: revision.user_message,
+      classified_intent: revision.revision_type,
+      referenced_artifact_ids: []
+    },
+    {
+      room_id: roomId,
+      role: "assistant",
+      content: revision.assistant_response,
+      classified_intent: revision.revision_type,
+      referenced_artifact_ids: []
+    }
+  ]);
 
   if (revision.revision_type === "memory_update") {
     await supabase.from("design_memories").insert({

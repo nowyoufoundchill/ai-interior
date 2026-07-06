@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .from("mood_boards")
     .select("*")
     .eq("room_id", roomId)
-    .eq("selected", true)
+    .eq("status", "locked")
     .maybeSingle();
 
   if (!selectedMoodBoard) {
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
-    .order("created_at", { ascending: false })
+    .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -112,17 +112,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     }
   }
 
+  await supabase
+    .from("renders")
+    .update({ status: "stale" })
+    .eq("room_id", roomId)
+    .eq("source_photo_id", body.source_photo_id)
+    .eq("status", "current");
+
   const { data, error } = await supabase
     .from("renders")
     .insert({
       room_id: roomId,
       mood_board_id: selectedMoodBoard?.id,
+      mood_board_version: selectedMoodBoard?.version ?? null,
       source_photo_id: body.source_photo_id,
       file_url: fileUrl,
       prompt: plan.render_prompt,
+      render_prompt: plan.render_prompt,
       preservation_constraints: plan.preservation_constraints,
       transformation_instructions: plan.transformation_instructions,
       negative_instructions: plan.negative_instructions,
+      user_regeneration_instructions: typeof body.instructions === "string" ? body.instructions : null,
+      generated_image_path: fileUrl,
+      status: "current",
       critique: plan.critique,
       quality_score: plan.quality_score
     })
@@ -131,7 +143,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await supabase.from("rooms").update({ status: "renders" }).eq("id", roomId);
+  await supabase.from("rooms").update({ status: "renders", current_stage: "executing" }).eq("id", roomId);
   await logAiRun({
     roomId,
     serviceName: "Render Prompt Director",
