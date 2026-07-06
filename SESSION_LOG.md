@@ -68,6 +68,9 @@
   - saved spike artifacts under `spike/runs/*.json`
 - Added provider-aware model fallback logic so Anthropic spike runs do not inherit OpenAI-only prompt model names.
 - Added Anthropic schema sanitization for structured-output compatibility during spike execution.
+- Fixed prompt loading for deployed server runtimes by resolving known prompt files from a bundled manifest in `/lib/ai/prompts.ts` instead of relying on `process.cwd()` file access alone.
+- Tightened the diagnosis service success criteria so the function reinforces typed dimensions as ground truth, visual evidence limits, and downstream usefulness for concepts, scale, lighting, and renders.
+- Revised `prompts/diagnosis/room-diagnosis.v1.md` to a fuller diagnosis brief and set its declared model to `gpt-5.4-mini-2026-03-17`.
 
 ### Verified
 - `npm.cmd run typecheck` passes.
@@ -77,6 +80,8 @@
 - Re-ran `npm.cmd run verify:live` after the GitHub migration fix; the live schema and storage checks all pass on July 5, 2026.
 - Re-ran `npm.cmd run typecheck` and `npm.cmd run build` after the gateway/prompt/schema refactor; both pass on July 5, 2026.
 - Re-ran `npm.cmd run typecheck` and `npm.cmd run build` after the Phase 0 spike implementation; both pass on July 5, 2026.
+- Re-ran `npm.cmd run typecheck` and `npm.cmd run build` after the prompt-loader deploy fix; both pass on July 5, 2026.
+- Re-ran `npm.cmd run typecheck` after tightening the diagnosis prompt/service contract; it passes on July 5, 2026.
 - OpenAI env is configured as server-only `OPENAI_API_KEY`; the previous `NEXT_PUBLIC_OPENAI_API_KEY` name was removed.
 - `room-photos` storage bucket exists and is public.
 
@@ -86,6 +91,7 @@
 - `docs/AI_Interior_Atelier_PRD_v2.md` exists locally and is intentionally untracked.
 - No live room/photo data exists in Supabase yet, so the spike has not been validated against owner room data from the app.
 - `TAVILY_API_KEY` is not configured locally yet, so Tavily validation remains blocked.
+- Phase 0 cannot be marked complete yet because real owner-photo validation and owner sign-off on outputs have not happened.
 - The codebase still has major PRD-v2 follow-up gaps: no concept edit/unlock/re-harmonize flow, no home-level preferences UI, and no before/after render comparison.
 
 ### Next Action

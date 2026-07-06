@@ -137,9 +137,12 @@ export async function roomVisionAnalyst(input: {
         caption: photo.ai_caption
       })),
       success_criteria: [
-        "Identify visible architecture, materials, lighting, constraints, opportunities, and risks.",
-        "Use uncertainties when photo evidence is incomplete.",
-        "Do not invent exact dimensions, brands, or hidden conditions."
+        "Identify visible architecture, layout cues, materials, lighting conditions, existing items, constraints, opportunities, and execution risks.",
+        "Treat typed dimensions and the room brief as ground truth, and use photos only for visual evidence and spatial reading.",
+        "Call out what should influence downstream concept direction, furniture scale, circulation, lighting strategy, and render realism.",
+        "Use uncertainties when photo evidence is incomplete or ambiguous instead of guessing.",
+        "Do not invent exact dimensions, brands, hidden conditions, or unseen architectural features.",
+        "Avoid generic decorating advice and keep the diagnosis specific to this room and its intended use."
       ]
     },
     images: input.photos.slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" })),

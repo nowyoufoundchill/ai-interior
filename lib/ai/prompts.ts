@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 type PromptMetadata = {
@@ -13,8 +14,16 @@ export type VersionedPrompt = PromptMetadata & {
   absolutePath: string;
 };
 
+const PROMPT_FILE_URLS: Record<string, URL> = {
+  "prompts/diagnosis/room-diagnosis.v1.md": new URL("../../prompts/diagnosis/room-diagnosis.v1.md", import.meta.url),
+  "prompts/concepts/generate-room-concepts.v1.md": new URL("../../prompts/concepts/generate-room-concepts.v1.md", import.meta.url),
+  "prompts/products/source-product-plan.v1.md": new URL("../../prompts/products/source-product-plan.v1.md", import.meta.url),
+  "prompts/renders/compose-render-plan.v1.md": new URL("../../prompts/renders/compose-render-plan.v1.md", import.meta.url),
+  "prompts/chat/design-chat.v1.md": new URL("../../prompts/chat/design-chat.v1.md", import.meta.url)
+};
+
 export async function loadPrompt(relativePath: string): Promise<VersionedPrompt> {
-  const absolutePath = path.join(process.cwd(), relativePath);
+  const absolutePath = resolvePromptPath(relativePath);
   const file = await readFile(absolutePath, "utf8");
   const match = file.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
 
@@ -55,4 +64,13 @@ function parseFrontmatter(frontmatter: string): PromptMetadata {
   }
 
   return metadata;
+}
+
+function resolvePromptPath(relativePath: string) {
+  const bundledUrl = PROMPT_FILE_URLS[relativePath];
+  if (bundledUrl) {
+    return fileURLToPath(bundledUrl);
+  }
+
+  return path.join(process.cwd(), relativePath);
 }

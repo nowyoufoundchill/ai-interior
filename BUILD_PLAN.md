@@ -25,6 +25,7 @@ PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20In
 - [ ] Test Tavily image/page extraction for product sourcing support.
 - [ ] Promote approved prompts into `/prompts/**` as versioned files only after owner sign-off.
 - [ ] Failure gate: do not treat any production AI output as final-quality until spike outputs are judged good enough by the owner.
+Status: infrastructure is complete, but Phase 0 itself is not complete until real-photo validation, Tavily validation, and owner sign-off happen.
 
 ## Phase 1: Foundation
 - [x] Next.js + Supabase + Tailwind project foundation exists.
@@ -38,6 +39,7 @@ PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20In
 - [x] Move prompt text out of service files into `/prompts/{service}/{name}.v{N}.md`.
 - [x] Add provider-aware `ai_runs` logging from the gateway: provider, model, raw input/output, latency, and validation errors.
 - [x] Failure gate: do not start real multi-provider service wiring until migration, generated types, gateway, prompt files, and debug logging all pass `npm.cmd run typecheck` and `npm.cmd run build`.
+Status: complete.
 
 ## Phase 2: Diagnosis + Concepts
 - [x] Diagnosis and concept routes now preserve history instead of replacing prior artifacts.
