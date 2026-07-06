@@ -75,11 +75,22 @@ create table if not exists public.mood_boards (
   created_at timestamptz not null default now()
 );
 
-alter table public.rooms
-  add constraint rooms_selected_mood_board_id_fkey
-  foreign key (selected_mood_board_id)
-  references public.mood_boards(id)
-  on delete set null;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'rooms_selected_mood_board_id_fkey'
+      and conrelid = 'public.rooms'::regclass
+  ) then
+    alter table public.rooms
+      add constraint rooms_selected_mood_board_id_fkey
+      foreign key (selected_mood_board_id)
+      references public.mood_boards(id)
+      on delete set null;
+  end if;
+end
+$$;
 
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
