@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   briefInterpretationSchema,
   designCriticSchema,
@@ -17,15 +18,15 @@ import {
   type RevisionResult,
   type RoomAnalysis,
   type WholeHomeContext
-} from "@/lib/ai/schemas";
+} from "@/lib/schemas";
 import {
   moodBoardListJsonSchema,
   productListJsonSchema,
   renderPlanJsonSchema,
   revisionJsonSchema,
   roomAnalysisJsonSchema
-} from "@/lib/ai/json-schemas";
-import { createStructuredResponse, isOpenAiConfigured } from "@/lib/ai/openai";
+} from "@/lib/schemas/json";
+import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
 import { styleLibrary } from "@/lib/ai/style-library";
 
 type RoomLike = {
@@ -71,37 +72,10 @@ export async function roomVisionAnalyst(input: {
   photoCount: number;
   photos?: PhotoLike[];
   home?: HomeLike | null;
+  provider?: GatewayProvider;
 }): Promise<RoomAnalysis> {
-  if (isOpenAiConfigured() && input.photos?.length) {
-    const output = await createStructuredResponse<RoomAnalysis>({
-      schemaName: "room_analysis",
-      schema: roomAnalysisJsonSchema,
-      instructions:
-        "You are a senior interior designer analyzing a real room from photos and a room brief. Return only validated structured diagnosis data. Be specific, practical, and honest about uncertainty.",
-      text: JSON.stringify({
-        task: "Diagnose this room for an interior design workflow.",
-        room: input.room,
-        home: input.home,
-        photo_labels: input.photos.map((photo) => ({
-          id: photo.id,
-          label: photo.label,
-          angle_type: photo.angle_type,
-          caption: photo.ai_caption
-        })),
-        success_criteria: [
-          "Identify visible architecture, materials, lighting, constraints, opportunities, and risks.",
-          "Use uncertainties when photo evidence is incomplete.",
-          "Do not invent exact dimensions, brands, or hidden conditions."
-        ]
-      }),
-      images: input.photos.slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" }))
-    });
-
-    return roomAnalysisSchema.parse(output);
-  }
-
   const roomType = input.room.room_type ?? "room";
-  const output = {
+  const mockOutput = {
     room_summary: `${input.room.name} is ready for a designer diagnosis once the uploaded angles are reviewed. This mock summary preserves the future structure for photo-aware analysis.`,
     architecture: {
       doors: ["Door locations will be identified from straight-on wall photos."],
@@ -140,7 +114,37 @@ export async function roomVisionAnalyst(input: {
     ]
   };
 
-  return roomAnalysisSchema.parse(output);
+  if (!input.photos?.length) {
+    return roomAnalysisSchema.parse(mockOutput);
+  }
+
+  return runStructuredTask({
+    roomId: input.room.id,
+    serviceName: "Room Vision Analyst",
+    provider: input.provider,
+    promptPath: "prompts/diagnosis/room-diagnosis.v1.md",
+    schemaName: "room_analysis",
+    schema: roomAnalysisJsonSchema,
+    zodSchema: roomAnalysisSchema,
+    taskInput: {
+      task: "Diagnose this room for an interior design workflow.",
+      room: input.room,
+      home: input.home,
+      photo_labels: input.photos.map((photo) => ({
+        id: photo.id,
+        label: photo.label,
+        angle_type: photo.angle_type,
+        caption: photo.ai_caption
+      })),
+      success_criteria: [
+        "Identify visible architecture, materials, lighting, constraints, opportunities, and risks.",
+        "Use uncertainties when photo evidence is incomplete.",
+        "Do not invent exact dimensions, brands, or hidden conditions."
+      ]
+    },
+    images: input.photos.slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" })),
+    mock: () => roomAnalysisSchema.parse(mockOutput)
+  });
 }
 
 export async function designBriefInterpreter(input: {
@@ -211,30 +215,32 @@ export async function moodBoardGenerator(input: {
   room: RoomLike;
   home?: HomeLike | null;
   analysis?: unknown;
+  provider?: GatewayProvider;
 }): Promise<MoodBoardConcept[]> {
-  if (isOpenAiConfigured()) {
-    const output = await createStructuredResponse<{ concepts: MoodBoardConcept[] }>({
-      schemaName: "mood_board_concepts",
-      schema: moodBoardListJsonSchema,
-      instructions:
-        "You are an interior design style director. Create exactly three distinct, buildable concept directions grounded in the room diagnosis and whole-home context. Avoid generic trend language.",
-      text: JSON.stringify({
-        task: "Generate three room mood board concepts.",
-        room: input.room,
-        home: input.home,
-        analysis: input.analysis,
-        success_criteria: [
-          "Each concept must feel meaningfully different.",
-          "Each concept must include palette hex values, materials, furniture, layout, lighting, art, decor, plants, budget strategy, risks, and rejection reason.",
-          "Concepts must respect constraints and whole-home notes."
-        ]
-      })
-    });
+  const mockConcepts = await styleDirector({ room: input.room });
+  const output = await runStructuredTask({
+    roomId: input.room.id,
+    serviceName: "Mood Board Generator",
+    provider: input.provider,
+    promptPath: "prompts/concepts/generate-room-concepts.v1.md",
+    schemaName: "mood_board_concepts",
+    schema: moodBoardListJsonSchema,
+    zodSchema: briefConceptListSchema,
+    taskInput: {
+      task: "Generate three room mood board concepts.",
+      room: input.room,
+      home: input.home,
+      analysis: input.analysis,
+      success_criteria: [
+        "Each concept must feel meaningfully different.",
+        "Each concept must include palette hex values, materials, furniture, layout, lighting, art, decor, plants, budget strategy, risks, and rejection reason.",
+        "Concepts must respect constraints and whole-home notes."
+      ]
+    },
+    mock: () => ({ concepts: mockConcepts })
+  });
 
-    return output.concepts.map((concept) => moodBoardSchema.parse(concept));
-  }
-
-  return styleDirector({ room: input.room });
+  return output.concepts.map((concept) => moodBoardSchema.parse(concept));
 }
 
 export async function productSourcingAgent(input?: {
@@ -242,32 +248,9 @@ export async function productSourcingAgent(input?: {
   home?: HomeLike | null;
   analysis?: unknown;
   selectedMoodBoard?: MoodBoardLike | null;
+  provider?: GatewayProvider;
+  tools?: unknown[];
 }): Promise<ProductPlanItem[]> {
-  if (isOpenAiConfigured() && input?.selectedMoodBoard) {
-    const output = await createStructuredResponse<{ products: ProductPlanItem[] }>({
-      schemaName: "product_plan",
-      schema: productListJsonSchema,
-      instructions:
-        "You are an interior design product sourcing agent. Use web search when available to find plausible current retailer or search-result URLs. Produce a shoppable plan with realistic categories, target retailers, approximate pricing, scale notes, risks, and alternatives. Do not claim live stock availability unless the source explicitly supports it.",
-      text: JSON.stringify({
-        task: "Generate a product sourcing plan for the selected concept.",
-        room: input.room,
-        home: input.home,
-        analysis: input.analysis,
-        selected_mood_board: input.selectedMoodBoard,
-        success_criteria: [
-          "Include at least six products covering anchor furniture, rug/textile, lighting, art/decor, storage or utility, and plant/accessory.",
-          "Use dimensions as target guidance when exact dimensions are unknown.",
-          "Use URLs as retailer home or search URLs when exact product URLs are not verified.",
-          "Include purchase risks such as scale, finish variation, lead time, and stock verification."
-        ]
-      }),
-      tools: [{ type: "web_search" }]
-    });
-
-    return output.products.map((product) => productSchema.parse(product));
-  }
-
   const products = [
     ["Desk", "Warm Oak Executive Desk", "West Elm", 1299],
     ["Desk chair", "Tailored Leather Task Chair", "Article", 549],
@@ -277,7 +260,7 @@ export async function productSourcingAgent(input?: {
     ["Plant", "Sculptural Olive Tree", "Terrain", 228]
   ] as const;
 
-  return products.map(([category, name, retailer, price]) =>
+  const mockProducts = products.map(([category, name, retailer, price]) =>
     productSchema.parse({
       category,
       name,
@@ -300,6 +283,37 @@ export async function productSourcingAgent(input?: {
       alternatives: ["Lower-cost substitute", "Vintage option", "Investment upgrade"]
     })
   );
+
+  if (!input?.selectedMoodBoard || !input.room) {
+    return mockProducts;
+  }
+
+  const output = await runStructuredTask({
+    roomId: input.room.id,
+    serviceName: "Product Sourcing Agent",
+    provider: input.provider,
+    promptPath: "prompts/products/source-product-plan.v1.md",
+    schemaName: "product_plan",
+    schema: productListJsonSchema,
+    zodSchema: briefProductListSchema,
+    taskInput: {
+      task: "Generate a product sourcing plan for the selected concept.",
+      room: input.room,
+      home: input.home,
+      analysis: input.analysis,
+      selected_mood_board: input.selectedMoodBoard,
+      success_criteria: [
+        "Include at least six products covering anchor furniture, rug/textile, lighting, art/decor, storage or utility, and plant/accessory.",
+        "Use dimensions as target guidance when exact dimensions are unknown.",
+        "Use URLs as retailer home or search URLs when exact product URLs are not verified.",
+        "Include purchase risks such as scale, finish variation, lead time, and stock verification."
+      ]
+    },
+    tools: input.tools ?? [{ type: "web_search" }],
+    mock: () => ({ products: mockProducts })
+  });
+
+  return output.products.map((product) => productSchema.parse(product));
 }
 
 export async function scaleAndFitEvaluator(input: {
@@ -316,38 +330,9 @@ export async function renderPromptDirector(input: {
   analysis?: unknown;
   selectedMoodBoard?: MoodBoardLike | null;
   sourcePhoto?: PhotoLike | null;
+  provider?: GatewayProvider;
 }): Promise<RenderPlan> {
-  if (isOpenAiConfigured()) {
-    const output = await createStructuredResponse<RenderPlan>({
-      schemaName: "render_plan",
-      schema: renderPlanJsonSchema,
-      instructions:
-        "You are a render prompt director for realistic interior design mockups. Preserve room architecture and camera geometry while applying the selected concept. Return a production-ready prompt and critique constraints.",
-      text: JSON.stringify({
-        task: "Create a render prompt plan for this room and source photo.",
-        room_id: input.roomId,
-        room: input.room,
-        analysis: input.analysis,
-        selected_mood_board: input.selectedMoodBoard,
-        source_photo: input.sourcePhoto,
-        source_photo_id: input.sourcePhotoId ?? "",
-        mood_board_id: input.moodBoardId ?? "",
-        success_criteria: [
-          "Preserve walls, doors, windows, floor plane, ceiling, fixed architecture, and camera angle.",
-          "Apply only reversible design changes unless explicitly requested.",
-          "List negative instructions that reduce distorted geometry and unrealistic scale."
-        ]
-      })
-    });
-
-    return renderPlanSchema.parse({
-      ...output,
-      source_photo_id: output.source_photo_id || undefined,
-      mood_board_id: output.mood_board_id || undefined
-    });
-  }
-
-  return renderPlanSchema.parse({
+  const mockPlan = renderPlanSchema.parse({
     source_photo_id: input.sourcePhotoId,
     mood_board_id: input.moodBoardId,
     render_prompt:
@@ -361,6 +346,38 @@ export async function renderPromptDirector(input: {
     },
     quality_score: 82
   });
+
+  return runStructuredTask({
+    roomId: input.roomId,
+    serviceName: "Render Prompt Director",
+    provider: input.provider,
+    promptPath: "prompts/renders/compose-render-plan.v1.md",
+    schemaName: "render_plan",
+    schema: renderPlanJsonSchema,
+    zodSchema: renderPlanSchema,
+    taskInput: {
+      task: "Create a render prompt plan for this room and source photo.",
+      room_id: input.roomId,
+      room: input.room,
+      analysis: input.analysis,
+      selected_mood_board: input.selectedMoodBoard,
+      source_photo: input.sourcePhoto,
+      source_photo_id: input.sourcePhotoId ?? "",
+      mood_board_id: input.moodBoardId ?? "",
+      success_criteria: [
+        "Preserve walls, doors, windows, floor plane, ceiling, fixed architecture, and camera angle.",
+        "Apply only reversible design changes unless explicitly requested.",
+        "List negative instructions that reduce distorted geometry and unrealistic scale."
+      ]
+    },
+    mock: () => mockPlan
+  }).then((output) =>
+    renderPlanSchema.parse({
+      ...output,
+      source_photo_id: output.source_photo_id || undefined,
+      mood_board_id: output.mood_board_id || undefined
+    })
+  );
 }
 
 export async function designCritic(): Promise<DesignCriticScore> {
@@ -389,28 +406,6 @@ export async function revisionAgent(input: {
   renders?: unknown;
   memories?: unknown;
 }): Promise<RevisionResult> {
-  if (isOpenAiConfigured()) {
-    const output = await createStructuredResponse<RevisionResult>({
-      schemaName: "revision_result",
-      schema: revisionJsonSchema,
-      instructions:
-        "You are a room-aware interior design assistant. Answer the user's revision request using the room brief, diagnosis, selected concept, products, renders, and memories. Save any state changes as structured before/after summaries.",
-      text: JSON.stringify({
-        task: "Respond to a room-aware design chat turn.",
-        message: input.message,
-        room: input.room,
-        home: input.home,
-        analysis: input.analysis,
-        selected_mood_board: input.selectedMoodBoard,
-        products: input.products,
-        renders: input.renders,
-        memories: input.memories
-      })
-    });
-
-    return revisionSchema.parse(output);
-  }
-
   const lower = input.message.toLowerCase();
   const revision_type = lower.includes("remember") || lower.includes("i prefer") || lower.includes("we prefer") || lower.includes("always") || lower.includes("never")
     ? "memory_update"
@@ -426,13 +421,38 @@ export async function revisionAgent(input: {
             ? "whole_home_check"
             : "general_question";
 
-  return revisionSchema.parse({
+  const mockRevision = revisionSchema.parse({
     user_message: input.message,
     revision_type,
     assistant_response:
       "This is a saved placeholder response. The future room-aware designer chat will load the room brief, selected concept, products, renders, and memory before answering.",
     state_before: {},
     state_after: {}
+  });
+
+  if (!input.room) {
+    return mockRevision;
+  }
+
+  return runStructuredTask({
+    roomId: input.room.id,
+    serviceName: "Revision Agent",
+    promptPath: "prompts/chat/design-chat.v1.md",
+    schemaName: "revision_result",
+    schema: revisionJsonSchema,
+    zodSchema: revisionSchema,
+    taskInput: {
+      task: "Respond to a room-aware design chat turn.",
+      message: input.message,
+      room: input.room,
+      home: input.home,
+      analysis: input.analysis,
+      selected_mood_board: input.selectedMoodBoard,
+      products: input.products,
+      renders: input.renders,
+      memories: input.memories
+    },
+    mock: () => mockRevision
   });
 }
 
@@ -463,3 +483,11 @@ function toArray(value: unknown): string[] {
 
   return [];
 }
+
+const briefConceptListSchema = z.object({
+  concepts: z.array(moodBoardSchema)
+});
+
+const briefProductListSchema = z.object({
+  products: z.array(productSchema)
+});

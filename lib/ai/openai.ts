@@ -19,15 +19,16 @@ export function isOpenAiConfigured() {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
-export function getOpenAiModel() {
-  return process.env.OPENAI_MODEL || DEFAULT_MODEL;
+export function getOpenAiModel(override?: string) {
+  return override || process.env.OPENAI_MODEL || DEFAULT_MODEL;
 }
 
-export async function createStructuredResponse<T>(input: {
+export async function runOpenAiStructuredResponse(input: {
   schemaName: string;
   schema: unknown;
   instructions: string;
   text: string;
+  model?: string;
   images?: { url: string; detail?: "low" | "high" | "original" | "auto" }[];
   tools?: unknown[];
 }) {
@@ -47,7 +48,7 @@ export async function createStructuredResponse<T>(input: {
   }
 
   const requestBody: Record<string, unknown> = {
-    model: getOpenAiModel(),
+    model: getOpenAiModel(input.model),
     instructions: input.instructions,
     input: [{ role: "user", content }],
     text: {
@@ -89,11 +90,17 @@ export async function createStructuredResponse<T>(input: {
     throw new Error("OpenAI response did not include output text.");
   }
 
-  return JSON.parse(outputText) as T;
+  return {
+    outputText,
+    modelName: getOpenAiModel(input.model),
+    requestBody,
+    responsePayload: payload
+  };
 }
 
-export async function createInteriorRenderImage(input: {
+export async function runOpenAiImageGeneration(input: {
   prompt: string;
+  model?: string;
   sourceImageUrl?: string;
 }) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -107,18 +114,20 @@ export async function createInteriorRenderImage(input: {
     content.push({ type: "input_image", image_url: input.sourceImageUrl, detail: "high" });
   }
 
+  const requestBody = {
+    model: getOpenAiModel(input.model),
+    input: [{ role: "user", content }],
+    tools: [{ type: "image_generation" }],
+    store: false
+  };
+
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      model: getOpenAiModel(),
-      input: [{ role: "user", content }],
-      tools: [{ type: "image_generation" }],
-      store: false
-    }),
+    body: JSON.stringify(requestBody),
     signal: AbortSignal.timeout(Number(process.env.OPENAI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS))
   });
 
@@ -130,11 +139,21 @@ export async function createInteriorRenderImage(input: {
   }
 
   if (typeof payload !== "object" || payload === null || !Array.isArray((payload as { output?: unknown }).output)) {
-    return null;
+    return {
+      imageBase64: null,
+      modelName: getOpenAiModel(input.model),
+      requestBody,
+      responsePayload: payload
+    };
   }
 
   const output = (payload as { output: ResponseItem[] }).output.find((item) => item.type === "image_generation_call" && typeof item.result === "string");
-  return output?.result ?? null;
+  return {
+    imageBase64: output?.result ?? null,
+    modelName: getOpenAiModel(input.model),
+    requestBody,
+    responsePayload: payload
+  };
 }
 
 function extractOutputText(payload: unknown) {

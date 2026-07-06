@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { logAiRun } from "@/lib/ai/logging";
-import { createInteriorRenderImage, isOpenAiConfigured } from "@/lib/ai/openai";
+import { generateImageEdit } from "@/lib/ai/gateway";
+import { isOpenAiConfigured } from "@/lib/ai/openai";
 import { renderPromptDirector } from "@/lib/ai/services";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -27,9 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: "Select a source photo before generating a render prompt." }, { status: 400 });
   }
 
-  const { data: sourcePhoto } = typeof body.source_photo_id === "string"
-    ? await supabase.from("photos").select("*").eq("id", body.source_photo_id).eq("room_id", roomId).maybeSingle()
-    : { data: null };
+  const { data: sourcePhoto } = await supabase.from("photos").select("*").eq("id", body.source_photo_id).eq("room_id", roomId).maybeSingle();
 
   if (!sourcePhoto) {
     return NextResponse.json({ error: "The selected source photo was not found for this room." }, { status: 400 });
@@ -56,24 +54,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Render prompt generation failed.";
-    await logAiRun({
-      roomId,
-      serviceName: "Render Prompt Director",
-      promptVersion: "render_director_v1",
-      inputPayload: { room, selected_mood_board: selectedMoodBoard, source_photo: sourcePhoto, body },
-      outputPayload: {},
-      status: "failed",
-      validationErrors: [message]
-    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
   let fileUrl: string | null = null;
 
   try {
-    const imageBase64 = await createInteriorRenderImage({
+    const imageBase64 = await generateImageEdit({
+      roomId,
+      serviceName: "Render Image Generator",
+      promptVersion: "render_image_v1",
       prompt: plan.render_prompt,
-      sourceImageUrl: sourcePhoto?.file_url
+      sourceImageUrl: sourcePhoto.file_url
     });
 
     if (isOpenAiConfigured() && !imageBase64) {
@@ -97,16 +89,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Render image generation failed.";
-    await logAiRun({
-      roomId,
-      serviceName: "Render Image Generator",
-      promptVersion: "render_image_v1",
-      inputPayload: { prompt: plan.render_prompt, source_photo: sourcePhoto },
-      outputPayload: {},
-      status: "failed",
-      validationErrors: [message]
-    });
-
     if (isOpenAiConfigured()) {
       return NextResponse.json({ error: message }, { status: 500 });
     }
@@ -123,8 +105,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .from("renders")
     .insert({
       room_id: roomId,
-      mood_board_id: selectedMoodBoard?.id,
-      mood_board_version: selectedMoodBoard?.version ?? null,
+      mood_board_id: selectedMoodBoard.id,
+      mood_board_version: selectedMoodBoard.version ?? null,
       source_photo_id: body.source_photo_id,
       file_url: fileUrl,
       prompt: plan.render_prompt,
@@ -144,14 +126,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await supabase.from("rooms").update({ status: "renders", current_stage: "executing" }).eq("id", roomId);
-  await logAiRun({
-    roomId,
-    serviceName: "Render Prompt Director",
-    promptVersion: "render_director_v1",
-    inputPayload: { room, selected_mood_board: selectedMoodBoard, source_photo: sourcePhoto, body },
-    outputPayload: plan,
-    qualityScore: plan.quality_score
-  });
 
   return NextResponse.json({ render: data });
 }

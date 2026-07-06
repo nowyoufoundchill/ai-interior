@@ -50,25 +50,45 @@
   - concept/product/render status badges
 - Added hidden route `/debug` backed by `ai_runs`.
 - Updated dashboard/home cards and live verification script to use the new stage model and table set.
+- Fixed `001_initial_schema.sql` to replay safely against the already-initialized live database and updated the GitHub Supabase workflows to run non-interactively with `--yes`.
+- Confirmed the GitHub workflow rerun for commit `74cea28` succeeded and that the live Supabase project now includes:
+  - `design_preferences`
+  - `chat_messages`
+  - `rooms.current_stage`
+  - version/status metadata on `room_analyses` and `mood_boards`
+- Refactored AI schemas into `/lib/schemas/`.
+- Added `/lib/ai/gateway.ts` as the central structured-call and image-edit gateway with centralized `ai_runs` logging.
+- Moved prompt instructions into versioned files under `/prompts/`.
+- Updated AI services and room API routes so model calls now flow through the gateway rather than direct service-level OpenAI calls.
+- Added Phase 0 spike infrastructure:
+  - hidden `/spike` workbench page
+  - `POST /api/spike/run` orchestration route
+  - Anthropic structured-output adapter for spike reasoning runs
+  - Tavily search/extract helper for product-sourcing enrichment
+  - saved spike artifacts under `spike/runs/*.json`
+- Added provider-aware model fallback logic so Anthropic spike runs do not inherit OpenAI-only prompt model names.
+- Added Anthropic schema sanitization for structured-output compatibility during spike execution.
 
 ### Verified
 - `npm.cmd run typecheck` passes.
 - `npm.cmd run build` passes.
 - Re-ran `npm.cmd run build` after the brain/session documentation update; it still passes on July 5, 2026.
 - Re-ran both `npm.cmd run typecheck` and `npm.cmd run build` after the PRD-v2 alignment changes; both pass on July 5, 2026.
+- Re-ran `npm.cmd run verify:live` after the GitHub migration fix; the live schema and storage checks all pass on July 5, 2026.
+- Re-ran `npm.cmd run typecheck` and `npm.cmd run build` after the gateway/prompt/schema refactor; both pass on July 5, 2026.
+- Re-ran `npm.cmd run typecheck` and `npm.cmd run build` after the Phase 0 spike implementation; both pass on July 5, 2026.
 - OpenAI env is configured as server-only `OPENAI_API_KEY`; the previous `NEXT_PUBLIC_OPENAI_API_KEY` name was removed.
 - `room-photos` storage bucket exists and is public.
 
 ### Current Warnings
 - Next.js previously warned about multiple lockfiles because the app was inheriting the parent user repo/root. Recheck after the app-local Git initialization.
-- Live app connectivity to Supabase through the public API still needs a full runtime verification from the deployed app or local dev server after migrations are applied through the final path.
 - Direct anon upload to Storage is blocked by RLS; current app upload path uses the server route with the service key.
 - `docs/AI_Interior_Atelier_PRD_v2.md` exists locally and is intentionally untracked.
-- `003_prd_v2_foundation_alignment.sql` has been authored locally but not yet confirmed against the live Supabase project.
-- The codebase still has major PRD-v2 follow-up gaps: no `/lib/schemas/` consolidation yet, no `/lib/ai/gateway.ts`, no versioned prompt files, and no concept edit/unlock/re-harmonize flow.
+- No live room/photo data exists in Supabase yet, so the spike has not been validated against owner room data from the app.
+- `TAVILY_API_KEY` is not configured locally yet, so Tavily validation remains blocked.
+- The codebase still has major PRD-v2 follow-up gaps: no concept edit/unlock/re-harmonize flow, no home-level preferences UI, and no before/after render comparison.
 
 ### Next Action
 - Use the documented local -> GitHub -> Vercel -> Supabase workflow for further implementation.
-- Apply and verify migration `003_prd_v2_foundation_alignment.sql`.
-- Decide whether the next implementation block should focus on AI architecture alignment (`/lib/schemas/`, gateway, prompts) or product workflow alignment (concept editing/unlock, preferences UI, render regeneration UX).
+- Run `/spike` with owner room-photo URLs and typed dimensions, add `TAVILY_API_KEY`, and review the saved artifacts plus `/debug` logs before promoting any prompt versions.
 

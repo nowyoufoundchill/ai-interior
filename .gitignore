@@ -7,3 +7,8 @@ dist/
 *.tsbuildinfo
 .npm-cache/
 .next-dev*.log
+
+.vercel
+.env*
+spike/runs/
+.spike-dev*.log

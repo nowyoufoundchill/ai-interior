@@ -1,5 +1,4 @@
-﻿import { NextResponse } from "next/server";
-import { logAiRun } from "@/lib/ai/logging";
+import { NextResponse } from "next/server";
 import { revisionAgent } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -47,21 +46,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Revision chat failed.";
-    await logAiRun({
-      roomId,
-      serviceName: "Revision Agent",
-      promptVersion: "revision_agent_v1",
-      inputPayload: { message, room, latest_analysis: latestAnalysis, selected_mood_board: selectedMoodBoard },
-      outputPayload: {},
-      status: "failed",
-      validationErrors: [errorMessage]
-    });
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 
   const stateBefore = revision.state_before as Json;
   const stateAfter = revision.state_after as Json;
-  const revisionPayload = { ...revision, state_before: stateBefore, state_after: stateAfter } as Json;
   const { data, error } = await supabase
     .from("revisions")
     .insert({
@@ -107,16 +96,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     });
   }
 
-  await logAiRun({
-    roomId,
-    serviceName: "Revision Agent",
-    promptVersion: "revision_agent_v1",
-    inputPayload: { message, room, latest_analysis: latestAnalysis, selected_mood_board: selectedMoodBoard },
-    outputPayload: revisionPayload,
-    qualityScore: 75
-  });
-
   return NextResponse.json({ revision: data });
 }
-
-

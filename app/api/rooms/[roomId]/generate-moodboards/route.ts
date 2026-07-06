@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { logAiRun } from "@/lib/ai/logging";
 import { moodBoardGenerator } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -29,15 +28,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Mood board generation failed.";
-    await logAiRun({
-      roomId,
-      serviceName: "Mood Board Generator",
-      promptVersion: "moodboard_generator_v1",
-      inputPayload: { room, analysis: latestAnalysis?.analysis ?? null },
-      outputPayload: {},
-      status: "failed",
-      validationErrors: [message]
-    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -64,28 +54,9 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     )
     .select("*");
 
-  if (error) {
-    await logAiRun({
-      roomId,
-      serviceName: "Mood Board Generator",
-      promptVersion: "moodboard_generator_v1",
-      inputPayload: { room, analysis: latestAnalysis?.analysis ?? null },
-      outputPayload: { concepts },
-      status: "failed",
-      validationErrors: [error.message]
-    });
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await supabase.from("rooms").update({ status: "concepts", current_stage: "concepts", selected_mood_board_id: null }).eq("id", roomId);
-  await logAiRun({
-    roomId,
-    serviceName: "Mood Board Generator",
-    promptVersion: "moodboard_generator_v1",
-    inputPayload: { room, analysis: latestAnalysis?.analysis ?? null },
-    outputPayload: { concepts },
-    qualityScore: Math.round(concepts.reduce((sum, item) => sum + item.quality_score, 0) / concepts.length)
-  });
 
   return NextResponse.json({ mood_boards: data });
 }

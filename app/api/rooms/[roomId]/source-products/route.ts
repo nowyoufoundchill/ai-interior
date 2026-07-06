@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { logAiRun } from "@/lib/ai/logging";
 import { productSourcingAgent } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -41,15 +40,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Product sourcing failed.";
-    await logAiRun({
-      roomId,
-      serviceName: "Product Sourcing Agent",
-      promptVersion: "product_sourcing_v1",
-      inputPayload: { room, selected_mood_board: selectedMoodBoard, analysis: latestAnalysis?.analysis ?? null },
-      outputPayload: {},
-      status: "failed",
-      validationErrors: [message]
-    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -58,8 +48,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .insert(
       products.map((product) => ({
         room_id: roomId,
-        mood_board_id: selectedMoodBoard?.id,
-        mood_board_version: selectedMoodBoard?.version ?? null,
+        mood_board_id: selectedMoodBoard.id,
+        mood_board_version: selectedMoodBoard.version ?? null,
         category: product.category,
         name: product.name,
         retailer: product.retailer,
@@ -78,28 +68,9 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     )
     .select("*");
 
-  if (error) {
-    await logAiRun({
-      roomId,
-      serviceName: "Product Sourcing Agent",
-      promptVersion: "product_sourcing_v1",
-      inputPayload: { room, selected_mood_board: selectedMoodBoard, analysis: latestAnalysis?.analysis ?? null },
-      outputPayload: { products },
-      status: "failed",
-      validationErrors: [error.message]
-    });
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await supabase.from("rooms").update({ status: "products", current_stage: "executing" }).eq("id", roomId);
-  await logAiRun({
-    roomId,
-    serviceName: "Product Sourcing Agent",
-    promptVersion: "product_sourcing_v1",
-    inputPayload: { room, selected_mood_board: selectedMoodBoard, analysis: latestAnalysis?.analysis ?? null },
-    outputPayload: { products },
-    qualityScore: 82
-  });
 
   return NextResponse.json({ products: data });
 }

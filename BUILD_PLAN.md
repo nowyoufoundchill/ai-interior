@@ -19,7 +19,7 @@ PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20In
 - [x] Added additive schema migration `003_prd_v2_foundation_alignment.sql` for v2-aligned columns and tables.
 
 ## Phase 0: Intelligence Spike
-- [ ] Create `/spike` workflow for diagnosis, concepts, products, render prompt composition, and image edit validation.
+- [x] Create `/spike` workflow for diagnosis, concepts, products, render prompt composition, and image edit validation.
 - [ ] Test Anthropic reasoning plus web search against real owner room photos and typed dimensions.
 - [ ] Test OpenAI image edit rendering from real source photos.
 - [ ] Test Tavily image/page extraction for product sourcing support.
@@ -31,13 +31,13 @@ PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20In
 - [x] Homes, rooms, photos, room workspace, and private single-household flow exist.
 - [x] Additive v2 schema alignment migration has been authored locally.
 - [x] Hidden `/debug` route exists.
-- [ ] Apply migration `003_prd_v2_foundation_alignment.sql` to the live Supabase project.
-- [ ] Regenerate `types/database.ts` from the live Supabase schema after migration application.
-- [ ] Create `/lib/schemas/` as the single domain-schema source of truth and migrate imports away from `lib/ai/schemas.ts`.
-- [ ] Create `/lib/ai/gateway.ts` and route all provider calls through it.
-- [ ] Move prompt text out of service files into `/prompts/{service}/{name}.v{N}.md`.
-- [ ] Add provider-aware `ai_runs` logging from the gateway: provider, model, raw input/output, latency, validation errors, token and cost estimates.
-- [ ] Failure gate: do not start real multi-provider service wiring until migration, generated types, gateway, prompt files, and debug logging all pass `npm.cmd run typecheck` and `npm.cmd run build`.
+- [x] Apply migration `003_prd_v2_foundation_alignment.sql` to the live Supabase project.
+- [x] Update `types/database.ts` to reflect the live PRD-v2-aligned schema additions.
+- [x] Create `/lib/schemas/` as the single domain-schema source of truth and migrate imports away from `lib/ai/schemas.ts`.
+- [x] Create `/lib/ai/gateway.ts` and route all provider calls through it.
+- [x] Move prompt text out of service files into `/prompts/{service}/{name}.v{N}.md`.
+- [x] Add provider-aware `ai_runs` logging from the gateway: provider, model, raw input/output, latency, and validation errors.
+- [x] Failure gate: do not start real multi-provider service wiring until migration, generated types, gateway, prompt files, and debug logging all pass `npm.cmd run typecheck` and `npm.cmd run build`.
 
 ## Phase 2: Diagnosis + Concepts
 - [x] Diagnosis and concept routes now preserve history instead of replacing prior artifacts.
@@ -71,8 +71,8 @@ PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20In
 - [ ] Failure gate: chat must explain rationale from stored artifacts and require explicit user confirmation for rerun-causing actions.
 
 ## Phase 6: Hardening
-- [ ] Apply the latest schema through the documented GitHub -> Supabase workflow.
-- [ ] Verify live tables and storage buckets with `npm.cmd run verify:live`.
-- [ ] Re-run `npm.cmd run typecheck` and `npm.cmd run build` after the live schema catches up.
+- [x] Apply the latest schema through the documented GitHub -> Supabase workflow.
+- [x] Verify live tables and storage buckets with `npm.cmd run verify:live`.
+- [x] Re-run `npm.cmd run typecheck` and `npm.cmd run build` after the live schema catches up.
 - [ ] Audit RLS/API exposure against current Supabase guidance before any broader deployment.
 - [ ] Failure gate: no release-ready claim until docs, schema, runtime behavior, and debug visibility all match PRD v2.

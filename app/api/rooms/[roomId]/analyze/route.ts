@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { logAiRun } from "@/lib/ai/logging";
 import { roomVisionAnalyst } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -37,15 +36,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Room analysis failed.";
-    await logAiRun({
-      roomId,
-      serviceName: "Room Vision Analyst",
-      promptVersion: "room_analysis_v1",
-      inputPayload: { room, photos: photos ?? [] },
-      outputPayload: {},
-      status: "failed",
-      validationErrors: [message]
-    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -68,18 +58,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .select("*")
     .single();
 
-  if (error) {
-    await logAiRun({
-      roomId,
-      serviceName: "Room Vision Analyst",
-      promptVersion: "room_analysis_v1",
-      inputPayload: { room, photos: photos ?? [] },
-      outputPayload: analysis,
-      status: "failed",
-      validationErrors: [error.message]
-    });
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await supabase
     .from("mood_boards")
@@ -88,14 +67,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .in("status", ["draft", "locked", "unlocked"]);
 
   await supabase.from("rooms").update({ status: "analyzed", current_stage: "diagnosed", selected_mood_board_id: null }).eq("id", roomId);
-  await logAiRun({
-    roomId,
-    serviceName: "Room Vision Analyst",
-    promptVersion: "room_analysis_v1",
-    inputPayload: { room, photos: photos ?? [] },
-    outputPayload: analysis,
-    qualityScore: 82
-  });
 
   return NextResponse.json({ analysis: data });
 }
