@@ -20,6 +20,7 @@
 - Added product filters/details, render image display, memory confirm/edit/delete controls, and auditable memory edit/delete revision records.
 - Added `scripts/verify-live.mjs` and `npm run verify:live`.
 - Added `002_private_server_access_hardening.sql` to remove broad anon/authenticated table mutation grants for public deployment hardening.
+- Added GitHub Actions workflows for Supabase migration dry-run on pull requests and migration deploy on pushes to `main`.
 - Fixed Supabase TypeScript build blockers:
   - Added `Relationships` keys to table types in `types/database.ts`.
   - Switched browser Supabase helper to typed `@supabase/supabase-js` client in `lib/supabase/browser.ts`.
@@ -42,6 +43,7 @@
 - Verify Git status from the app repo.
 - Verify remote connectivity.
 - Apply `supabase/migrations/001_initial_schema.sql` and `002_private_server_access_hardening.sql` in the Supabase SQL Editor or through the Supabase CLI with database credentials.
+- Add GitHub repo secret `SUPABASE_DB_URL` so `.github/workflows/supabase-db-check.yml` and `.github/workflows/supabase-db-deploy.yml` can validate and deploy migrations automatically.
 - Reload or wait for Supabase PostgREST schema cache after migration.
 - Run the app locally against Supabase and test dashboard -> home -> room -> photo upload.
 - Run the Phase 1 foundation review agent checkpoint.

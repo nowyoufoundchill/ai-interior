@@ -25,6 +25,30 @@ npm install
 npm run dev
 ```
 
+## GitHub + Supabase
+
+This repo is wired for GitHub Actions based Supabase migration checks and deploys:
+
+- Pull requests touching `supabase/**` run `.github/workflows/supabase-db-check.yml`
+- Pushes to `main` touching `supabase/**` run `.github/workflows/supabase-db-deploy.yml`
+
+Configure the GitHub repository secret:
+
+```text
+SUPABASE_DB_URL=postgres://...your-session-pooler-or-direct-connection-string...
+```
+
+Get this from Supabase Dashboard -> Connect -> Session pooler connection string, or use the direct connection string if your network supports it.
+
+If you also want Supabase's native GitHub integration:
+
+1. In Supabase Dashboard, go to `Project Settings -> Integrations`.
+2. Under GitHub Integration, authorize GitHub and choose `nowyoufoundchill/ai-interior`.
+3. Set `Working directory` to `.` because the `supabase/` folder is at the repository root.
+4. Enable `Deploy to production`.
+
+This matches Supabase's documented GitHub integration flow and lets Supabase watch branch and PR changes in the repo.
+
 ## Phase 1 Includes
 
 - Next.js App Router, TypeScript, Tailwind CSS.
