@@ -41,6 +41,7 @@ export async function runAnthropicStructuredResponse(input: {
   instructions: string;
   text: string;
   model?: string;
+  maxTokens?: number;
   images?: { url: string }[];
   tools?: unknown[];
 }) {
@@ -68,7 +69,7 @@ export async function runAnthropicStructuredResponse(input: {
 
   const requestBody: Record<string, unknown> = {
     model: getAnthropicModel(input.model),
-    max_tokens: Number(process.env.ANTHROPIC_MAX_TOKENS ?? 4096),
+    max_tokens: input.maxTokens ?? Number(process.env.ANTHROPIC_MAX_TOKENS ?? 4096),
     system: input.instructions,
     messages: [
       {
@@ -144,6 +145,11 @@ function sanitizeAnthropicSchema(value: unknown): unknown {
   const result: Record<string, unknown> = {};
 
   for (const [key, item] of Object.entries(record)) {
+    if (key === "additionalProperties" && typeof item === "object" && item !== null) {
+      result[key] = false;
+      continue;
+    }
+
     if (
       key === "minItems" ||
       key === "maxItems" ||

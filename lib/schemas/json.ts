@@ -71,6 +71,59 @@ export const roomAnalysisJsonSchema = {
   ]
 } as const;
 
+export const moodBoardJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    concept_name: { type: "string" },
+    design_thesis: { type: "string" },
+    style_keywords: stringArray,
+    palette: {
+      type: "array",
+      minItems: 4,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string" },
+          hex: { type: "string" }
+        },
+        required: ["name", "hex"]
+      }
+    },
+    materials: stringArray,
+    furniture_direction: { type: "string" },
+    layout_direction: { type: "string" },
+    lighting_direction: { type: "string" },
+    art_direction: { type: "string" },
+    decor_direction: { type: "string" },
+    plant_direction: { type: "string" },
+    budget_strategy: { type: "string" },
+    why_it_works: { type: "string" },
+    why_user_may_reject_it: { type: "string" },
+    risk_profile: stringArray,
+    quality_score: score
+  },
+  required: [
+    "concept_name",
+    "design_thesis",
+    "style_keywords",
+    "palette",
+    "materials",
+    "furniture_direction",
+    "layout_direction",
+    "lighting_direction",
+    "art_direction",
+    "decor_direction",
+    "plant_direction",
+    "budget_strategy",
+    "why_it_works",
+    "why_user_may_reject_it",
+    "risk_profile",
+    "quality_score"
+  ]
+} as const;
+
 export const moodBoardListJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -79,58 +132,7 @@ export const moodBoardListJsonSchema = {
       type: "array",
       minItems: 3,
       maxItems: 3,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          concept_name: { type: "string" },
-          design_thesis: { type: "string" },
-          style_keywords: stringArray,
-          palette: {
-            type: "array",
-            minItems: 4,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                name: { type: "string" },
-                hex: { type: "string" }
-              },
-              required: ["name", "hex"]
-            }
-          },
-          materials: stringArray,
-          furniture_direction: { type: "string" },
-          layout_direction: { type: "string" },
-          lighting_direction: { type: "string" },
-          art_direction: { type: "string" },
-          decor_direction: { type: "string" },
-          plant_direction: { type: "string" },
-          budget_strategy: { type: "string" },
-          why_it_works: { type: "string" },
-          why_user_may_reject_it: { type: "string" },
-          risk_profile: stringArray,
-          quality_score: score
-        },
-        required: [
-          "concept_name",
-          "design_thesis",
-          "style_keywords",
-          "palette",
-          "materials",
-          "furniture_direction",
-          "layout_direction",
-          "lighting_direction",
-          "art_direction",
-          "decor_direction",
-          "plant_direction",
-          "budget_strategy",
-          "why_it_works",
-          "why_user_may_reject_it",
-          "risk_profile",
-          "quality_score"
-        ]
-      }
+      items: moodBoardJsonSchema
     }
   },
   required: ["concepts"]
@@ -155,7 +157,11 @@ export const productListJsonSchema = {
           price: { type: "number" },
           dimensions: {
             type: "object",
-            additionalProperties: { type: "string" }
+            additionalProperties: { type: "string" },
+            properties: {
+              note: { type: "string" }
+            },
+            required: ["note"]
           },
           material: { type: "string" },
           finish: { type: "string" },
@@ -227,6 +233,91 @@ export const renderPlanJsonSchema = {
     "critique",
     "quality_score"
   ]
+} as const;
+
+const criticDimensionsJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    style_clarity: score,
+    room_fit: score,
+    functional_fit: score,
+    scale_realism: score,
+    color_material_cohesion: score,
+    luxury_signal: score,
+    originality: score,
+    practicality: score,
+    budget_alignment: score,
+    whole_home_alignment: score
+  },
+  required: [
+    "style_clarity",
+    "room_fit",
+    "functional_fit",
+    "scale_realism",
+    "color_material_cohesion",
+    "luxury_signal",
+    "originality",
+    "practicality",
+    "budget_alignment",
+    "whole_home_alignment"
+  ]
+} as const;
+
+const diagnosisCritiqueDimensionsJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    room_specificity: score,
+    downstream_usefulness: score,
+    evidence_discipline: score,
+    constraint_capture: score,
+    execution_risk_awareness: score
+  },
+  required: [
+    "room_specificity",
+    "downstream_usefulness",
+    "evidence_discipline",
+    "constraint_capture",
+    "execution_risk_awareness"
+  ]
+} as const;
+
+export const conceptCritiqueJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    per_concept: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          concept_name: { type: "string" },
+          scores: criticDimensionsJsonSchema,
+          issues: stringArray
+        },
+        required: ["concept_name", "scores", "issues"]
+      }
+    },
+    concept_differentiation_score: score,
+    differentiation_notes: { type: "string" }
+  },
+  required: ["per_concept", "concept_differentiation_score", "differentiation_notes"]
+} as const;
+
+export const diagnosisCritiqueJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    scores: diagnosisCritiqueDimensionsJsonSchema,
+    strengths: stringArray,
+    issues: stringArray,
+    missing_factors: stringArray,
+    regeneration_needed: { type: "boolean" },
+    regeneration_focus: stringArray
+  },
+  required: ["scores", "strengths", "issues", "missing_factors", "regeneration_needed", "regeneration_focus"]
 } as const;
 
 export const revisionJsonSchema = {

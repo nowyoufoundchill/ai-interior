@@ -26,16 +26,16 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .order("version", { ascending: false })
     .limit(1);
 
-  let analysis;
+  let diagnosis;
   try {
-    analysis = await roomVisionAnalyst({
+    diagnosis = await roomVisionAnalyst({
       room,
       home,
       photoCount: photos?.length ?? 0,
       photos: photos ?? []
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Room analysis failed.";
+    const message = error instanceof Error ? error.message : "Room diagnosis failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -45,7 +45,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .from("room_analyses")
     .insert({
       room_id: roomId,
-      analysis,
+      analysis: diagnosis,
       version: (existingAnalyses?.[0]?.version ?? 0) + 1,
       status: "current",
       source_photo_ids: (photos ?? []).map((photo) => photo.id),
@@ -68,5 +68,5 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
 
   await supabase.from("rooms").update({ status: "analyzed", current_stage: "diagnosed", selected_mood_board_id: null }).eq("id", roomId);
 
-  return NextResponse.json({ analysis: data });
+  return NextResponse.json({ diagnosis: data, analysis: data });
 }

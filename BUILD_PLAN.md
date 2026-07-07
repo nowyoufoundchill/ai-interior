@@ -20,12 +20,20 @@ PRD v2 in [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20In
 
 ## Phase 0: Intelligence Spike
 - [x] Create `/spike` workflow for diagnosis, concepts, products, render prompt composition, and image edit validation.
-- [ ] Test Anthropic reasoning plus web search against real owner room photos and typed dimensions.
-- [ ] Test OpenAI image edit rendering from real source photos.
-- [ ] Test Tavily image/page extraction for product sourcing support.
-- [ ] Promote approved prompts into `/prompts/**` as versioned files only after owner sign-off.
-- [ ] Failure gate: do not treat any production AI output as final-quality until spike outputs are judged good enough by the owner.
-Status: infrastructure is complete, but Phase 0 itself is not complete until real-photo validation, Tavily validation, and owner sign-off happen.
+- [x] Anthropic reasoning path has been validated against real owner office photos and typed dimensions. The staged office batch now completes diagnosis + concepts + products on the live pipeline (`spike/runs/batch/2026-07-07T04-27-41-099Z/summary.json`).
+- [x] Test OpenAI image edit rendering from real source photos. Real office render validation completed for room `8e4ee483-596f-41ef-8ff1-a2f301db1f69` with render `fd65a8c9-1eb3-49f9-a782-c3de664c87a0`.
+- [x] Test Tavily image/page extraction for product sourcing support. Direct search + extract artifact saved at `spike/runs/tavily-phase0-2026-07-07T03-56-11-268Z.json`.
+- [x] Promoted a context-brain-backed `v2` concept prompt into `/prompts/concepts/`.
+- [x] Owner directional sign-off: `generate-room-concepts.v2` is considered directionally good enough to keep moving forward with, assuming OpenAI and Tavily remain available for their downstream tasks.
+- [x] Failure gate: Phase 0 is cleared for continued implementation because the owner gave directional prompt approval and the real-provider spike validations now cover Anthropic reasoning, OpenAI rendering, and Tavily search/extract. Production polish judgment is still deferred to later phases.
+Status: complete. Phase 0 is closed; Phase 1 is complete; the build is ready to proceed with Phase 2.
+
+### Context brain architecture (added 2026-07-06/07)
+Adopted a three-layer split instead of continuing to grow prompt files directly, based on evidence from the 10-variant batch that prompt wording alone moves tone but not judgment:
+- **Prompt** = compact operating system: role, decision hierarchy, output contract only (`prompts/concepts/generate-room-concepts.v2.md`).
+- **Context brain** = the actual design intelligence, as structured data read into the taskInput on every real call: property dossier, room intelligence, taste graph, design policy, a relevant slice of the style library, and an annotated design portfolio (`/lib/ai/context-brain/*`, `/lib/ai/design-portfolio.ts`).
+- **Evaluator** = quality governor: a real gateway-logged Critic (`/lib/ai/critic.ts`) scoring against an explicit rubric (`/lib/ai/critic-rubric.ts`), including a concept-differentiation check with one bounded regeneration retry, not an unbounded auto-loop.
+This pattern is now proven enough to clear Phase 0 for the Concept Director path: the real-photo office batch completes through concepts and products, and the render path has been validated separately with real office photos. Diagnosis, products, renders, and chat are still not all upgraded to the same full context-brain + critic depth, so that remains follow-on work rather than a Phase 0 blocker.
 
 ## Phase 1: Foundation
 - [x] Next.js + Supabase + Tailwind project foundation exists.
@@ -44,6 +52,8 @@ Status: complete.
 ## Phase 2: Diagnosis + Concepts
 - [x] Diagnosis and concept routes now preserve history instead of replacing prior artifacts.
 - [x] Concept locking now invalidates downstream products and renders by marking them stale.
+- [x] Concept Director now runs on a context brain (property dossier, room intelligence, taste graph, design policy, style library slice, design portfolio) plus a real gateway-logged Critic with a bounded differentiation retry, instead of a thin prompt + mocked critic. Typecheck/build and real-photo batch verification have now cleared.
+- [x] Apply the same context-brain + real-critic pattern to Diagnosis (`roomVisionAnalyst`). Diagnosis now uses a context-brain-backed `v2` prompt plus a real diagnosis critic with one bounded regeneration pass. Typecheck/build verification has cleared.
 - [ ] Replace `room_analyses` naming and surrounding app language with diagnosis-first terminology where practical.
 - [ ] Build concept editing, unlock, and re-harmonize flows on top of the new mood board version/status fields.
 - [ ] Surface stale badges and rerun affordances more consistently across the room UI.
@@ -59,6 +69,7 @@ Status: complete.
 
 ## Phase 4: Products
 - [x] Product records are now append-only and tied to mood board version where available.
+- [ ] `productSourcingAgent` now defaults to Anthropic, but it still does not use the same full context brain or critic pass as Concept Director.
 - [ ] Add cached product image storage path handling rather than relying on hotlinked images alone.
 - [ ] Introduce approved/rejected product controls and stale badges in the UI.
 - [ ] Shift product sourcing prompts and logic toward rationale-first, typed-dimension-aware outputs.

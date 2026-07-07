@@ -16,6 +16,7 @@ export async function runStructuredTask<T>(input: {
   schema: unknown;
   zodSchema: ZodType<T>;
   taskInput: unknown;
+  maxTokens?: number;
   images?: { url: string; detail?: "low" | "high" | "original" | "auto" }[];
   tools?: unknown[];
   mock?: () => T;
@@ -37,6 +38,7 @@ export async function runStructuredTask<T>(input: {
           instructions: prompt.body,
           text: JSON.stringify(input.taskInput),
           model: resolveProviderModel("anthropic", prompt.model),
+          maxTokens: input.maxTokens,
           images: input.images,
           tools: input.tools
         });

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "verify:live": "node scripts/verify-live.mjs"
+    "verify:live": "node scripts/verify-live.mjs",
+    "simulate:batch": "node scripts/simulate-workflow-batch.mjs",
+    "evaluate:batch": "node scripts/evaluate-workflow-batch.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

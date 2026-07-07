@@ -22,7 +22,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     return NextResponse.json({ error: "Select a mood board before sourcing products." }, { status: 400 });
   }
 
-  const { data: latestAnalysis } = await supabase
+  const { data: latestDiagnosis } = await supabase
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
@@ -35,7 +35,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     products = await productSourcingAgent({
       room,
       home,
-      analysis: latestAnalysis?.analysis,
+      analysis: latestDiagnosis?.analysis,
       selectedMoodBoard
     });
   } catch (error) {

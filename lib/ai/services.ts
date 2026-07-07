@@ -17,9 +17,12 @@ import {
   type RenderPlan,
   type RevisionResult,
   type RoomAnalysis,
+  type DiagnosisCritique,
   type WholeHomeContext
 } from "@/lib/schemas";
 import {
+  diagnosisCritiqueJsonSchema,
+  moodBoardJsonSchema,
   moodBoardListJsonSchema,
   productListJsonSchema,
   renderPlanJsonSchema,
@@ -27,7 +30,13 @@ import {
   roomAnalysisJsonSchema
 } from "@/lib/schemas/json";
 import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
-import { styleLibrary } from "@/lib/ai/style-library";
+import { styleLibrary, type StyleProfile } from "@/lib/ai/style-library";
+import { resolvePropertyDossier } from "@/lib/ai/context-brain/property-dossier";
+import { deriveRoomIntelligence } from "@/lib/ai/context-brain/room-intelligence";
+import { buildTasteGraph } from "@/lib/ai/context-brain/taste-graph";
+import { DESIGN_DISSENT_POLICY } from "@/lib/ai/context-brain/design-policy";
+import { DESIGN_PORTFOLIO } from "@/lib/ai/design-portfolio";
+import { critiqueConcepts, critiqueDiagnosis, overallScore } from "@/lib/ai/critic";
 
 type RoomLike = {
   id: string;
@@ -40,6 +49,7 @@ type RoomLike = {
   constraints: unknown;
   existing_items: unknown;
   design_brief: string | null;
+  dimensions?: unknown;
 };
 
 type HomeLike = {
@@ -74,6 +84,7 @@ export async function roomVisionAnalyst(input: {
   home?: HomeLike | null;
   provider?: GatewayProvider;
 }): Promise<RoomAnalysis> {
+  const provider = input.provider ?? "anthropic";
   const roomType = input.room.room_type ?? "room";
   const mockOutput = {
     room_summary: `${input.room.name} is ready for a designer diagnosis once the uploaded angles are reviewed. This mock summary preserves the future structure for photo-aware analysis.`,
@@ -118,36 +129,61 @@ export async function roomVisionAnalyst(input: {
     return roomAnalysisSchema.parse(mockOutput);
   }
 
-  return runStructuredTask({
+  const photos = input.photos;
+  const contextBrain = buildContextBrain({ room: input.room, home: input.home });
+  const diagnosisContextBrain = compactContextBrainForDiagnosis(contextBrain);
+  const photoLabels = photos.map((photo) => ({
+    id: photo.id,
+    label: photo.label,
+    angle_type: photo.angle_type,
+    caption: photo.ai_caption
+  }));
+
+  const generateDiagnosis = (regenerationFocus?: string[]) =>
+    runStructuredTask({
+      roomId: input.room.id,
+      serviceName: regenerationFocus?.length ? "Room Vision Analyst Regeneration" : "Room Vision Analyst",
+      provider,
+      promptPath: "prompts/diagnosis/room-diagnosis.v2.md",
+      schemaName: "room_analysis",
+      schema: roomAnalysisJsonSchema,
+      zodSchema: roomAnalysisSchema,
+      maxTokens: 4096,
+      taskInput: {
+        task: "Diagnose this room for an interior design workflow.",
+        room: input.room,
+        home: input.home,
+        photo_labels: photoLabels,
+        context_brain: diagnosisContextBrain,
+        regeneration_focus: regenerationFocus ?? [],
+        success_criteria: [
+          "Identify visible architecture, layout cues, materials, lighting conditions, existing items, constraints, opportunities, and execution risks.",
+          "Treat typed dimensions and the room brief as ground truth, and use photos only for visual evidence and spatial reading.",
+          "Call out what should influence downstream concept direction, furniture scale, circulation, lighting strategy, and render realism.",
+          "Use uncertainties when photo evidence is incomplete or ambiguous instead of guessing.",
+          "Do not invent exact dimensions, brands, hidden conditions, or unseen architectural features.",
+          "Avoid generic decorating advice and keep the diagnosis specific to this room and its intended use."
+        ]
+      },
+      images: photos.slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" })),
+      mock: () => roomAnalysisSchema.parse(mockOutput)
+    });
+
+  let diagnosis = await generateDiagnosis();
+  let critique = await critiqueDiagnosis({
     roomId: input.room.id,
-    serviceName: "Room Vision Analyst",
-    provider: input.provider,
-    promptPath: "prompts/diagnosis/room-diagnosis.v1.md",
-    schemaName: "room_analysis",
-    schema: roomAnalysisJsonSchema,
-    zodSchema: roomAnalysisSchema,
-    taskInput: {
-      task: "Diagnose this room for an interior design workflow.",
-      room: input.room,
-      home: input.home,
-      photo_labels: input.photos.map((photo) => ({
-        id: photo.id,
-        label: photo.label,
-        angle_type: photo.angle_type,
-        caption: photo.ai_caption
-      })),
-      success_criteria: [
-        "Identify visible architecture, layout cues, materials, lighting conditions, existing items, constraints, opportunities, and execution risks.",
-        "Treat typed dimensions and the room brief as ground truth, and use photos only for visual evidence and spatial reading.",
-        "Call out what should influence downstream concept direction, furniture scale, circulation, lighting strategy, and render realism.",
-        "Use uncertainties when photo evidence is incomplete or ambiguous instead of guessing.",
-        "Do not invent exact dimensions, brands, hidden conditions, or unseen architectural features.",
-        "Avoid generic decorating advice and keep the diagnosis specific to this room and its intended use."
-      ]
-    },
-    images: input.photos.slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" })),
-    mock: () => roomAnalysisSchema.parse(mockOutput)
+    diagnosis,
+    room: input.room,
+    home: input.home,
+    contextBrain: diagnosisContextBrain,
+    provider
   });
+
+  if (shouldRegenerateDiagnosis(critique)) {
+    diagnosis = await generateDiagnosis(critique.regeneration_focus);
+  }
+
+  return diagnosis;
 }
 
 export async function designBriefInterpreter(input: {
@@ -214,36 +250,242 @@ export async function styleDirector(input: {
   );
 }
 
+/**
+ * Selects a small, relevant slice of the style library instead of dumping all
+ * 14 entries into every call. Matches against the room's stated style
+ * preferences and whole-home style notes first; falls back to the styles
+ * with the deepest authored detail (proportion/lighting/luxury mechanics) so
+ * the generator always has at least a few fully-authored anchors to work
+ * from.
+ */
+function selectRelevantStyles(input: { room: RoomLike; home?: HomeLike | null }): StyleProfile[] {
+  const text = [
+    ...toArray(input.room.style_preferences),
+    ...toArray(input.room.color_preferences),
+    input.home?.style_notes ?? ""
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const scored = styleLibrary.map((style) => {
+    const nameHit = text.includes(style.style_name.toLowerCase());
+    const keywordHits = [...style.pairs_well_with, style.style_name].filter((keyword) =>
+      text.includes(keyword.toLowerCase())
+    ).length;
+    const depthBonus = style.proportion_rules ? 1 : 0;
+    return { style, score: (nameHit ? 5 : 0) + keywordHits + depthBonus };
+  });
+
+  const ranked = scored.sort((a, b) => b.score - a.score).map((entry) => entry.style);
+  const withDepthFirst = [...ranked.filter((style) => style.proportion_rules), ...ranked.filter((style) => !style.proportion_rules)];
+
+  return withDepthFirst.slice(0, 5);
+}
+
+function buildContextBrain(input: { room: RoomLike; home?: HomeLike | null; analysis?: unknown }) {
+  const analysis = (input.analysis ?? null) as Partial<RoomAnalysis> | null;
+
+  const dimensions = (input.room.dimensions ?? null) as {
+    width_ft?: number | string | null;
+    length_ft?: number | string | null;
+    ceiling_height?: number | string | null;
+    notes?: string | null;
+  } | null;
+
+  return {
+    property_dossier: resolvePropertyDossier(input.home?.region ?? null),
+    room_intelligence: deriveRoomIntelligence({
+      dimensions,
+      purpose: input.room.purpose,
+      constraints: toArray(input.room.constraints),
+      analysis
+    }),
+    taste_graph: buildTasteGraph({
+      stylePreferences: input.room.style_preferences,
+      colorPreferences: input.room.color_preferences,
+      constraints: input.room.constraints,
+      homeStyleNotes: input.home?.style_notes ?? null,
+      wholeHomeConstraints: input.home?.whole_home_constraints
+    }),
+    design_policy: DESIGN_DISSENT_POLICY,
+    style_library: selectRelevantStyles({ room: input.room, home: input.home }),
+    design_portfolio: DESIGN_PORTFOLIO
+  };
+}
+
+function compactContextBrainForGeneration(contextBrain: ReturnType<typeof buildContextBrain>) {
+  return {
+    property_dossier: {
+      local_luxury_register: contextBrain.property_dossier.local_luxury_register,
+      what_reads_as_wrong_here: contextBrain.property_dossier.what_reads_as_wrong_here.slice(0, 4),
+      geography_informed_moves: contextBrain.property_dossier.geography_informed_moves.slice(0, 3)
+    },
+    room_intelligence: contextBrain.room_intelligence,
+    taste_graph: {
+      preferred_styles: contextBrain.taste_graph.preferred_styles.slice(0, 6),
+      banned_cliches: contextBrain.taste_graph.banned_cliches.slice(0, 4),
+      standing_constraints: contextBrain.taste_graph.standing_constraints.slice(0, 8),
+      formality_balance: contextBrain.taste_graph.formality_balance,
+      ai_may_disagree_when: contextBrain.taste_graph.ai_may_disagree_when.slice(0, 3)
+    },
+    design_policy: {
+      priority_order: contextBrain.design_policy.priority_order,
+      rule: contextBrain.design_policy.rule
+    },
+    style_library: contextBrain.style_library.slice(0, 3).map((style) => ({
+      style_name: style.style_name,
+      summary: style.summary,
+      color_palette: style.color_palette.slice(0, 5),
+      materials: style.materials.slice(0, 5),
+      furniture_silhouettes: style.furniture_silhouettes.slice(0, 4),
+      lighting_types: style.lighting_types.slice(0, 4),
+      luxury_signals: style.luxury_signals.slice(0, 4),
+      common_mistakes: style.common_mistakes.slice(0, 3),
+      proportion_rules: style.proportion_rules?.slice(0, 2) ?? [],
+      lighting_layers: style.lighting_layers ?? null,
+      luxury_mechanics: style.luxury_mechanics?.slice(0, 2) ?? []
+    })),
+    design_portfolio: contextBrain.design_portfolio.slice(0, 3).map((pattern) => ({
+      pattern_name: pattern.pattern_name,
+      register: pattern.register,
+      why_it_works: pattern.why_it_works,
+      generic_failure_version: pattern.generic_failure_version,
+      principle_demonstrated: pattern.principle_demonstrated
+    }))
+  };
+}
+
+function compactContextBrainForCritic(contextBrain: ReturnType<typeof buildContextBrain>) {
+  return {
+    property_dossier: {
+      local_luxury_register: contextBrain.property_dossier.local_luxury_register,
+      what_reads_as_wrong_here: contextBrain.property_dossier.what_reads_as_wrong_here.slice(0, 4)
+    },
+    room_intelligence: contextBrain.room_intelligence,
+    taste_graph: {
+      preferred_styles: contextBrain.taste_graph.preferred_styles.slice(0, 6),
+      standing_constraints: contextBrain.taste_graph.standing_constraints.slice(0, 8),
+      formality_balance: contextBrain.taste_graph.formality_balance
+    },
+    design_portfolio: contextBrain.design_portfolio.slice(0, 2).map((pattern) => ({
+      pattern_name: pattern.pattern_name,
+      principle_demonstrated: pattern.principle_demonstrated,
+      generic_failure_version: pattern.generic_failure_version
+    }))
+  };
+}
+
+function compactContextBrainForDiagnosis(contextBrain: ReturnType<typeof buildContextBrain>) {
+  return {
+    property_dossier: {
+      climate_notes: contextBrain.property_dossier.climate_notes,
+      architectural_vernacular: contextBrain.property_dossier.architectural_vernacular,
+      local_luxury_register: contextBrain.property_dossier.local_luxury_register,
+      what_reads_as_wrong_here: contextBrain.property_dossier.what_reads_as_wrong_here.slice(0, 4)
+    },
+    room_intelligence: contextBrain.room_intelligence,
+    taste_graph: {
+      preferred_styles: contextBrain.taste_graph.preferred_styles.slice(0, 6),
+      standing_constraints: contextBrain.taste_graph.standing_constraints.slice(0, 8),
+      banned_cliches: contextBrain.taste_graph.banned_cliches.slice(0, 4),
+      formality_balance: contextBrain.taste_graph.formality_balance
+    },
+    design_policy: {
+      priority_order: contextBrain.design_policy.priority_order,
+      rule: contextBrain.design_policy.rule
+    }
+  };
+}
+
+function shouldRegenerateDiagnosis(critique: DiagnosisCritique) {
+  if (critique.regeneration_needed) {
+    return true;
+  }
+
+  return overallScore(critique.scores) < 72;
+}
+
 export async function moodBoardGenerator(input: {
   room: RoomLike;
   home?: HomeLike | null;
   analysis?: unknown;
   provider?: GatewayProvider;
+  skipCritic?: boolean;
 }): Promise<MoodBoardConcept[]> {
   const mockConcepts = await styleDirector({ room: input.room });
-  const output = await runStructuredTask({
-    roomId: input.room.id,
-    serviceName: "Mood Board Generator",
-    provider: input.provider,
-    promptPath: "prompts/concepts/generate-room-concepts.v1.md",
-    schemaName: "mood_board_concepts",
-    schema: moodBoardListJsonSchema,
-    zodSchema: briefConceptListSchema,
-    taskInput: {
-      task: "Generate three room mood board concepts.",
-      room: input.room,
-      home: input.home,
-      analysis: input.analysis,
-      success_criteria: [
-        "Each concept must feel meaningfully different.",
-        "Each concept must include palette hex values, materials, furniture, layout, lighting, art, decor, plants, budget strategy, risks, and rejection reason.",
-        "Concepts must respect constraints and whole-home notes."
-      ]
-    },
-    mock: () => ({ concepts: mockConcepts })
-  });
+  const contextBrain = buildContextBrain(input);
+  const generationContextBrain = compactContextBrainForGeneration(contextBrain);
+  const criticContextBrain = compactContextBrainForCritic(contextBrain);
+  const provider = input.provider ?? "anthropic";
+  const styleAnchors = generationContextBrain.style_library.map((style) => style.style_name);
 
-  return output.concepts.map((concept) => moodBoardSchema.parse(concept));
+  const generateOne = (slotIndex: number, previousConcepts: MoodBoardConcept[], regenerationFeedback?: string) =>
+    runStructuredTask({
+      roomId: input.room.id,
+      serviceName: `Mood Board Generator ${slotIndex}`,
+      provider,
+      promptPath: "prompts/concepts/generate-room-concept.v1.md",
+      schemaName: `mood_board_concept_${slotIndex}`,
+      schema: moodBoardJsonSchema,
+      zodSchema: moodBoardSchema,
+      maxTokens: 4096,
+      taskInput: {
+        task: "Generate one room mood board concept.",
+        room: input.room,
+        home: input.home,
+        diagnosis: input.analysis,
+        context_brain: generationContextBrain,
+        concept_slot: slotIndex,
+        required_style_anchor: styleAnchors[slotIndex - 1] ?? null,
+        slot_goal:
+          slotIndex === 1
+            ? "Create the clearest best-fit concept for this room and brief."
+            : slotIndex === 2
+              ? "Create a distinctly more contrasty, darker, or more formal alternative than the first concept."
+              : "Create a distinctly lighter, cleaner, or more relaxed/architectural alternative than the earlier concepts.",
+        previous_concepts_summary: previousConcepts.map((concept) => ({
+          concept_name: concept.concept_name,
+          design_thesis: concept.design_thesis,
+          style_keywords: concept.style_keywords,
+          palette: concept.palette.map((item) => item.name),
+          risk_profile: concept.risk_profile
+        })),
+        regeneration_feedback: regenerationFeedback ?? null
+      },
+      mock: () => mockConcepts[slotIndex - 1] ?? mockConcepts[0]
+    });
+
+  const generateSet = async (regenerationFeedback?: string) => {
+    const concepts: MoodBoardConcept[] = [];
+    for (let slotIndex = 1; slotIndex <= 3; slotIndex += 1) {
+      const concept = await generateOne(slotIndex, concepts, regenerationFeedback);
+      concepts.push(concept);
+    }
+    return concepts;
+  };
+
+  let concepts = await generateSet();
+
+  if (input.skipCritic) {
+    return concepts;
+  }
+
+  let critique = await critiqueConcepts({ roomId: input.room.id, concepts, contextBrain: criticContextBrain, provider });
+
+  // The critic remains authoritative, but automatic regeneration is disabled
+  // for now so the real office workflow can complete within practical batch
+  // and route time limits during Phase 0 validation.
+
+  // Replace the model's self-reported quality_score (observed to drift onto a
+  // 0-10 convention against a 0-100 schema) with the critic's calibrated
+  // score, so quality_score is always independently derived, not self-graded.
+  return concepts.map((concept) => {
+    const match = critique.per_concept.find((entry) => entry.concept_name === concept.concept_name);
+    return {
+      ...concept,
+      quality_score: match ? overallScore(match.scores) : concept.quality_score
+    };
+  });
 }
 
 export async function productSourcingAgent(input?: {
@@ -254,6 +496,7 @@ export async function productSourcingAgent(input?: {
   provider?: GatewayProvider;
   tools?: unknown[];
 }): Promise<ProductPlanItem[]> {
+  const provider = input?.provider ?? "anthropic";
   const products = [
     ["Desk", "Warm Oak Executive Desk", "West Elm", 1299],
     ["Desk chair", "Tailored Leather Task Chair", "Article", 549],
@@ -294,11 +537,12 @@ export async function productSourcingAgent(input?: {
   const output = await runStructuredTask({
     roomId: input.room.id,
     serviceName: "Product Sourcing Agent",
-    provider: input.provider,
+    provider,
     promptPath: "prompts/products/source-product-plan.v1.md",
     schemaName: "product_plan",
     schema: productListJsonSchema,
     zodSchema: briefProductListSchema,
+    maxTokens: 12288,
     taskInput: {
       task: "Generate a product sourcing plan for the selected concept.",
       room: input.room,
@@ -312,7 +556,7 @@ export async function productSourcingAgent(input?: {
         "Include purchase risks such as scale, finish variation, lead time, and stock verification."
       ]
     },
-    tools: input.tools ?? [{ type: "web_search" }],
+    tools: input.tools,
     mock: () => ({ products: mockProducts })
   });
 
@@ -335,6 +579,7 @@ export async function renderPromptDirector(input: {
   sourcePhoto?: PhotoLike | null;
   provider?: GatewayProvider;
 }): Promise<RenderPlan> {
+  const provider = input.provider ?? "anthropic";
   const mockPlan = renderPlanSchema.parse({
     source_photo_id: input.sourcePhotoId,
     mood_board_id: input.moodBoardId,
@@ -353,7 +598,7 @@ export async function renderPromptDirector(input: {
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Render Prompt Director",
-    provider: input.provider,
+    provider,
     promptPath: "prompts/renders/compose-render-plan.v1.md",
     schemaName: "render_plan",
     schema: renderPlanJsonSchema,
@@ -383,19 +628,59 @@ export async function renderPromptDirector(input: {
   );
 }
 
-export async function designCritic(): Promise<DesignCriticScore> {
+/**
+ * Aggregate single-score critic, kept for backward compatibility with any
+ * caller expecting one DesignCriticScore. When given a room and concepts,
+ * this now delegates to the real critic (critiqueConcepts in critic.ts) and
+ * averages across concepts instead of returning a hardcoded mock score.
+ */
+export async function designCritic(input?: {
+  room?: RoomLike;
+  home?: HomeLike | null;
+  analysis?: unknown;
+  concepts?: MoodBoardConcept[];
+  provider?: GatewayProvider;
+}): Promise<DesignCriticScore> {
+  if (!input?.room || !input.concepts?.length) {
+    return designCriticSchema.parse({
+      style_clarity: 86,
+      room_fit: 82,
+      functional_fit: 80,
+      scale_realism: 78,
+      color_material_cohesion: 88,
+      luxury_signal: 84,
+      originality: 76,
+      practicality: 83,
+      budget_alignment: 75,
+      whole_home_alignment: 81,
+      summary: "Mock critic score — no room/concepts provided. Real scoring requires critiqueConcepts() with a live room."
+    });
+  }
+
+  const contextBrain = buildContextBrain({ room: input.room, home: input.home, analysis: input.analysis });
+  const critique = await critiqueConcepts({
+    roomId: input.room.id,
+    concepts: input.concepts,
+    contextBrain,
+    provider: input.provider
+  });
+
+  const dimensionKeys = Object.keys(critique.per_concept[0]?.scores ?? {}) as Array<
+    keyof (typeof critique.per_concept)[number]["scores"]
+  >;
+
+  const averaged = Object.fromEntries(
+    dimensionKeys.map((key) => [
+      key,
+      Math.round(
+        critique.per_concept.reduce((sum, entry) => sum + entry.scores[key], 0) / critique.per_concept.length
+      )
+    ])
+  );
+
   return designCriticSchema.parse({
-    style_clarity: 86,
-    room_fit: 82,
-    functional_fit: 80,
-    scale_realism: 78,
-    color_material_cohesion: 88,
-    luxury_signal: 84,
-    originality: 76,
-    practicality: 83,
-    budget_alignment: 75,
-    whole_home_alignment: 81,
-    summary: "Mock critic score. Future calls should use the same rubric before outputs are shown as final."
+    ...averaged,
+    summary: `Averaged across ${critique.per_concept.length} concepts. Concept differentiation scored ${critique.concept_differentiation_score}/100: ${critique.differentiation_notes}`
   });
 }
 
@@ -486,11 +771,6 @@ function toArray(value: unknown): string[] {
 
   return [];
 }
-
-const briefConceptListSchema = z.object({
-  concepts: z.array(moodBoardSchema)
-});
-
 const briefProductListSchema = z.object({
   products: z.array(productSchema)
 });

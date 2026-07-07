@@ -99,8 +99,7 @@ export async function runSpike(input: SpikeInput) {
     home,
     analysis: diagnosis,
     selectedMoodBoard: lockedConcept,
-    provider,
-    tools: [{ type: "web_search_20260318", name: "web_search", response_inclusion: "excluded" }]
+    provider
   });
 
   const tavily = isTavilyConfigured()

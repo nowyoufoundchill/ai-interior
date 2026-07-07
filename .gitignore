@@ -12,3 +12,6 @@ dist/
 .env*
 spike/runs/
 .spike-dev*.log
+.batch-start*.log
+.render-*.log
+.spike-*.log

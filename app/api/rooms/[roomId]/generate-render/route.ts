@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: "The selected source photo was not found for this room." }, { status: 400 });
   }
 
-  const { data: latestAnalysis } = await supabase
+  const { data: latestDiagnosis } = await supabase
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       sourcePhotoId: body.source_photo_id,
       moodBoardId: selectedMoodBoard.id,
       room,
-      analysis: latestAnalysis?.analysis,
+      analysis: latestDiagnosis?.analysis,
       selectedMoodBoard,
       sourcePhoto
     });

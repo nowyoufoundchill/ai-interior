@@ -5,7 +5,7 @@ import type { Database } from "@/types/database";
 type Home = Database["public"]["Tables"]["homes"]["Row"];
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
 type Photo = Database["public"]["Tables"]["photos"]["Row"];
-type Analysis = Database["public"]["Tables"]["room_analyses"]["Row"];
+type Diagnosis = Database["public"]["Tables"]["room_analyses"]["Row"];
 type MoodBoard = Database["public"]["Tables"]["mood_boards"]["Row"];
 type Product = Database["public"]["Tables"]["products"]["Row"];
 type Render = Database["public"]["Tables"]["renders"]["Row"];
@@ -25,7 +25,7 @@ export type RoomWorkspaceData = {
   room: Room;
   home: Home | null;
   photos: Photo[];
-  analyses: Analysis[];
+  diagnoses: Diagnosis[];
   moodBoards: MoodBoard[];
   products: Product[];
   renders: Render[];
@@ -101,7 +101,7 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     room: roomWithHome,
     home: roomWithHome.homes,
     photos: (photos.data ?? []) as Photo[],
-    analyses: (analyses.data ?? []) as Analysis[],
+    diagnoses: (analyses.data ?? []) as Diagnosis[],
     moodBoards: (moodBoards.data ?? []) as MoodBoard[],
     products: (products.data ?? []) as Product[],
     renders: (renders.data ?? []) as Render[],

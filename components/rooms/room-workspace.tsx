@@ -10,7 +10,7 @@ import { PhotoUploader } from "@/components/rooms/photo-uploader";
 
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
 type Home = Database["public"]["Tables"]["homes"]["Row"];
-type Analysis = Database["public"]["Tables"]["room_analyses"]["Row"];
+type Diagnosis = Database["public"]["Tables"]["room_analyses"]["Row"];
 type MoodBoard = Database["public"]["Tables"]["mood_boards"]["Row"];
 type Product = Database["public"]["Tables"]["products"]["Row"];
 type Render = Database["public"]["Tables"]["renders"]["Row"];
@@ -23,7 +23,7 @@ export function RoomWorkspace(props: {
   room: Room;
   home: Home;
   photos: Photo[];
-  analyses: Analysis[];
+  diagnoses: Diagnosis[];
   moodBoards: MoodBoard[];
   products: Product[];
   renders: Render[];
@@ -37,7 +37,7 @@ export function RoomWorkspace(props: {
   const router = useRouter();
 
   const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
-  const latestAnalysis = props.analyses[0];
+  const latestDiagnosis = props.diagnoses[0];
 
   async function runAction(label: string, url: string, body?: Record<string, unknown>) {
     setLoadingAction(label);
@@ -90,7 +90,7 @@ export function RoomWorkspace(props: {
               Locked concept:{" "}
               <span className="font-semibold text-atelier-ink">{lockedMoodBoard?.concept_name ?? "None yet"}</span>
             </p>
-            <p className="mt-2">What&apos;s next: {nextHint(props.room.current_stage || props.room.status, props.photos.length, Boolean(latestAnalysis), Boolean(lockedMoodBoard))}</p>
+            <p className="mt-2">What&apos;s next: {nextHint(props.room.current_stage || props.room.status, props.photos.length, Boolean(latestDiagnosis), Boolean(lockedMoodBoard))}</p>
             <p className="mt-2">Saved photos: {props.photos.length}</p>
             <p className="mt-2">
               Debug runs: {props.aiRuns.length}{" "}
@@ -129,7 +129,7 @@ export function RoomWorkspace(props: {
 
       {activeTab === "Diagnosis" && (
         <DiagnosisPanel
-          analysis={latestAnalysis}
+          diagnosis={latestDiagnosis}
           isLoading={loadingAction === "analyze"}
           canGenerate={props.photos.length > 0}
           onGenerate={() => runAction("analyze", `/api/rooms/${props.room.id}/analyze`)}
@@ -139,7 +139,7 @@ export function RoomWorkspace(props: {
       {activeTab === "Concepts" && (
         <ConceptPanel
           moodBoards={props.moodBoards}
-          hasAnalysis={Boolean(latestAnalysis)}
+          hasDiagnosis={Boolean(latestDiagnosis)}
           loadingAction={loadingAction}
           onGenerate={() => runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`)}
           onLock={(id) => runAction("select", `/api/rooms/${props.room.id}/select-moodboard`, { mood_board_id: id })}
@@ -179,12 +179,12 @@ export function RoomWorkspace(props: {
 }
 
 function DiagnosisPanel(props: {
-  analysis?: Analysis;
+  diagnosis?: Diagnosis;
   isLoading: boolean;
   canGenerate: boolean;
   onGenerate: () => void;
 }) {
-  const analysis = asRecord(props.analysis?.analysis);
+  const diagnosis = asRecord(props.diagnosis?.analysis);
 
   return (
     <section className="grid gap-5">
@@ -198,16 +198,16 @@ function DiagnosisPanel(props: {
       />
       {!props.canGenerate ? (
         <EmptyState text="Upload room photos to begin your designer diagnosis." />
-      ) : !props.analysis ? (
+      ) : !props.diagnosis ? (
         <EmptyState text="Generate the first room diagnosis after photos and dimensions have been added." />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          <InfoBlock title="Room Summary" value={String(analysis.room_summary ?? "")} />
-          <InfoBlock title="Recommended Strategy" value={String(analysis.recommended_strategy ?? "")} />
-          <ListBlock title="Opportunities" items={toStringArray(analysis.opportunities)} />
-          <ListBlock title="Design Risks" items={toStringArray(analysis.design_risks)} />
-          <ListBlock title="Constraints" items={toStringArray(analysis.constraints)} />
-          <ListBlock title="Uncertainties" items={toStringArray(analysis.uncertainties)} />
+          <InfoBlock title="Room Summary" value={String(diagnosis.room_summary ?? "")} />
+          <InfoBlock title="Recommended Strategy" value={String(diagnosis.recommended_strategy ?? "")} />
+          <ListBlock title="Opportunities" items={toStringArray(diagnosis.opportunities)} />
+          <ListBlock title="Design Risks" items={toStringArray(diagnosis.design_risks)} />
+          <ListBlock title="Constraints" items={toStringArray(diagnosis.constraints)} />
+          <ListBlock title="Uncertainties" items={toStringArray(diagnosis.uncertainties)} />
         </div>
       )}
     </section>
@@ -216,7 +216,7 @@ function DiagnosisPanel(props: {
 
 function ConceptPanel(props: {
   moodBoards: MoodBoard[];
-  hasAnalysis: boolean;
+  hasDiagnosis: boolean;
   loadingAction: string | null;
   onGenerate: () => void;
   onLock: (id: string) => void;
@@ -227,12 +227,12 @@ function ConceptPanel(props: {
         eyebrow="Concept directions"
         title="Three distinct concept directions"
         actionLabel={props.loadingAction === "moodboards" ? "Generating" : "Generate concepts"}
-        disabled={!props.hasAnalysis || props.loadingAction === "moodboards"}
+        disabled={!props.hasDiagnosis || props.loadingAction === "moodboards"}
         icon={Palette}
         onAction={props.onGenerate}
       />
-      {!props.hasAnalysis ? (
-        <EmptyState text="Generate three design directions after the room has been analyzed." />
+      {!props.hasDiagnosis ? (
+        <EmptyState text="Generate three design directions after the room diagnosis is ready." />
       ) : props.moodBoards.length === 0 ? (
         <EmptyState text="No concepts have been generated yet." />
       ) : (

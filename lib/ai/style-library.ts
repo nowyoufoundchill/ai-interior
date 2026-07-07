@@ -12,6 +12,19 @@ export type StyleProfile = {
   budget_substitutions: string[];
   pairs_well_with: string[];
   avoid_pairing_with: string[];
+  /**
+   * Optional design-theory depth. Populated first for the styles most
+   * relevant to current active projects; remaining styles can be deepened
+   * the same way as they come into active use.
+   */
+  proportion_rules?: string[];
+  lighting_layers?: {
+    ambient: string;
+    task: string;
+    accent: string;
+    decorative?: string;
+  };
+  luxury_mechanics?: string[];
 };
 
 export const styleLibrary: StyleProfile[] = [
@@ -28,7 +41,21 @@ export const styleLibrary: StyleProfile[] = [
     common_mistakes: ["nautical decor", "cold gray walls", "too few light sources"],
     budget_substitutions: ["ceramic lamp instead of stone", "vintage art print", "jute-wool blend rug"],
     pairs_well_with: ["Organic Modern", "Lowcountry Coastal", "Masculine Executive"],
-    avoid_pairing_with: ["high-gloss glam", "literal beach theme"]
+    avoid_pairing_with: ["high-gloss glam", "literal beach theme"],
+    proportion_rules: [
+      "One dominant anchor piece per zone (desk, sofa, bed) sized to roughly 1/3 of the wall it sits against — undersizing the anchor is the most common way this style reads cheap.",
+      "Keep a minimum 36 in. clearance on primary circulation paths; this style's calm feeling depends on negative space being real, not accidental leftover space."
+    ],
+    lighting_layers: {
+      ambient: "Dimmable recessed or a single quiet fixture at 2700-3000K; never the sole light source in the evening.",
+      task: "One substantial lamp (table or floor) per functional zone with a shade that reads as fabric or ceramic, not builder-grade.",
+      accent: "Picture light or a directional sconce on the room's one intentional focal moment (art or architecture), not spread evenly.",
+      decorative: "A single warm low-glow element (candle, small accent lamp) to avoid the room going flat and cold after dark."
+    },
+    luxury_mechanics: [
+      "Layering three distinct light sources at different heights is what separates this from a builder-grade room lit by one ceiling fixture — the layering itself is the luxury signal, not any single fixture's price.",
+      "Aged/oxidizing metals (unlacquered brass, blackened bronze) read as intentional and expensive specifically because they show they were chosen to change over time, unlike plated finishes that are meant to stay static."
+    ]
   },
   {
     style_name: "Organic Modern",
@@ -43,7 +70,21 @@ export const styleLibrary: StyleProfile[] = [
     common_mistakes: ["all beige room", "under-scaled furniture", "no contrast"],
     budget_substitutions: ["stone tray", "limewash-look paint", "oak veneer case goods"],
     pairs_well_with: ["Japandi", "Warm Minimal", "California Casual"],
-    avoid_pairing_with: ["ornate traditional", "bright coastal"]
+    avoid_pairing_with: ["ornate traditional", "bright coastal"],
+    proportion_rules: [
+      "Favor fewer, larger-scaled pieces over many small ones; this style fails when it is executed as a collection of small matching accessories instead of a small number of confident gestures.",
+      "Low-slung furniture (lower seat/back heights) reads as calm and expensive here; standard-height case goods can make the room feel like a generic rental unless deliberately mixed with lower forms."
+    ],
+    lighting_layers: {
+      ambient: "Soft, diffused ambient light (paper, linen, or frosted shades) rather than exposed bulbs or bright white recessed cans.",
+      task: "A sculptural floor or table lamp treated as a design object, not just a light source.",
+      accent: "Low, warm accent light grazing a textured surface (plaster, stone, wood grain) to let material texture read at night, not just in daylight photos.",
+      decorative: "Minimal — one quiet accent is enough; this style is undermined by decorative over-lighting."
+    },
+    luxury_mechanics: [
+      "The 'calm proportion' luxury signal comes from restraint under real storage/functional pressure — hidden storage that keeps surfaces clear is doing more design work than any single decorative object.",
+      "Stone, plaster, and true wood grain read as expensive because they are materially honest — avoid faux finishes that mimic them, since the whole appeal depends on the material being real or convincingly close."
+    ]
   },
   {
     style_name: "Transitional",
@@ -103,7 +144,21 @@ export const styleLibrary: StyleProfile[] = [
     common_mistakes: ["literal shells", "too much blue", "thin rugs"],
     budget_substitutions: ["woven tray", "painted vintage case good", "linen blend drapes"],
     pairs_well_with: ["Moody Coastal", "Classic Southern", "California Casual"],
-    avoid_pairing_with: ["industrial loft", "neon palettes"]
+    avoid_pairing_with: ["industrial loft", "neon palettes"],
+    proportion_rules: [
+      "Slipcovered and woven pieces should be sized generously (deep seating, wide silhouettes) — this style reads thin and under-scaled if furniture is picked too tightly for the floor plan.",
+      "Grasscloth or woven wall texture should cover a full wall or none — partial application is one of the most common ways this style looks like an afterthought rather than a material decision."
+    ],
+    lighting_layers: {
+      ambient: "Warm ambient light with visible fixtures (lantern-style pendants) rather than fully recessed, invisible lighting — this style benefits from fixtures that look intentional.",
+      task: "Ceramic table lamps at seating and work zones; avoid purely functional/utilitarian task lighting, which reads office-grade rather than home-grade.",
+      accent: "Woven or textured shade sconces to keep light warm and soften architecture that may otherwise feel plain.",
+      decorative: "A single lantern or statement fixture at the entry or focal point is appropriate; more than one competing statement fixture undercuts the calm this style depends on."
+    },
+    luxury_mechanics: [
+      "Texture density (grasscloth, rattan weave, linen slub) is the primary luxury signal in this style — it substitutes for color or ornament, so flat, smooth surfaces throughout will make the room feel unfinished rather than restrained.",
+      "Tailored slipcovers (fitted, not billowy) are what separates 'elevated coastal' from 'beach rental' at effectively the same furniture cost."
+    ]
   },
   {
     style_name: "Masculine Executive",
@@ -118,7 +173,21 @@ export const styleLibrary: StyleProfile[] = [
     common_mistakes: ["too dark without lamps", "oversized executive furniture", "cold metal finishes"],
     budget_substitutions: ["leather-look accent chair", "vintage brass lamp", "walnut veneer credenza"],
     pairs_well_with: ["Moody Coastal", "Modern Traditional", "Boutique Hotel"],
-    avoid_pairing_with: ["cutesy coastal", "fragile minimalism"]
+    avoid_pairing_with: ["cutesy coastal", "fragile minimalism"],
+    proportion_rules: [
+      "Desk and seating scale should feel substantial relative to the room — an undersized desk is the single fastest way to undercut an 'executive' brief regardless of material or color choices.",
+      "Keep a minimum 30-36 in. clearance behind any desk chair and along every door swing; this style is often deployed in multi-purpose rooms where circulation math matters as much as furniture choice."
+    ],
+    lighting_layers: {
+      ambient: "Warm dimmable base layer (2700-3000K); avoid cool white light, which reads corporate rather than executive.",
+      task: "A directional desk lamp with real presence (bankers lamp, articulating library lamp) — task lighting is also a status object in this style.",
+      accent: "Picture light on art or a lit bookcase/credenza to create depth on a video-call backdrop, not just in person.",
+      decorative: "Optional single sculptural lamp or sconce; more than one decorative fixture starts to read cluttered rather than collected."
+    },
+    luxury_mechanics: [
+      "Leather patina and real wood grain do the same job here that aged brass does in coastal styles — they signal the room was built to last and improve with use, not to look good only on delivery day.",
+      "Cord and cable management is a genuine luxury signal in an executive office context: visible cords instantly read as unfinished regardless of how good the furniture is."
+    ]
   },
   {
     style_name: "California Casual",
@@ -208,7 +277,21 @@ export const styleLibrary: StyleProfile[] = [
     common_mistakes: ["too theatrical", "poor task lighting", "ignoring comfort"],
     budget_substitutions: ["dramatic paint", "single statement lamp", "large framed print"],
     pairs_well_with: ["Masculine Executive", "Transitional", "Collected Eclectic"],
-    avoid_pairing_with: ["farmhouse literalism", "tiny furniture"]
+    avoid_pairing_with: ["farmhouse literalism", "tiny furniture"],
+    proportion_rules: [
+      "Oversized single gestures (one large lamp, one large artwork) outperform several medium ones — this style's 'memorable moment' depends on scale contrast, not accumulation.",
+      "Seating should be lower and deeper than standard residential scale to read lounge-like rather than domestic-standard."
+    ],
+    lighting_layers: {
+      ambient: "Deliberately moodier ambient base (dimmed, warm) than a typical residential room — this style should never be lit flat and bright.",
+      task: "Directional floor lamps or wall-mounted reading lights rather than table lamps alone, to support the layered-shadow look hospitality interiors use.",
+      accent: "Wall sconces or picture lights used generously to create depth and shadow across multiple surfaces, not just one focal wall.",
+      decorative: "Candlelight-style low accent sources are appropriate here more than in most other styles in this library — the mood depends on visible warm light sources, not just their effect."
+    },
+    luxury_mechanics: [
+      "Deliberate shadow and contrast (not even, shadowless lighting) is the core luxury mechanic — a hospitality-inspired room lit like a showroom loses the entire effect.",
+      "Statement lighting is allowed to be the most expensive single item in the room here, unlike most other styles in this library where the anchor furniture usually carries that role."
+    ]
   },
   {
     style_name: "Modern Rustic",

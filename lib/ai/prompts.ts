@@ -16,14 +16,19 @@ export type VersionedPrompt = PromptMetadata & {
 
 const PROMPT_FILE_URLS: Record<string, URL> = {
   "prompts/diagnosis/room-diagnosis.v1.md": new URL("../../prompts/diagnosis/room-diagnosis.v1.md", import.meta.url),
+  "prompts/diagnosis/room-diagnosis.v2.md": new URL("../../prompts/diagnosis/room-diagnosis.v2.md", import.meta.url),
   "prompts/concepts/generate-room-concepts.v1.md": new URL("../../prompts/concepts/generate-room-concepts.v1.md", import.meta.url),
+  "prompts/concepts/generate-room-concepts.v2.md": new URL("../../prompts/concepts/generate-room-concepts.v2.md", import.meta.url),
+  "prompts/concepts/generate-room-concept.v1.md": new URL("../../prompts/concepts/generate-room-concept.v1.md", import.meta.url),
   "prompts/products/source-product-plan.v1.md": new URL("../../prompts/products/source-product-plan.v1.md", import.meta.url),
   "prompts/renders/compose-render-plan.v1.md": new URL("../../prompts/renders/compose-render-plan.v1.md", import.meta.url),
-  "prompts/chat/design-chat.v1.md": new URL("../../prompts/chat/design-chat.v1.md", import.meta.url)
+  "prompts/chat/design-chat.v1.md": new URL("../../prompts/chat/design-chat.v1.md", import.meta.url),
+  "prompts/critic/score-artifact.v1.md": new URL("../../prompts/critic/score-artifact.v1.md", import.meta.url),
+  "prompts/critic/score-diagnosis.v1.md": new URL("../../prompts/critic/score-diagnosis.v1.md", import.meta.url)
 };
 
 export async function loadPrompt(relativePath: string): Promise<VersionedPrompt> {
-  const absolutePath = resolvePromptPath(relativePath);
+  const absolutePath = await resolvePromptPath(relativePath);
   const file = await readFile(absolutePath, "utf8");
   const match = file.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
 
@@ -66,11 +71,18 @@ function parseFrontmatter(frontmatter: string): PromptMetadata {
   return metadata;
 }
 
-function resolvePromptPath(relativePath: string) {
-  const bundledUrl = PROMPT_FILE_URLS[relativePath];
-  if (bundledUrl) {
-    return fileURLToPath(bundledUrl);
+async function resolvePromptPath(relativePath: string) {
+  const workspacePath = path.resolve(process.cwd(), relativePath);
+
+  try {
+    await readFile(workspacePath, "utf8");
+    return workspacePath;
+  } catch {
+    const bundledUrl = PROMPT_FILE_URLS[relativePath];
+    if (bundledUrl) {
+      return fileURLToPath(bundledUrl);
+    }
   }
 
-  return path.join(process.cwd(), relativePath);
+  return workspacePath;
 }

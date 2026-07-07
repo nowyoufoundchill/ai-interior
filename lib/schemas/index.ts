@@ -73,9 +73,13 @@ export const productSchema = z.object({
   name: z.string(),
   retailer: z.string(),
   url: z.string().url().optional(),
-  image_url: z.string().url().optional(),
+  image_url: z.string().optional(),
   price: z.number().optional(),
-  dimensions: z.record(z.string()),
+  dimensions: z
+    .object({
+      note: z.string()
+    })
+    .catchall(z.string()),
   material: z.string(),
   finish: z.string(),
   scores: z.object({
@@ -128,7 +132,7 @@ export const designMemorySchema = z.object({
   content: z.record(z.unknown())
 });
 
-export const designCriticSchema = z.object({
+export const criticDimensionsSchema = z.object({
   style_clarity: z.number().min(0).max(100),
   room_fit: z.number().min(0).max(100),
   functional_fit: z.number().min(0).max(100),
@@ -138,8 +142,40 @@ export const designCriticSchema = z.object({
   originality: z.number().min(0).max(100),
   practicality: z.number().min(0).max(100),
   budget_alignment: z.number().min(0).max(100),
-  whole_home_alignment: z.number().min(0).max(100),
+  whole_home_alignment: z.number().min(0).max(100)
+});
+
+export const designCriticSchema = criticDimensionsSchema.extend({
   summary: z.string()
+});
+
+export const conceptCritiqueSchema = z.object({
+  per_concept: z.array(
+    z.object({
+      concept_name: z.string(),
+      scores: criticDimensionsSchema,
+      issues: z.array(z.string())
+    })
+  ),
+  concept_differentiation_score: z.number().min(0).max(100),
+  differentiation_notes: z.string()
+});
+
+export const diagnosisCritiqueDimensionsSchema = z.object({
+  room_specificity: z.number().min(0).max(100),
+  downstream_usefulness: z.number().min(0).max(100),
+  evidence_discipline: z.number().min(0).max(100),
+  constraint_capture: z.number().min(0).max(100),
+  execution_risk_awareness: z.number().min(0).max(100)
+});
+
+export const diagnosisCritiqueSchema = z.object({
+  scores: diagnosisCritiqueDimensionsSchema,
+  strengths: z.array(z.string()),
+  issues: z.array(z.string()),
+  missing_factors: z.array(z.string()),
+  regeneration_needed: z.boolean(),
+  regeneration_focus: z.array(z.string())
 });
 
 export type RoomAnalysis = z.infer<typeof roomAnalysisSchema>;
@@ -151,3 +187,5 @@ export type RenderPlan = z.infer<typeof renderPlanSchema>;
 export type RevisionResult = z.infer<typeof revisionSchema>;
 export type DesignMemory = z.infer<typeof designMemorySchema>;
 export type DesignCriticScore = z.infer<typeof designCriticSchema>;
+export type ConceptCritique = z.infer<typeof conceptCritiqueSchema>;
+export type DiagnosisCritique = z.infer<typeof diagnosisCritiqueSchema>;

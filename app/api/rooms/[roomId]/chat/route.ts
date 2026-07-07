@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const supabase = createServerSupabaseClient();
   const { data: room } = await supabase.from("rooms").select("*").eq("id", roomId).maybeSingle();
   const { data: home } = room ? await supabase.from("homes").select("*").eq("id", room.home_id).maybeSingle() : { data: null };
-  const { data: latestAnalysis } = await supabase
+  const { data: latestDiagnosis } = await supabase
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       message,
       room: room ?? undefined,
       home,
-      analysis: latestAnalysis?.analysis,
+      analysis: latestDiagnosis?.analysis,
       selectedMoodBoard,
       products,
       renders,

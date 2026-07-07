@@ -5,7 +5,7 @@ AI Interior Atelier is a private, premium virtual interior design studio for one
 
 `Home -> Room -> Diagnosis -> 3 Concepts -> Lock one concept -> Products and Renders -> Design Chat`
 
-The flagship moment is transforming the owner&apos;s real room photos into concept-aligned renders. The locked concept is the contract that downstream products and renders must follow.
+The flagship moment is transforming the owner's real room photos into concept-aligned renders. The locked concept is the contract that downstream products and renders must follow.
 
 ## Current Reality
 - The codebase started from a v1-style model and is being migrated toward PRD v2.
@@ -41,8 +41,22 @@ The flagship moment is transforming the owner&apos;s real room photos into conce
 - Current implementation centralizes model calls through `/lib/ai/gateway.ts`.
 - Current provider reality:
   - Gateway logging, prompt loading, and provider routing are centralized.
-  - The production room routes still default to the existing OpenAI-backed flow.
-  - A hidden `/spike` workbench now exercises Anthropic reasoning, OpenAI image edit validation, and optional Tavily enrichment without changing the production room workflow.
+  - Diagnosis, concept generation, product sourcing, and render prompt planning now default to Anthropic.
+  - OpenAI remains the validated image-edit renderer.
+  - Tavily is validated as a search/extract supplement for sourcing support.
+  - Diagnosis and concept generation now run on a context brain + real critic pattern (see "Context Brain Layer" below); the other services are only partially upgraded to that same depth.
+  - A hidden `/spike` workbench exercises Anthropic reasoning, OpenAI image edit validation, and Tavily enrichment without changing the production room workflow.
+
+## Context Brain Layer (added 2026-07-06/07)
+- Prompts are treated as a compact operating system (role, decision hierarchy, output contract), not the place design intelligence lives. This follows evidence from a 10-variant real-photo batch showing prompt wording alone moved tone but not judgment.
+- Design intelligence lives as structured data under `/lib/ai/context-brain/` (property dossier, room intelligence, taste graph, design policy) plus `/lib/ai/design-portfolio.ts` (annotated reference patterns) and a deepened `/lib/ai/style-library.ts`.
+- `/lib/ai/critic.ts` is a real, gateway-logged Critic (previously a hardcoded mock) scored against `/lib/ai/critic-rubric.ts`, including a concept-differentiation check with one bounded regeneration retry.
+- This pattern is proven in production-like validation for Concept Director and is now also applied to Diagnosis with a dedicated diagnosis critic and bounded regeneration pass. Products, renders, and chat are only partially migrated.
+- Real validation artifacts now closing the loop:
+  - office batch completion: `spike/runs/batch/2026-07-07T04-27-41-099Z/summary.json`
+  - Tavily direct validation: `spike/runs/tavily-phase0-2026-07-07T03-56-11-268Z.json`
+  - OpenAI render validation: room `8e4ee483-596f-41ef-8ff1-a2f301db1f69`, render `fd65a8c9-1eb3-49f9-a782-c3de664c87a0`
+- Owner feedback as of July 6, 2026: `generate-room-concepts.v2` is directionally good enough to continue with, provided OpenAI and Tavily remain available for their respective downstream tasks. With the provider validations above, that is now sufficient to close Phase 0.
 
 ## Current Data Model Notes
 - Existing tables from the original foundation are still present.
@@ -74,11 +88,13 @@ The flagship moment is transforming the owner&apos;s real room photos into conce
 
 ## Known Gaps Against PRD v2
 - Concept edit/unlock/re-harmonize flows are not built yet.
-- `design_preferences` exists only in the new migration path, not in live UI behavior yet.
+- `design_preferences` exists only in the new migration path, not in live UI behavior yet; the taste graph is currently bootstrapped from brief fields only, not from confirmed owner reactions.
 - Chat still stores `revisions` and legacy memory records alongside the new `chat_messages` direction.
 - The app still uses legacy naming such as `room_analyses` in multiple places.
-- Tavily is not configured locally yet, so product-sourcing supplementation in the spike cannot be fully validated.
-- Multi-provider routing is now available for the spike harness, but the production room routes are intentionally not switched over yet.
+- Multi-provider routing is now available and validated across the Phase 0 spike path, and the context-brain + real-critic pattern now covers both Diagnosis and Concept Director.
+- Diagnosis-first naming cleanup still needs to happen in app language and storage naming where practical.
+- Product sourcing and render planning now route to Anthropic by default, but neither has the same mature evaluator loop as Concept Director yet.
+- Phase 0 is complete; the next meaningful delivery work is Phase 2 implementation and cleanup against PRD v2.
 
 ## Operational Notes
 - `docs/AI_Interior_Atelier_PRD_v2.md` is intentionally local-only right now unless the owner says otherwise.
