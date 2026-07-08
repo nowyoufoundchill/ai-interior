@@ -10,7 +10,9 @@ dist/
 
 .vercel
 .env*
+!.env*.example
 spike/runs/
+test-runs/
 .spike-dev*.log
 .batch-start*.log
 .render-*.log

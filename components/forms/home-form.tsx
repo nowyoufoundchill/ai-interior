@@ -11,25 +11,26 @@ export function HomeForm() {
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2">
           <span className="atelier-label">Home name</span>
-          <input name="name" required className="atelier-field" placeholder="Charleston house" />
+          <input data-testid="home-name-input" name="name" required className="atelier-field" placeholder="Charleston house" />
         </label>
         <label className="grid gap-2">
           <span className="atelier-label">Region</span>
-          <input name="region" className="atelier-field" placeholder="Charleston, coastal South, mountain town" />
+          <input data-testid="home-region-input" name="region" className="atelier-field" placeholder="Charleston, coastal South, mountain town" />
         </label>
         <label className="grid gap-2">
           <span className="atelier-label">Home type</span>
-          <input name="home_type" className="atelier-field" placeholder="New build, historic cottage, townhouse" />
+          <input data-testid="home-type-input" name="home_type" className="atelier-field" placeholder="New build, historic cottage, townhouse" />
         </label>
         <label className="grid gap-2">
           <span className="atelier-label">Whole-home palette</span>
-          <input name="whole_home_palette" className="atelier-field" placeholder="warm white, oak, moss, brass" />
+          <input data-testid="home-palette-input" name="whole_home_palette" className="atelier-field" placeholder="warm white, oak, moss, brass" />
         </label>
       </div>
 
       <label className="grid gap-2">
         <span className="atelier-label">Style notes</span>
         <textarea
+          data-testid="home-style-notes-input"
           name="style_notes"
           rows={5}
           className="atelier-field"
@@ -40,6 +41,7 @@ export function HomeForm() {
       <label className="grid gap-2">
         <span className="atelier-label">Whole-home constraints</span>
         <textarea
+          data-testid="home-constraints-input"
           name="whole_home_constraints"
           rows={3}
           className="atelier-field"
@@ -47,7 +49,7 @@ export function HomeForm() {
         />
       </label>
 
-      <button className="w-fit rounded-md bg-atelier-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal">
+      <button data-testid="home-create-submit" className="w-fit rounded-md bg-atelier-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal">
         Create home
       </button>
     </form>

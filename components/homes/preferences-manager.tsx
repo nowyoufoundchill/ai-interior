@@ -77,7 +77,7 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
       <div className="atelier-card grid gap-3 p-5 md:grid-cols-[0.4fr_1fr_auto] md:items-end">
         <label className="grid gap-2">
           <span className="atelier-label">Type</span>
-          <select className="atelier-field" value={type} onChange={(event) => setType(event.target.value)}>
+          <select data-testid="preferences-type-select" className="atelier-field" value={type} onChange={(event) => setType(event.target.value)}>
             {PREFERENCE_TYPES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -88,6 +88,7 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
         <label className="grid gap-2">
           <span className="atelier-label">Preference</span>
           <input
+            data-testid="preferences-label-input"
             className="atelier-field"
             value={label}
             onChange={(event) => setLabel(event.target.value)}
@@ -99,6 +100,7 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
         </label>
         <button
           type="button"
+          data-testid="preferences-add-button"
           onClick={add}
           disabled={busy || !label.trim()}
           className="flex items-center justify-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
@@ -117,12 +119,14 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
           {preferences.map((preference) => (
             <span
               key={preference.id}
+              data-testid={`preference-card-${preference.id}`}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${TYPE_TONE[preference.preference_type] ?? "bg-atelier-linen text-atelier-charcoal"}`}
             >
               <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{preference.preference_type}</span>
               <span className="font-medium">{preference.label}</span>
               <button
                 type="button"
+                data-testid={`preference-remove-button-${preference.id}`}
                 onClick={() => remove(preference.id)}
                 disabled={busy}
                 aria-label="Remove preference"

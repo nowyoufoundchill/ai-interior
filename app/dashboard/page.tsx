@@ -44,6 +44,7 @@ export default async function DashboardPage() {
             </div>
             <Link
               href="/homes/new"
+              data-testid="home-new-link"
               className="flex w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal"
             >
               <Plus className="h-4 w-4" />
@@ -58,7 +59,11 @@ export default async function DashboardPage() {
               <p className="atelier-label">Homes</p>
               <h2 className="mt-2 font-serif text-3xl">Project library</h2>
             </div>
-            <Link href="/homes/new" className="hidden rounded-md border border-atelier-taupe/30 px-4 py-2 text-sm font-semibold md:block">
+            <Link
+              href="/homes/new"
+              data-testid="home-new-link-secondary"
+              className="hidden rounded-md border border-atelier-taupe/30 px-4 py-2 text-sm font-semibold md:block"
+            >
               Add home
             </Link>
           </div>
@@ -72,7 +77,12 @@ export default async function DashboardPage() {
               {homes.map((home) => {
                 const rooms = Array.isArray(home.rooms) ? home.rooms : [];
                 return (
-                  <Link key={home.id} href={`/homes/${home.id}`} className="atelier-card grid gap-5 p-6 transition hover:-translate-y-0.5">
+                  <Link
+                    key={home.id}
+                    href={`/homes/${home.id}`}
+                    data-testid={`home-card-${home.id}`}
+                    className="atelier-card grid gap-5 p-6 transition hover:-translate-y-0.5"
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="atelier-label">{home.region || "Home project"}</p>

@@ -19,6 +19,15 @@ type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type AiRun = Database["public"]["Tables"]["ai_runs"]["Row"];
 type TabName = (typeof ROOM_TABS)[number];
 
+const TAB_TESTID: Record<TabName, string> = {
+  "Photos & Brief": "photos-brief",
+  Diagnosis: "diagnosis",
+  Concepts: "concepts",
+  Products: "products",
+  Renders: "renders",
+  Chat: "chat"
+};
+
 export function RoomWorkspace(props: {
   room: Room;
   home: Home;
@@ -100,7 +109,7 @@ export function RoomWorkspace(props: {
             <p className="mt-2">Saved photos: {props.photos.length}</p>
             <p className="mt-2">
               Debug runs: {props.aiRuns.length}{" "}
-              <Link href="/debug" className="font-semibold text-atelier-ink underline underline-offset-4">
+              <Link data-testid="debug-link" href="/debug" className="font-semibold text-atelier-ink underline underline-offset-4">
                 Open debug
               </Link>
             </p>
@@ -113,6 +122,7 @@ export function RoomWorkspace(props: {
           <button
             key={tab}
             type="button"
+            data-testid={`tab-${TAB_TESTID[tab]}`}
             onClick={() => setActiveTab(tab)}
             className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-semibold transition ${
               activeTab === tab ? "bg-atelier-ink text-white" : "bg-white/60 text-atelier-charcoal hover:bg-atelier-linen"
@@ -126,8 +136,8 @@ export function RoomWorkspace(props: {
       {activeTab === "Photos & Brief" && (
         <section className="grid gap-5">
           <div className="grid gap-4 lg:grid-cols-2">
-            <InfoBlock title="Dimensions" value={formatDimensions(props.room.dimensions)} />
-            <InfoBlock title="Brief" value={props.room.design_brief || "No design brief saved yet."} />
+            <InfoBlock testId="room-dimensions-info" title="Dimensions" value={formatDimensions(props.room.dimensions)} />
+            <InfoBlock testId="room-brief-info" title="Brief" value={props.room.design_brief || "No design brief saved yet."} />
           </div>
           <PhotoUploader roomId={props.room.id} photos={props.photos} />
         </section>
@@ -212,6 +222,7 @@ function DiagnosisPanel(props: {
         eyebrow="Designer diagnosis"
         title="Professional room readout"
         actionLabel={props.isLoading ? "Generating" : "Generate diagnosis"}
+        actionTestId="diagnosis-generate-button"
         disabled={!props.canGenerate || props.isLoading}
         icon={ClipboardList}
         onAction={props.onGenerate}
@@ -221,7 +232,7 @@ function DiagnosisPanel(props: {
       ) : !props.diagnosis ? (
         <EmptyState text="Generate the first room diagnosis after photos and dimensions have been added." />
       ) : (
-        <div className="grid gap-4">
+        <div data-testid={`diagnosis-panel-${props.diagnosis.version ?? props.diagnosis.id}`} className="grid gap-4">
           <div className="flex items-center gap-3 text-sm text-atelier-charcoal">
             <span className="atelier-label">Diagnosis v{props.diagnosis.version ?? 1}</span>
             <StatusBadge status={props.diagnosis.status} />
@@ -263,6 +274,7 @@ function ConceptPanel(props: {
         eyebrow="Concept directions"
         title="Three distinct concept directions"
         actionLabel={props.loadingAction === "moodboards" ? "Generating" : props.moodBoards.length ? "Regenerate concepts" : "Generate concepts"}
+        actionTestId="concepts-generate-button"
         disabled={!props.hasDiagnosis || props.loadingAction === "moodboards"}
         icon={Palette}
         onAction={props.onGenerate}
@@ -333,9 +345,10 @@ function ConceptCard(props: {
 
   const isLocked = board.status === "locked";
   const isStale = board.status === "stale";
+  const conceptKey = board.version ?? board.id;
 
   return (
-    <article className={`atelier-card grid gap-4 p-5 ${isStale ? "opacity-70" : ""}`}>
+    <article data-testid={`concept-card-${conceptKey}`} className={`atelier-card grid gap-4 p-5 ${isStale ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="atelier-label">
@@ -371,6 +384,7 @@ function ConceptCard(props: {
         <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
           <span className="atelier-label">Re-harmonize direction</span>
           <textarea
+            data-testid={`concept-reharmonize-input-${conceptKey}`}
             className="atelier-field"
             rows={3}
             value={instructions}
@@ -380,6 +394,7 @@ function ConceptCard(props: {
           <div className="flex gap-2">
             <button
               type="button"
+              data-testid={`concept-reharmonize-submit-${conceptKey}`}
               disabled={props.busy}
               onClick={() => {
                 props.onReharmonize(board.id, instructions);
@@ -389,7 +404,12 @@ function ConceptCard(props: {
             >
               {props.busy ? "Re-harmonizing" : "Create refined version"}
             </button>
-            <button type="button" onClick={() => setMode("none")} className="rounded-md px-3 py-2 text-sm text-atelier-charcoal">
+            <button
+              type="button"
+              data-testid={`concept-reharmonize-cancel-${conceptKey}`}
+              onClick={() => setMode("none")}
+              className="rounded-md px-3 py-2 text-sm text-atelier-charcoal"
+            >
               Cancel
             </button>
           </div>
@@ -399,8 +419,15 @@ function ConceptCard(props: {
       {mode === "edit" && (
         <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
           <span className="atelier-label">Edit concept</span>
-          <input className="atelier-field" value={editName} onChange={(event) => setEditName(event.target.value)} placeholder="Concept name" />
+          <input
+            data-testid={`concept-edit-name-input-${conceptKey}`}
+            className="atelier-field"
+            value={editName}
+            onChange={(event) => setEditName(event.target.value)}
+            placeholder="Concept name"
+          />
           <textarea
+            data-testid={`concept-edit-thesis-input-${conceptKey}`}
             className="atelier-field"
             rows={3}
             value={editThesis}
@@ -411,6 +438,7 @@ function ConceptCard(props: {
           <div className="flex gap-2">
             <button
               type="button"
+              data-testid={`concept-edit-submit-${conceptKey}`}
               disabled={props.busy}
               onClick={() => {
                 props.onEdit(board.id, { concept_name: editName, design_thesis: editThesis });
@@ -420,7 +448,12 @@ function ConceptCard(props: {
             >
               {props.busy ? "Saving" : "Save as new version"}
             </button>
-            <button type="button" onClick={() => setMode("none")} className="rounded-md px-3 py-2 text-sm text-atelier-charcoal">
+            <button
+              type="button"
+              data-testid={`concept-edit-cancel-${conceptKey}`}
+              onClick={() => setMode("none")}
+              className="rounded-md px-3 py-2 text-sm text-atelier-charcoal"
+            >
               Cancel
             </button>
           </div>
@@ -432,6 +465,7 @@ function ConceptCard(props: {
           {isLocked ? (
             <button
               type="button"
+              data-testid={`concept-unlock-button-${conceptKey}`}
               onClick={() => props.onUnlock(board.id)}
               disabled={props.busy}
               className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
@@ -441,6 +475,7 @@ function ConceptCard(props: {
           ) : (
             <button
               type="button"
+              data-testid={`concept-lock-button-${conceptKey}`}
               onClick={() => props.onLock(board.id)}
               disabled={props.busy}
               className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
@@ -450,6 +485,7 @@ function ConceptCard(props: {
           )}
           <button
             type="button"
+            data-testid={`concept-reharmonize-button-${conceptKey}`}
             onClick={() => setMode("reharmonize")}
             disabled={props.busy}
             className="rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
@@ -459,6 +495,7 @@ function ConceptCard(props: {
           {!isStale && (
             <button
               type="button"
+              data-testid={`concept-edit-button-${conceptKey}`}
               onClick={() => setMode("edit")}
               disabled={props.busy}
               className="rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
@@ -516,6 +553,7 @@ function ProductsPanel(props: {
         eyebrow="Product plan"
         title="Shoppable direction with rationale"
         actionLabel={props.isLoading ? "Sourcing" : "Generate products"}
+        actionTestId="products-generate-button"
         disabled={!props.hasLockedConcept || props.isLoading}
         icon={Package}
         onAction={props.onGenerate}
@@ -532,7 +570,12 @@ function ProductsPanel(props: {
           <div className="flex flex-col gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-3 md:flex-row md:items-end">
             <label className="grid gap-2">
               <span className="atelier-label">Category</span>
-              <select className="atelier-field min-w-44" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <select
+                data-testid="product-filter-category-select"
+                className="atelier-field min-w-44"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+              >
                 {categories.map((item) => (
                   <option key={item}>{item}</option>
                 ))}
@@ -540,7 +583,12 @@ function ProductsPanel(props: {
             </label>
             <label className="grid gap-2">
               <span className="atelier-label">Retailer</span>
-              <select className="atelier-field min-w-44" value={retailer} onChange={(event) => setRetailer(event.target.value)}>
+              <select
+                data-testid="product-filter-retailer-select"
+                className="atelier-field min-w-44"
+                value={retailer}
+                onChange={(event) => setRetailer(event.target.value)}
+              >
                 {retailers.map((item) => (
                   <option key={item}>{item}</option>
                 ))}
@@ -548,22 +596,46 @@ function ProductsPanel(props: {
             </label>
             <label className="grid gap-2">
               <span className="atelier-label">Max price</span>
-              <input className="atelier-field w-36" type="number" min="0" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} placeholder="No cap" />
+              <input
+                data-testid="product-filter-max-price-input"
+                className="atelier-field w-36"
+                type="number"
+                min="0"
+                value={maxPrice}
+                onChange={(event) => setMaxPrice(event.target.value)}
+                placeholder="No cap"
+              />
             </label>
             <label className="grid gap-2">
               <span className="atelier-label">Dimensions</span>
-              <input className="atelier-field w-40" value={dimensionText} onChange={(event) => setDimensionText(event.target.value)} placeholder="width, note" />
+              <input
+                data-testid="product-filter-dimensions-input"
+                className="atelier-field w-40"
+                value={dimensionText}
+                onChange={(event) => setDimensionText(event.target.value)}
+                placeholder="width, note"
+              />
             </label>
             <label className="grid gap-2">
               <span className="atelier-label">Risk</span>
-              <input className="atelier-field w-40" value={riskText} onChange={(event) => setRiskText(event.target.value)} placeholder="lead time" />
+              <input
+                data-testid="product-filter-risk-input"
+                className="atelier-field w-40"
+                value={riskText}
+                onChange={(event) => setRiskText(event.target.value)}
+                placeholder="lead time"
+              />
             </label>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product) => {
               const scores = asRecord(product.scores);
               return (
-                <article key={product.id} className={`atelier-card overflow-hidden ${product.status === "rejected" ? "opacity-60" : ""}`}>
+                <article
+                  key={product.id}
+                  data-testid={`product-card-${product.id}`}
+                  className={`atelier-card overflow-hidden ${product.status === "rejected" ? "opacity-60" : ""}`}
+                >
                   {(product.cached_image_path ?? product.image_url) && (
                     <img src={product.cached_image_path ?? product.image_url ?? ""} alt="" className="aspect-[4/3] w-full object-cover" />
                   )}
@@ -598,7 +670,13 @@ function ProductsPanel(props: {
                       <span>Luxury {String(scores.luxury_signal ?? "N/A")}</span>
                     </div>
                     {product.url && (
-                      <a href={product.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-atelier-ink underline underline-offset-4">
+                      <a
+                        data-testid={`product-source-link-${product.id}`}
+                        href={product.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-semibold text-atelier-ink underline underline-offset-4"
+                      >
                         Open product source
                       </a>
                     )}
@@ -609,6 +687,7 @@ function ProductsPanel(props: {
                           {product.status !== "approved" && (
                             <button
                               type="button"
+                              data-testid={`product-approve-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "approve")}
                               className="rounded-md border border-atelier-moss px-3 py-1.5 text-xs font-semibold text-atelier-moss transition hover:bg-atelier-moss hover:text-white disabled:opacity-60"
@@ -619,6 +698,7 @@ function ProductsPanel(props: {
                           {product.status !== "rejected" && (
                             <button
                               type="button"
+                              data-testid={`product-reject-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "reject")}
                               className="rounded-md border border-atelier-taupe/40 px-3 py-1.5 text-xs font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
@@ -629,6 +709,7 @@ function ProductsPanel(props: {
                           {(product.status === "approved" || product.status === "rejected") && (
                             <button
                               type="button"
+                              data-testid={`product-reset-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "reset")}
                               className="rounded-md px-3 py-1.5 text-xs text-atelier-charcoal underline underline-offset-4 disabled:opacity-60"
@@ -667,6 +748,7 @@ function RendersPanel(props: {
         eyebrow="Photo edit studio"
         title="Restyle your real room photos"
         actionLabel={props.isLoading ? "Editing" : "Edit this photo"}
+        actionTestId="render-generate-button"
         disabled={!props.hasLockedConcept || props.photos.length === 0 || props.isLoading}
         icon={Wand2}
         onAction={() => props.onGenerate(sourcePhotoId || undefined, instructions || undefined)}
@@ -683,7 +765,12 @@ function RendersPanel(props: {
           <div className="grid gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-4 md:grid-cols-2">
             <label className="grid gap-2">
               <span className="atelier-label">Source photo</span>
-              <select className="atelier-field" value={sourcePhotoId} onChange={(event) => setSourcePhotoId(event.target.value)}>
+              <select
+                data-testid="render-source-photo-select"
+                className="atelier-field"
+                value={sourcePhotoId}
+                onChange={(event) => setSourcePhotoId(event.target.value)}
+              >
                 {props.photos.map((photo) => (
                   <option key={photo.id} value={photo.id}>
                     {photo.label ?? "Room photo"}
@@ -694,6 +781,7 @@ function RendersPanel(props: {
             <label className="grid gap-2">
               <span className="atelier-label">Edit instructions (optional)</span>
               <textarea
+                data-testid="render-instructions-input"
                 className="atelier-field"
                 rows={2}
                 value={instructions}
@@ -713,7 +801,7 @@ function RendersPanel(props: {
                 const sourcePhoto = props.photos.find((photo) => photo.id === render.source_photo_id);
                 const critique = asRecord(render.critique);
                 return (
-                  <article key={render.id} className="atelier-card overflow-hidden">
+                  <article key={render.id} data-testid={`render-card-${render.id}`} className="atelier-card overflow-hidden">
                     <div className="grid gap-1 md:grid-cols-2">
                       <figure className="grid gap-1">
                         <figcaption className="atelier-label px-4 pt-4">Before</figcaption>
@@ -776,6 +864,7 @@ function ChatPanel(props: {
       <PanelHeader eyebrow="Design chat" title="Explain decisions and propose reruns" icon={MessageSquare} />
       <div className="atelier-card grid gap-3 p-5">
         <textarea
+          data-testid="chat-message-input"
           className="atelier-field"
           rows={4}
           value={props.message}
@@ -784,6 +873,7 @@ function ChatPanel(props: {
         />
         <button
           type="button"
+          data-testid="chat-send-button"
           onClick={props.onSend}
           disabled={props.isLoading}
           className="flex w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
@@ -799,7 +889,7 @@ function ChatPanel(props: {
           {props.revisions.map((revision) => {
             const proposal = proposalHint(revision.revision_type);
             return (
-              <article key={revision.id} className="atelier-card grid gap-3 p-5">
+              <article key={revision.id} data-testid={`chat-message-card-${revision.id}`} className="atelier-card grid gap-3 p-5">
                 <p className="atelier-label">{revision.revision_type.replaceAll("_", " ")}</p>
                 <p className="font-semibold text-atelier-ink">{revision.user_message}</p>
                 <p className="text-sm leading-6 text-atelier-charcoal">{revision.assistant_response}</p>
@@ -839,6 +929,7 @@ function PanelHeader(props: {
   eyebrow: string;
   title: string;
   actionLabel?: string;
+  actionTestId?: string;
   disabled?: boolean;
   icon: ComponentType<{ className?: string }>;
   onAction?: () => void;
@@ -853,6 +944,7 @@ function PanelHeader(props: {
       {props.actionLabel && props.onAction && (
         <button
           type="button"
+          data-testid={props.actionTestId}
           onClick={props.onAction}
           disabled={props.disabled}
           className="flex w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:cursor-not-allowed disabled:opacity-50"
@@ -865,9 +957,9 @@ function PanelHeader(props: {
   );
 }
 
-function InfoBlock({ title, value }: { title: string; value: string }) {
+function InfoBlock({ title, value, testId }: { title: string; value: string; testId?: string }) {
   return (
-    <article className="atelier-card p-5">
+    <article data-testid={testId} className="atelier-card p-5">
       <p className="atelier-label">{title}</p>
       <p className="mt-3 text-sm leading-6 text-atelier-charcoal">{value}</p>
     </article>

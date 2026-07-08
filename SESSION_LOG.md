@@ -323,3 +323,47 @@
 
 ### Result
 - Phases 2-6 of the PRD-v2 build plan are implemented and pass the type gate. The remaining work is the three owner-side deploy actions above.
+
+## 2026-07-08 — PRD v3 discovered and kicked off; test harness + suite scaffolding built
+
+### Context
+- Owner asked to open "PRD v3," but no such file existed in `docs/` at the start of this session — only `AI_Interior_Atelier_PRD_v2.md`. Checked Google Drive too (empty result). Owner then wrote `docs/AI_Interior_Atelier_PRD_v3.md` directly (appeared on disk mid-session) — it explicitly supersedes v1 and v2 entirely.
+- PRD v3 keeps the same product loop/data model/AI-service architecture as v2 but adds: a real test harness (`AI_MODE` mock/live, `.env.test`, `seed:test`/`teardown`, `test_run_id` residue tracking), `data-testid` coverage, a consolidated 6-style library, five verification suites run as skills, and a Release Gate (§12) as the actual definition of "done" — not agent self-assessment.
+- Two owner decisions recorded: (1) **no Supabase Auth** — "just me and my wife," overriding PRD v3 §3's auth line; `/login` stays a no-op redirect. (2) Owner asked to install Chrome DevTools MCP (https://github.com/ChromeDevTools/chrome-devtools-mcp) when told it wasn't available in this environment.
+
+### Built
+- **Docs realignment**: `BUILD_PLAN.md` and `PROJECT_BRAIN.md` now point at PRD v3 as sole authority, with a new "PRD v3 Delta Plan" checklist in `BUILD_PLAN.md` tracking only the *delta* (v2-era Phases 0-6 are carried forward, not redone). New "Known Gaps Against PRD v3" section in `PROJECT_BRAIN.md`.
+- **Chrome DevTools MCP installed**: `claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`, confirmed `✓ Connected` via `claude mcp list`. MCP tool sets load at session start, so it wasn't callable in the session that installed it — a fresh session should have it and should prefer it over Playwright for suites 2/4/5.
+- **Style library consolidated** (background agent): 14 thin entries -> the exact 6 named in PRD v3 §7 (Lowcountry Coastal, Moody Coastal, Organic Modern, Modern Traditional, Masculine Executive, Boutique Hotel), each with the full PRD field list plus `proportion_rules`/`lighting_layers`/`luxury_mechanics`. Fixed dangling `pairs_well_with` references that pointed at now-removed style names (e.g. Lowcountry Coastal pointed at "Classic Southern", "California Casual" — repointed to surviving styles). `lib/ai/services.ts` needed no changes since field names/type name (`StyleProfile`) were kept stable.
+- **`data-testid` coverage** (background agent): added across `components/rooms/room-workspace.tsx`, `components/rooms/photo-uploader.tsx`, `components/homes/preferences-manager.tsx`, `components/forms/home-form.tsx`, `components/forms/room-form.tsx`, `components/layout/app-shell.tsx`, `app/dashboard/page.tsx`, `app/homes/[homeId]/page.tsx`. Convention: kebab-case `{element}-{action}-{id}`, reusing existing stable ids (mood board version, product/render/photo id) rather than inventing counters. `/debug` and `/spike` skipped (internal tooling, not the owner-facing loop).
+- **`AI_MODE` test harness**:
+  - `resolveAiMode()` added to `lib/ai/gateway.ts`; `runStructuredTask` and `generateImageEdit` now force the mock path whenever `AI_MODE=mock`, regardless of whether real provider keys are configured (previously mock was only a fallback for missing keys).
+  - Every inline mock literal in `lib/ai/services.ts` (diagnosis, products, render plan, chat/revision) and `lib/ai/critic.ts` (concept/diagnosis/product critique) extracted into `/lib/ai/fixtures/{diagnosis,products,renders,chat,critic}.ts` as factory functions — satisfies PRD v3 §3's "mock fixtures live in `/lib/ai/fixtures/`" without changing any behavior. `npm run typecheck` clean after every extraction step.
+  - `supabase/migrations/005_test_harness_residue_tracking.sql`: additive nullable `test_run_id` column on all 13 tables + partial indexes. **Written but not yet pushed/applied to the live project.**
+  - `scripts/test-env.mjs`: loads `.env.test` if present, else falls back to `.env.local` with a loud console warning (since no second Supabase project exists yet — see gap below).
+  - `scripts/seed-test.mjs`: seeds one home + one room using the owner's real office photos and brief from `spike/payloads/office-variation-matrix.json` (reused rather than inventing synthetic data), uploads the 4 real JPGs to the `room-photos` bucket under `test-runs/{test_run_id}/`, tags every row with a fresh `test_run_id`, writes `test-runs/current.json` for other scripts to pick up.
+  - `scripts/teardown-test.mjs`: explicit child-to-parent delete by `test_run_id` across all 12 relevant tables plus matching Storage objects — deliberately not relying on FK cascade, since `revisions`/`ai_runs` use `on delete set null` on `room_id`, not cascade, and would otherwise survive a `homes` delete with a dangling `test_run_id`.
+  - `scripts/check-test-residue.mjs`: always reads `.env.local` (production) regardless of what `.env.test` is set to — the point is checking the environment tests are *not* supposed to touch (PRD v3 §12.2).
+  - `.env.test.example` added (documents the separate-project intent); `.gitignore` updated to let `.env*.example` through the existing blanket `.env*` ignore rule and to ignore `test-runs/` (ephemeral seed state) — deliberately did **not** ignore `reports/`, since the Release Report (§12.4) is a real deliverable that should be committed.
+  - New npm scripts: `seed:test`, `teardown:test`, `check:residue`, plus placeholder `suite:integrity`/`suite:e2e`/`suite:live-smoke`/`suite:assets-responsive`/`suite:design-review` (scripts referenced don't exist yet — next session's first job).
+- **Debug state-assertion endpoint**: `app/api/debug/room-state/[roomId]/route.ts` (GET, read-only) returns a room's diagnoses/mood_boards/products/renders/chat_messages plus derived booleans (`stale_diagnosis_count`, `locked_mood_board_version`, `products_match_locked_version`, `renders_match_locked_version`, etc.) so the Integrity suite can assert the §4 invalidation table via one HTTP call instead of scraping the DOM.
+- **Playwright installed** as a devDependency (`playwright`, `@playwright/test`) with the Chromium binary confirmed working via a headless smoke test (`launch` -> `goto` -> read title). `scripts/suites/` and `.claude/skills/` directories created but no suite script content written yet.
+
+### Verified
+- `npm run typecheck` passes clean after every structural change this session (style library consolidation, data-testid wiring, gateway/fixtures refactor, debug endpoint).
+- Playwright Chromium launch smoke-tested directly (not via a suite script yet).
+- Migration 005 has **not** been applied to the live Supabase project yet (no local `SUPABASE_DB_URL`/Supabase CLI auth available this session; the established workflow is push to `main` -> GitHub Actions applies `supabase/**` migrations, same as 003/004 previously).
+
+### Current Warnings / Known Gaps
+- No dedicated `.env.test` Supabase project exists — the test harness will run against the same project as production until the owner provisions a second one. `check-test-residue.mjs` is the safety net, not a nice-to-have.
+- Migration 005 is uncommitted and unapplied — `seed:test` will fail against the live project until it's pushed and the GitHub Actions workflow runs.
+- No suite scripts exist yet under `scripts/suites/` despite the npm script entries referencing them — this is the very next work item, not a completed deliverable.
+- Chrome DevTools MCP is installed and connected but was not usable in this session (installed mid-session, after the tool list was already fixed). A fresh session should pick it up automatically.
+
+### Next Action (see also "Resume point for next session" in BUILD_PLAN.md)
+1. Commit and push this session's changes (migration 005 + gateway/fixtures/style-library/data-testid/debug-endpoint/harness-scripts) to `main` so CI applies migration 005, then `npm run verify:live`.
+2. Confirm `chrome-devtools` MCP tools are available in the new session (`claude mcp list` should show it connected already) and prefer them over Playwright for suites 2, 4, and 5.
+3. Write the 5 suite scripts under `scripts/suites/` (Integrity, Functional E2E, Live API smoke, Assets & responsive, Design brain & feel) plus matching `.claude/skills/` entries, replacing the placeholder npm scripts.
+4. Run `npm run seed:test`, drive the suites against `AI_MODE=mock`, fix failures, reseed and re-run per §12.4 cycle discipline (never verify a fix against dirty state).
+5. One `AI_MODE=live` smoke cycle (Suite 3) against real Anthropic/OpenAI/Tavily.
+6. Write `/reports/release-{date}.md` and do the final BUILD_PLAN/PROJECT_BRAIN/SESSION_LOG sync.

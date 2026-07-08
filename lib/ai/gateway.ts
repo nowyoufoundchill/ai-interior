@@ -7,6 +7,16 @@ import type { Json } from "@/types/database";
 
 export type GatewayProvider = "openai" | "anthropic" | "mock";
 
+/**
+ * `AI_MODE=mock` forces every gateway call onto its `mock` fixture regardless
+ * of which provider keys are configured, so test suites never spend real
+ * money or depend on live model output. Unset/anything else means normal
+ * provider routing (the app's real, production behavior).
+ */
+export function resolveAiMode(): "mock" | "live" {
+  return process.env.AI_MODE === "mock" ? "mock" : "live";
+}
+
 export async function runStructuredTask<T>(input: {
   roomId?: string;
   serviceName: string;
@@ -25,8 +35,9 @@ export async function runStructuredTask<T>(input: {
   const prompt = await loadPrompt(input.promptPath);
 
   const inputPayload = toJsonValue(input.taskInput);
+  const forceMock = resolveAiMode() === "mock";
 
-  if (provider === "anthropic" && isAnthropicConfigured()) {
+  if (!forceMock && provider === "anthropic" && isAnthropicConfigured()) {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -84,7 +95,7 @@ export async function runStructuredTask<T>(input: {
     throw lastError ?? new Error("Gateway structured task failed.");
   }
 
-  if (provider === "openai" && isOpenAiConfigured()) {
+  if (!forceMock && provider === "openai" && isOpenAiConfigured()) {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -142,7 +153,11 @@ export async function runStructuredTask<T>(input: {
   }
 
   if (!input.mock) {
-    throw new Error(`Provider ${provider} is unavailable for ${input.serviceName}.`);
+    throw new Error(
+      forceMock
+        ? `AI_MODE=mock but ${input.serviceName} has no mock() fixture. Add one at the call site (see /lib/ai/fixtures).`
+        : `Provider ${provider} is unavailable for ${input.serviceName}.`
+    );
   }
 
   const mocked = input.mock();
@@ -166,7 +181,7 @@ export async function generateImageEdit(input: {
   prompt: string;
   sourceImageUrl?: string;
 }) {
-  if (!isOpenAiConfigured()) {
+  if (!isOpenAiConfigured() || resolveAiMode() === "mock") {
     await logAiRun({
       roomId: input.roomId,
       serviceName: input.serviceName,

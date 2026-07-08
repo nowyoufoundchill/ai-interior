@@ -50,6 +50,7 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
             </div>
             <Link
               href={`/homes/${home.id}/rooms/new`}
+              data-testid="room-new-link"
               className="flex items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal"
             >
               <Plus className="h-4 w-4" />
@@ -64,7 +65,12 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {rooms.map((room) => (
-                <Link key={room.id} href={`/rooms/${room.id}`} className="atelier-card grid gap-4 p-5 transition hover:-translate-y-0.5">
+                <Link
+                  key={room.id}
+                  href={`/rooms/${room.id}`}
+                  data-testid={`room-card-${room.id}`}
+                  className="atelier-card grid gap-4 p-5 transition hover:-translate-y-0.5"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="atelier-label">{room.room_type || "Room"}</p>

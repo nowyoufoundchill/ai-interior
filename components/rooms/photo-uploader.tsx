@@ -77,7 +77,12 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <select className="atelier-field min-w-44" value={label} onChange={(event) => setLabel(event.target.value)}>
+            <select
+              data-testid="photo-upload-label-select"
+              className="atelier-field min-w-44"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            >
               {PHOTO_LABELS.map((item) => (
                 <option key={item}>{item}</option>
               ))}
@@ -85,7 +90,14 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal">
               {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
               {isUploading ? "Uploading" : "Add photo"}
-              <input type="file" accept="image/*" className="sr-only" onChange={uploadPhoto} disabled={isUploading} />
+              <input
+                data-testid="photo-upload-input"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={uploadPhoto}
+                disabled={isUploading}
+              />
             </label>
           </div>
         </div>
@@ -114,16 +126,22 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {photos.map((photo) => (
-            <figure key={photo.id} className="atelier-card overflow-hidden">
+            <figure key={photo.id} data-testid={`photo-card-${photo.id}`} className="atelier-card overflow-hidden">
               <img src={photo.file_url} alt={photo.label ?? "Room photo"} className="aspect-[4/3] w-full object-cover" />
               <figcaption className="flex items-center justify-between gap-3 p-3">
-                <select className="atelier-field" value={photo.label ?? ""} onChange={(event) => updateLabel(photo.id, event.target.value)}>
+                <select
+                  data-testid={`photo-label-select-${photo.id}`}
+                  className="atelier-field"
+                  value={photo.label ?? ""}
+                  onChange={(event) => updateLabel(photo.id, event.target.value)}
+                >
                   {PHOTO_LABELS.map((item) => (
                     <option key={item}>{item}</option>
                   ))}
                 </select>
                 <button
                   type="button"
+                  data-testid={`photo-delete-button-${photo.id}`}
                   onClick={() => deletePhoto(photo)}
                   className="rounded-md border border-atelier-taupe/30 p-2 text-atelier-charcoal transition hover:bg-atelier-linen"
                   aria-label="Delete photo"

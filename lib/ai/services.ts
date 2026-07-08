@@ -37,6 +37,10 @@ import { buildTasteGraph } from "@/lib/ai/context-brain/taste-graph";
 import { DESIGN_DISSENT_POLICY } from "@/lib/ai/context-brain/design-policy";
 import { DESIGN_PORTFOLIO } from "@/lib/ai/design-portfolio";
 import { critiqueConcepts, critiqueDiagnosis, critiqueProducts, overallScore } from "@/lib/ai/critic";
+import { buildDiagnosisFixture } from "@/lib/ai/fixtures/diagnosis";
+import { buildProductPlanFixture } from "@/lib/ai/fixtures/products";
+import { buildRenderPlanFixture } from "@/lib/ai/fixtures/renders";
+import { buildRevisionFixture } from "@/lib/ai/fixtures/chat";
 
 type RoomLike = {
   id: string;
@@ -86,47 +90,15 @@ export async function roomVisionAnalyst(input: {
 }): Promise<RoomAnalysis> {
   const provider = input.provider ?? "anthropic";
   const roomType = input.room.room_type ?? "room";
-  const mockOutput = {
-    room_summary: `${input.room.name} is ready for a designer diagnosis once the uploaded angles are reviewed. This mock summary preserves the future structure for photo-aware analysis.`,
-    architecture: {
-      doors: ["Door locations will be identified from straight-on wall photos."],
-      windows: ["Window count, scale, and treatment opportunities will be inferred from uploaded photos."],
-      ceiling: "Ceiling height and fixture placement are currently based on the room brief.",
-      flooring: "Flooring material will be read from floor and wide-angle photos.",
-      trim: "Trim, casing, and baseboard profile will be captured in the real vision pass.",
-      built_ins: []
-    },
-    lighting: {
-      natural_light: "medium" as const,
-      artificial_light: ["Layer task, ambient, and accent lighting before finalizing products."],
-      risk_notes: ["Mock analysis cannot yet confirm glare, shadowing, or actual fixture output."]
-    },
-    materials: ["warm wood", "textured textile", "aged metal", "ceramic accent"],
-    existing_items: [
-      {
-        item: "Existing pieces from the room brief",
-        keep_status: "unknown" as const,
-        design_relevance: "Future analysis will separate keep, remove, and style-anchor items."
-      }
-    ],
-    constraints: [`Respect the room purpose: ${input.room.purpose ?? roomType}.`],
-    opportunities: [
-      "Create a clear focal wall and a more intentional lighting hierarchy.",
-      "Use scale, material contrast, and fewer stronger pieces to avoid a generic AI-room feel."
-    ],
-    design_risks: [
-      "Furniture scale should be checked before sourcing.",
-      "Mood boards should not rely on trend language without room-specific rationale."
-    ],
-    recommended_strategy:
-      "Use the uploaded room geometry, the whole-home notes, and the brief to create three distinct but executable design directions.",
-    uncertainties: [
-      `${input.photoCount} photos are attached; final diagnosis should confirm doors, windows, flooring, and existing items from image understanding.`
-    ]
-  };
+  const mockOutput = buildDiagnosisFixture({
+    roomName: input.room.name,
+    roomPurpose: input.room.purpose,
+    roomType,
+    photoCount: input.photoCount
+  });
 
   if (!input.photos?.length) {
-    return roomAnalysisSchema.parse(mockOutput);
+    return mockOutput;
   }
 
   const photos = input.photos;
@@ -166,7 +138,7 @@ export async function roomVisionAnalyst(input: {
         ]
       },
       images: photos.slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" })),
-      mock: () => roomAnalysisSchema.parse(mockOutput)
+      mock: () => mockOutput
     });
 
   let diagnosis = await generateDiagnosis();
@@ -552,38 +524,7 @@ export async function productSourcingAgent(input?: {
   designPreferences?: { preference_type: string; label: string }[];
 }): Promise<ProductPlanItem[]> {
   const provider = input?.provider ?? "anthropic";
-  const products = [
-    ["Desk", "Warm Oak Executive Desk", "West Elm", 1299],
-    ["Desk chair", "Tailored Leather Task Chair", "Article", 549],
-    ["Rug", "Textured Wool Area Rug", "Lulu and Georgia", 998],
-    ["Table lamp", "Aged Brass Library Lamp", "Rejuvenation", 399],
-    ["Artwork", "Oversized Tonal Landscape", "Chairish", 850],
-    ["Plant", "Sculptural Olive Tree", "Terrain", 228]
-  ] as const;
-
-  const mockProducts = products.map(([category, name, retailer, price]) =>
-    productSchema.parse({
-      category,
-      name,
-      retailer,
-      url: "https://example.com",
-      image_url: "https://images.unsplash.com/photo-1618220179428-22790b461013",
-      price,
-      dimensions: { note: "Confirm exact dimensions before purchase." },
-      material: category === "Rug" ? "wool blend" : "mixed natural materials",
-      finish: "warm neutral",
-      scores: {
-        style_fit: 88,
-        scale_fit: 78,
-        budget_fit: 74,
-        material_fit: 86,
-        luxury_signal: 82
-      },
-      reason_selected: "Chosen as a placeholder because it supports the selected concept with scale, material warmth, and a clear design rationale.",
-      risks: ["Real sourcing should verify stock, dimensions, lead time, and finish variation."],
-      alternatives: ["Lower-cost substitute", "Vintage option", "Investment upgrade"]
-    })
-  );
+  const mockProducts = buildProductPlanFixture();
 
   if (!input?.selectedMoodBoard || !input.room) {
     return mockProducts;
@@ -666,20 +607,10 @@ export async function renderPromptDirector(input: {
 }): Promise<RenderPlan> {
   const provider = input.provider ?? "anthropic";
   const userInstructions = input.userInstructions?.trim() || null;
-  const mockPlan = renderPlanSchema.parse({
-    source_photo_id: input.sourcePhotoId,
-    mood_board_id: input.moodBoardId,
-    render_prompt:
-      "Edit this real room photo in place: keep the existing architecture, camera angle, windows, doors, floor plane, and ceiling exactly, and restyle only the paint, furniture, lighting, art, rug, and styling to match the locked concept." +
-      (userInstructions ? ` Owner edit request: ${userInstructions}` : ""),
-    preservation_constraints: ["Preserve architecture", "Preserve camera angle", "Preserve window and door locations"],
-    transformation_instructions: ["Layer lighting", "Add right-scaled furniture", "Use palette and materials from the selected mood board"],
-    negative_instructions: ["No distorted room geometry", "No blocked doors", "No unrealistic furniture scale", "No generic beach decor"],
-    critique: {
-      notes: ["Mock render prompt only. Image generation will be connected in a later phase."],
-      score: 82
-    },
-    quality_score: 82
+  const mockPlan = buildRenderPlanFixture({
+    sourcePhotoId: input.sourcePhotoId,
+    moodBoardId: input.moodBoardId,
+    userInstructions
   });
 
   return runStructuredTask({
@@ -798,14 +729,7 @@ export async function revisionAgent(input: {
             ? "whole_home_check"
             : "general_question";
 
-  const mockRevision = revisionSchema.parse({
-    user_message: input.message,
-    revision_type,
-    assistant_response:
-      "This is a saved placeholder response. The future room-aware designer chat will load the room brief, selected concept, products, renders, and memory before answering.",
-    state_before: {},
-    state_after: {}
-  });
+  const mockRevision = buildRevisionFixture({ message: input.message, revisionType: revision_type });
 
   if (!input.room) {
     return mockRevision;

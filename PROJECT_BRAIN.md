@@ -8,10 +8,10 @@ AI Interior Atelier is a private, premium virtual interior design studio for one
 The flagship moment is transforming the owner's real room photos into concept-aligned renders. The locked concept is the contract that downstream products and renders must follow.
 
 ## Current Reality
-- The codebase started from a v1-style model and is being migrated toward PRD v2.
-- PRD v2 is the only planning authority now.
-- The app is still single-household and private-first.
-- Auth is still effectively deferred in the product experience.
+- `docs/AI_Interior_Atelier_PRD_v3.md` supersedes v1 and v2 entirely and is the sole planning authority as of 2026-07-08. PRD v2 phases 0-6 (see below) were completed against the prior spec and are being carried forward, not redone, except where v3 changes the contract.
+- The app is single-household and private-first. **Owner decision (2026-07-08): Supabase Auth is explicitly not needed** ("just me and my wife") — this overrides PRD v3 §3's auth line. `/login` remains a no-op redirect to `/dashboard`. Revisit only if the owner asks for multi-user access.
+- PRD v3 adds requirements with no v2 equivalent: a real test harness (`AI_MODE` mock/live, `.env.test`, `seed:test`/`teardown`, `test_run_id` residue tracking, `data-testid` coverage), a consolidated 6-style library (currently 14 thin entries), and five verification suites run as repo skills, culminating in a Release Gate (v3 §12).
+- Chrome DevTools MCP (`chrome-devtools`, https://github.com/ChromeDevTools/chrome-devtools-mcp) was installed at user scope on 2026-07-08 (`claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`) and shows connected via `claude mcp list`. MCP tool sets load at session start, so it was not callable in the session that installed it. Any fresh session should have it available and should prefer it for suites 2/4/5; this session used Playwright (installed as a devDependency) as the interim driver — same intent (real browser, real clicks, real screenshots), different mechanism.
 - The room workspace now uses `current_stage` semantics and append-only artifact handling for new writes.
 - The PRD-v2 alignment migration has been applied successfully to the live Supabase project through the GitHub workflow.
 - The AI layer now uses `/lib/schemas`, `/lib/ai/gateway.ts`, and repo-backed versioned prompt files under `/prompts`.
@@ -78,13 +78,15 @@ The flagship moment is transforming the owner's real room photos into concept-al
 - Home-level preferences UI does not exist yet even though the migration path is defined.
 
 ## Agent Rules
-- Treat [docs/AI_Interior_Atelier_PRD_v2.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/AI_Interior_Atelier_PRD_v2.md) as the single product spec.
+- Treat [docs/AI_Interior_Atelier_PRD_v3.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/AI_Interior_Atelier_PRD_v3.md) as the single product spec. v2 is historical context only.
 - Do not reintroduce destructive delete-on-rerun behavior.
 - Locked concepts must remain the only valid source for downstream product/render generation.
 - Additive migrations only unless the owner explicitly approves destructive cleanup.
 - Do not add a fourth AI provider without owner sign-off.
+- Do not build Supabase Auth — owner explicitly declined it (2026-07-08); this is an intentional, permanent deviation from PRD v3 §3, not a gap to close.
 - Keep secrets in `.env.local` or platform env configuration only.
 - Apply Supabase changes through repo migrations, not dashboard-only edits.
+- "Done" means the phase gate in PRD v3 §12.3 is green, not agent self-assessment. A phase is not complete because code was written and typechecks.
 
 ## Build status against PRD v2 (updated 2026-07-07)
 Phases 2-6 of `BUILD_PLAN.md` are now implemented and pass the type gate (`tsc --noEmit` on a clean reconstruction; `next build` must be run on Windows). Highlights:
@@ -96,7 +98,15 @@ Phases 2-6 of `BUILD_PLAN.md` are now implemented and pass the type gate (`tsc -
 
 Remaining owner-side deploy actions: apply migration 004 via the GitHub->Supabase workflow + `verify:live`; run `npm run build` on Windows; commit from Windows (the sandbox mount is a stale snapshot this session).
 
-## Known Gaps Against PRD v2
+## Known Gaps Against PRD v3 (new, added 2026-07-08)
+- No test harness: no `AI_MODE` flag, no mock fixtures, no `.env.test`, no `seed:test`/`teardown`, no `test_run_id` column anywhere.
+- No `data-testid` coverage on interactive elements or artifact cards.
+- No debug state-assertion endpoint (needed for the Integrity suite to assert the §4 invalidation table).
+- Style library has 14 thin entries; PRD v3 §7 wants 6 deep ones (Lowcountry Coastal, Moody Coastal, Organic Modern, Modern Traditional, Masculine Executive, Boutique Hotel).
+- No verification suites/skills exist yet (Integrity, Functional E2E, Live API smoke, Assets & responsive, Design brain & feel) and no Release Gate has ever run.
+- No separate test Supabase project/branch exists; only one set of live credentials is configured in `.env.local`. Until a second Supabase project is provisioned, the test harness will run against the same project with strict `test_run_id` tagging + teardown rather than true environment isolation — flagged as a real residue risk until a dedicated test project exists.
+
+## Known Gaps Against PRD v2 (historical — v2 is superseded)
 - The `room_analyses` physical table rename remains deferred as a destructive migration; app-facing language is already diagnosis-first.
 - API routes still have no per-user auth (single-household private mode, auth intentionally deferred). This must be revisited before any multi-tenant or public deployment.
 - Product/render critics are logged but non-blocking (no auto-regeneration), matching the concept-critic convention; tightening these into gated loops is future work.
