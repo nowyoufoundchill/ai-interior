@@ -1,7 +1,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
-import { BASE_URL, getRoomState, readCurrentTestRun, waitForServer } from "./_lib.mjs";
+import { createClient } from "@supabase/supabase-js";
+import { loadTestEnv } from "../test-env.mjs";
+import { BASE_URL, clickTabAndWait, getRoomState, readCurrentTestRun, waitForAtLeast, waitForServer } from "./_lib.mjs";
 import { buildFullJourney } from "./_journey.mjs";
 
 /**
@@ -48,8 +50,7 @@ async function main() {
         ["tab-renders", "empty-renders"],
         ["tab-chat", "empty-chat"]
       ]) {
-        await page.getByTestId(tabTestId).click();
-        await page.waitForLoadState("networkidle");
+        await clickTabAndWait(page, tabTestId);
         await capture(page, manifest, { width, tab: tabTestId, state });
       }
     }
@@ -67,16 +68,14 @@ async function main() {
         ["tab-renders", "populated-before-after"],
         ["tab-chat", "populated-chat"]
       ]) {
-        await page.getByTestId(tabTestId).click();
-        await page.waitForLoadState("networkidle");
+        await clickTabAndWait(page, tabTestId);
         await capture(page, manifest, { width, tab: tabTestId, state });
       }
     }
 
     // --- Hover state on a concept card ----------------------------------------
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.getByTestId("tab-concepts").click();
-    await page.waitForLoadState("networkidle");
+    await clickTabAndWait(page, "tab-concepts");
     const firstConceptCard = page.locator('[data-testid^="concept-card-"]').first();
     if (await firstConceptCard.count()) {
       await firstConceptCard.hover();
@@ -84,20 +83,25 @@ async function main() {
     }
 
     // --- Stale state: rerun diagnosis so the locked concept set goes stale ---
-    await page.getByTestId("tab-diagnosis").click();
-    await page.waitForLoadState("networkidle");
+    await clickTabAndWait(page, "tab-diagnosis");
     await page.getByTestId("diagnosis-generate-button").click();
     await page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
-    await page.getByTestId("tab-concepts").click();
-    await page.waitForLoadState("networkidle");
+    await clickTabAndWait(page, "tab-concepts");
+    // "networkidle" after the diagnosis POST can resolve before React
+    // commits the refreshed mood_boards data — wait for the actual "stale"
+    // badge text (StatusBadge renders the raw status string) before
+    // capturing, not just for the tab panel to exist.
+    await waitForAtLeast(page.getByText("stale", { exact: false }), 1, { timeoutMs: 8000 });
     await capture(page, manifest, { width: 1440, tab: "tab-concepts", state: "stale-concepts-after-diagnosis-rerun" });
 
-    // --- Dump the room state snapshot for cross-reference; the actual
-    // diagnosis/concept text specificity read happens from the populated-*
-    // screenshots above, which render the full field content in the UI. ---
+    // --- Dump the room state snapshot plus full diagnosis/concept text, so
+    // the reviewer can judge specificity (PRD v3 §11: "references this
+    // room's features and dimensions, no generic advice") directly from
+    // structured text as well as from the populated-* screenshots. --------
     const state = await getRoomState(roomId);
     writeFileSync(path.join(SCREENSHOT_DIR, "state-snapshot.json"), JSON.stringify(state, null, 2));
+    writeFileSync(path.join(SCREENSHOT_DIR, "full-content.json"), JSON.stringify(await dumpFullContent(roomId), null, 2));
 
     writeFileSync(path.join(SCREENSHOT_DIR, "manifest.json"), JSON.stringify(manifest, null, 2));
     console.log(`[design-review] captured ${manifest.length} screenshots to ${SCREENSHOT_DIR}`);
@@ -105,6 +109,26 @@ async function main() {
   } finally {
     await browser.close();
   }
+}
+
+async function dumpFullContent(roomId) {
+  loadTestEnv();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const { data: room } = await supabase.from("rooms").select("*").eq("id", roomId).single();
+  const { data: diagnosis } = await supabase
+    .from("room_analyses")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data: concepts } = await supabase.from("mood_boards").select("*").eq("room_id", roomId).order("version", { ascending: true });
+
+  return {
+    room: { name: room.name, room_type: room.room_type, dimensions: room.dimensions, design_brief: room.design_brief },
+    diagnosis: diagnosis?.analysis ?? null,
+    concepts: (concepts ?? []).map((c) => ({ version: c.version, status: c.status, concept_name: c.concept_name, concept_data: c.concept_data }))
+  };
 }
 
 async function capture(page, manifest, { width, tab, state }) {

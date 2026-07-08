@@ -118,6 +118,36 @@ export async function waitForAtLeast(locator, minCount, { timeoutMs = 8000, inte
   return last;
 }
 
+// A tab click swaps `activeTab` client state with no network request at
+// all, so `waitForLoadState("networkidle")` is not a real synchronization
+// point for it (there's nothing in flight to wait on) — screenshotting
+// right after such a click can race React's re-render and capture the
+// PREVIOUS panel's content under the NEWLY-active tab's highlight, or vice
+// versa. Each tab has one element that only exists on its own panel; wait
+// for that instead of trusting "networkidle".
+const TAB_PANEL_MARKER = {
+  "tab-photos-brief": "photo-upload-input",
+  "tab-diagnosis": "diagnosis-generate-button",
+  "tab-concepts": "concepts-generate-button",
+  "tab-products": "products-generate-button",
+  "tab-renders": "render-generate-button",
+  "tab-chat": "chat-message-input"
+};
+
+export async function clickTabAndWait(page, tabTestId, { timeoutMs = 8000 } = {}) {
+  await page.getByTestId(tabTestId).click();
+  const marker = TAB_PANEL_MARKER[tabTestId];
+  if (marker) {
+    await page.getByTestId(marker).waitFor({ state: "visible", timeout: timeoutMs });
+  }
+  await page.waitForLoadState("networkidle");
+  // The tab button's active-state background uses a CSS `transition`
+  // (~150-300ms). Content/state is already correct by this point, but a
+  // screenshot fired immediately can still catch the highlight mid-fade
+  // between the previous and newly active tab. Let it settle.
+  await page.waitForTimeout(300);
+}
+
 export async function waitForServer(url = BASE_URL, timeoutMs = 30000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

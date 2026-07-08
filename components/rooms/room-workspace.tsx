@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Check, ClipboardList, Loader2, MessageSquare, Package, Palette, Wand2 } from "lucide-react";
@@ -16,7 +15,6 @@ type Product = Database["public"]["Tables"]["products"]["Row"];
 type Render = Database["public"]["Tables"]["renders"]["Row"];
 type Revision = Database["public"]["Tables"]["revisions"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
-type AiRun = Database["public"]["Tables"]["ai_runs"]["Row"];
 type TabName = (typeof ROOM_TABS)[number];
 
 const TAB_TESTID: Record<TabName, string> = {
@@ -38,7 +36,6 @@ export function RoomWorkspace(props: {
   renders: Render[];
   revisions: Revision[];
   memories: Memory[];
-  aiRuns: AiRun[];
 }) {
   const [activeTab, setActiveTab] = useState<TabName>("Photos & Brief");
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -107,12 +104,6 @@ export function RoomWorkspace(props: {
             </p>
             <p className="mt-2">What&apos;s next: {nextHint(props.room.current_stage || props.room.status, props.photos.length, Boolean(latestDiagnosis), Boolean(lockedMoodBoard))}</p>
             <p className="mt-2">Saved photos: {props.photos.length}</p>
-            <p className="mt-2">
-              Debug runs: {props.aiRuns.length}{" "}
-              <Link data-testid="debug-link" href="/debug" className="font-semibold text-atelier-ink underline underline-offset-4">
-                Open debug
-              </Link>
-            </p>
           </div>
         </div>
       </section>

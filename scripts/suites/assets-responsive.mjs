@@ -1,7 +1,8 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
-import { BASE_URL, readCurrentTestRun, SuiteReporter, waitForServer } from "./_lib.mjs";
+import { BASE_URL, clickTabAndWait, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForServer } from "./_lib.mjs";
+import { buildFullJourney } from "./_journey.mjs";
 
 // Some cached product photos are multi-megabyte originals; naturalWidth can
 // still read 0 for a moment after navigation while the browser is mid
@@ -17,7 +18,6 @@ async function waitForNaturalWidth(imgLocator, timeoutMs = 8000, intervalMs = 20
   }
   return last;
 }
-import { buildFullJourney } from "./_journey.mjs";
 
 /**
  * PRD v3 §12.1 Suite 4 — Assets & responsive. Checks every <img> for HTTP 200
@@ -54,8 +54,7 @@ async function main() {
 
     // --- Image integrity: HTTP 200 AND rendered natural width > 0 ----------
     for (const tabTestId of TABS) {
-      await page.getByTestId(tabTestId).click();
-      await page.waitForLoadState("networkidle");
+      await clickTabAndWait(page, tabTestId);
       const images = page.locator("img");
       const count = await images.count();
       for (let i = 0; i < count; i += 1) {
@@ -77,8 +76,7 @@ async function main() {
       await page.setViewportSize({ width, height: 900 });
 
       for (const tabTestId of TABS) {
-        await page.getByTestId(tabTestId).click();
-        await page.waitForLoadState("networkidle");
+        await clickTabAndWait(page, tabTestId);
 
         const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
         const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
@@ -88,11 +86,11 @@ async function main() {
           { scrollWidth, clientWidth }
         );
 
-        // Excludes inline text hyperlinks embedded in prose (debug-link,
-        // product-source-link "Open product source") — secondary, incidental
-        // links read as text, not primary touch controls; forcing them to a
-        // 44px box would visually break the copy they sit in. Every primary
-        // interactive control (nav, tabs, buttons) is still held to the bar.
+        // Excludes the inline text hyperlink embedded in a product card
+        // ("Open product source") — a secondary, incidental link read as
+        // text, not a primary touch control; forcing it to a 44px box would
+        // visually break the copy it sits in. Every primary interactive
+        // control (nav, tabs, buttons) is still held to the bar.
         const undersizedTargets = await page.evaluate((excluded) => {
           const elements = Array.from(document.querySelectorAll("button[data-testid], a[data-testid]"));
           return elements
@@ -103,7 +101,7 @@ async function main() {
               return { testId: el.getAttribute("data-testid"), width: rect.width, height: rect.height };
             })
             .filter((entry) => entry.width > 0 && entry.height > 0 && (entry.width < 44 || entry.height < 44));
-        }, ["debug-link", "product-source-link-"]);
+        }, ["product-source-link-"]);
         reporter.assert(
           undersizedTargets.length === 0,
           `all visible tap targets >= 44px at ${width}px (${tabTestId})`,
@@ -115,10 +113,9 @@ async function main() {
 
       // Renders tab: both Before and After images visible, non-zero size
       // (documented slider deviation — see module docstring).
-      await page.getByTestId("tab-renders").click();
-      await page.waitForLoadState("networkidle");
+      await clickTabAndWait(page, "tab-renders");
       const beforeAfterImages = page.locator('[data-testid^="render-card-"] img');
-      const babCount = await beforeAfterImages.count();
+      const babCount = await waitForAtLeast(beforeAfterImages, 1, { timeoutMs: 3000 });
       if (babCount > 0) {
         for (let i = 0; i < babCount; i += 1) {
           const box = await beforeAfterImages.nth(i).boundingBox();

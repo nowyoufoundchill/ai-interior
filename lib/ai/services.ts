@@ -185,27 +185,68 @@ export async function wholeHomeContextAgent(input: {
   });
 }
 
+// Per-style mock fixture data (concept name, thesis, palette, rejection
+// note) so the 3 mock concepts a room sees under AI_MODE=mock are visibly
+// distinct — matching styleLibrary.slice(0, 3) by index. Concepts that all
+// share one hardcoded palette and one templated why_it_works sentence fail
+// the PRD v3 §5.2/§11 differentiation requirement even in mock mode, which
+// defeats the point of using mock mode to verify the UI (Suite 5 design
+// review would never be able to pass against identical-looking concepts).
+const MOCK_CONCEPT_PROFILES: Array<{
+  conceptName: string;
+  thesis: string;
+  palette: { name: string; hex: string }[];
+  whyMayReject: string;
+}> = [
+  {
+    conceptName: "Tidewater Study",
+    thesis: "An airy, architectural coastal direction that leans on light and material honesty instead of beach props.",
+    palette: [
+      { name: "Warm white", hex: "#f7f2ea" },
+      { name: "Haint blue", hex: "#a9c4c2" },
+      { name: "Sand", hex: "#d9c7a8" },
+      { name: "Natural oak", hex: "#b9895a" },
+      { name: "Sea grass green", hex: "#8a9a6b" }
+    ],
+    whyMayReject: "It may feel too light and airy if the desired outcome is darker or more enclosed."
+  },
+  {
+    conceptName: "Dusk Harbor Room",
+    thesis: "A moodier coastal direction pulled toward dusk: darker accents and tactile materials over literal beach signifiers.",
+    palette: [
+      { name: "Warm white", hex: "#f2ede2" },
+      { name: "Blue-gray", hex: "#5c6b73" },
+      { name: "Mushroom", hex: "#a9998a" },
+      { name: "Natural oak", hex: "#a67b4d" },
+      { name: "Blackened bronze", hex: "#3b342c" }
+    ],
+    whyMayReject: "It may feel too dark or reserved if the desired outcome is bright and high-energy."
+  },
+  {
+    conceptName: "Quiet Organic Atelier",
+    thesis: "A tactile, warm modern direction built on soft forms, natural texture, and quiet, uncluttered negative space.",
+    palette: [
+      { name: "Bone", hex: "#f0e9dd" },
+      { name: "Greige", hex: "#b8ab97" },
+      { name: "Walnut", hex: "#6b4a35" },
+      { name: "Charcoal", hex: "#3a3a38" },
+      { name: "Sage", hex: "#8a9482" }
+    ],
+    whyMayReject: "It may feel too restrained if the desired outcome is highly colorful or maximal."
+  }
+];
+
 export async function styleDirector(input: {
   room: RoomLike;
 }): Promise<MoodBoardConcept[]> {
   const styles = styleLibrary.slice(0, 3);
-  return styles.map((style, index) =>
-    moodBoardSchema.parse({
-      concept_name: index === 0 ? "Tailored Coastal Study" : index === 1 ? "Quiet Organic Atelier" : "Collected Transitional Room",
-      design_thesis:
-        index === 0
-          ? "A composed, slightly moody direction that uses coastal restraint without beach references."
-          : index === 1
-            ? "A tactile, warm modern direction focused on calm materials, softened edges, and practical storage."
-            : "A layered direction that blends classic structure with fresher art, lighting, and relaxed upholstery.",
+  return styles.map((style, index) => {
+    const profile = MOCK_CONCEPT_PROFILES[index] ?? MOCK_CONCEPT_PROFILES[0];
+    return moodBoardSchema.parse({
+      concept_name: profile.conceptName,
+      design_thesis: profile.thesis,
       style_keywords: [style.style_name, ...style.pairs_well_with.slice(0, 2)],
-      palette: [
-        { name: "Warm white", hex: "#f5efe4" },
-        { name: "Oak", hex: "#b9895a" },
-        { name: "Moss", hex: "#687461" },
-        { name: "Charcoal", hex: "#3b3933" },
-        { name: "Aged brass", hex: "#b08a4c" }
-      ],
+      palette: profile.palette,
       materials: style.materials.slice(0, 6),
       furniture_direction: style.furniture_silhouettes.join(", "),
       layout_direction: "Anchor the main function first, then add storage, lighting, and one strong secondary seating or styling moment.",
@@ -214,12 +255,12 @@ export async function styleDirector(input: {
       decor_direction: "Use fewer, better objects with visible texture and a reason to be in the room.",
       plant_direction: style.plants.join(", "),
       budget_strategy: "Invest in the main workhorse piece, lighting, and rug scale; save on accessories and secondary tables.",
-      why_it_works: `This direction gives ${input.room.name} a clear point of view while preserving whole-home flexibility.`,
-      why_user_may_reject_it: "It may feel too restrained if the desired outcome is highly colorful or maximal.",
+      why_it_works: `${style.summary} This reading of ${style.style_name.toLowerCase()} gives ${input.room.name} a clear, specific point of view.`,
+      why_user_may_reject_it: profile.whyMayReject,
       risk_profile: style.common_mistakes.slice(0, 3),
       quality_score: 86 - index
-    })
-  );
+    });
+  });
 }
 
 /**

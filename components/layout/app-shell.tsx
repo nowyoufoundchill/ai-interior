@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Home, LayoutDashboard, MessageSquare, Package, Sparkles } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "nav-link-dashboard" },
+  { href: "/dashboard", label: "Studio", icon: LayoutDashboard, testId: "nav-link-dashboard" },
   { href: "/dashboard", label: "Homes", icon: Home, testId: "nav-link-homes" },
   { href: "/dashboard", label: "Mood Boards", icon: Sparkles, testId: "nav-link-mood-boards" },
   { href: "/dashboard", label: "Products", icon: Package, testId: "nav-link-products" },
