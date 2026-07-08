@@ -39,5 +39,11 @@ export async function buildFullJourney(page, roomId) {
   await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
   await page.waitForLoadState("networkidle");
 
+  await page.getByTestId("tab-chat").click();
+  await page.getByTestId("chat-message-input").fill("Why did you choose this palette for this room?");
+  await page.getByTestId("chat-send-button").click();
+  await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
+  await page.waitForLoadState("networkidle");
+
   return { lockedConceptKey: key };
 }
