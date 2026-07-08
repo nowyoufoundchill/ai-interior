@@ -88,6 +88,36 @@ export class SuiteReporter {
   }
 }
 
+/**
+ * Playwright's `locator.count()` is a point-in-time DOM snapshot with no
+ * auto-retry (unlike `expect(locator)` matchers from @playwright/test's
+ * runner, which these standalone scripts don't use). After a click that
+ * triggers `router.refresh()`, the RSC response can land (and
+ * `waitForLoadState("networkidle")` can resolve) slightly before React
+ * commits the new props to the DOM. Poll instead of snapshotting once.
+ */
+export async function waitForCount(locator, expectedCount, { timeoutMs = 8000, intervalMs = 150 } = {}) {
+  const start = Date.now();
+  let last = -1;
+  while (Date.now() - start < timeoutMs) {
+    last = await locator.count();
+    if (last === expectedCount) return last;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return last;
+}
+
+export async function waitForAtLeast(locator, minCount, { timeoutMs = 8000, intervalMs = 150 } = {}) {
+  const start = Date.now();
+  let last = -1;
+  while (Date.now() - start < timeoutMs) {
+    last = await locator.count();
+    if (last >= minCount) return last;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return last;
+}
+
 export async function waitForServer(url = BASE_URL, timeoutMs = 30000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

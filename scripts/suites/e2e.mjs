@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { BASE_URL, readCurrentTestRun, SuiteReporter, waitForServer } from "./_lib.mjs";
+import { BASE_URL, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForCount, waitForServer } from "./_lib.mjs";
 
 /**
  * PRD v3 §12.1 Suite 2 — Functional E2E. Drives the real browser through the
@@ -41,7 +41,14 @@ async function main() {
     }
   });
   page.on("requestfailed", (request) => {
-    failedRequests.push(`NETWORK_FAIL ${request.method()} ${request.url()} :: ${request.failure()?.errorText}`);
+    // Next.js's App Router cancels an in-flight RSC prefetch/refresh request
+    // (`?_rsc=...`) whenever a newer navigation/refresh supersedes it — an
+    // expected internal mechanism, not a user-facing failure. Only flag
+    // aborted requests that aren't that pattern.
+    const url = request.url();
+    const isRscAbort = url.includes("_rsc=") && request.failure()?.errorText === "net::ERR_ABORTED";
+    if (isRscAbort) return;
+    failedRequests.push(`NETWORK_FAIL ${request.method()} ${url} :: ${request.failure()?.errorText}`);
   });
 
   try {
@@ -61,7 +68,7 @@ async function main() {
     await page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     const diagnosisPanel = page.locator('[data-testid^="diagnosis-panel-"]');
-    reporter.assert(await diagnosisPanel.count() >= 1, "diagnosis panel renders after generation");
+    reporter.assert(await waitForAtLeast(diagnosisPanel, 1) >= 1, "diagnosis panel renders after generation");
 
     // --- Concepts: generate, edit, re-harmonize, lock ------------------------
     await page.getByTestId("tab-concepts").click();
@@ -69,7 +76,8 @@ async function main() {
     await page.waitForResponse((res) => res.url().includes("/generate-moodboards") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     const conceptCards = page.locator('[data-testid^="concept-card-"]');
-    reporter.assert(await conceptCards.count() === 3, "exactly 3 concept cards render", await conceptCards.count());
+    const conceptCount = await waitForCount(conceptCards, 3);
+    reporter.assert(conceptCount === 3, "exactly 3 concept cards render", conceptCount);
 
     const firstCard = conceptCards.nth(0);
     const firstKey = await extractKey(firstCard, "concept-card-");
@@ -79,7 +87,7 @@ async function main() {
     await page.waitForResponse((res) => res.url().includes("/moodboards/") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     reporter.assert(
-      (await page.getByText("E2E Edited Concept Name").count()) >= 1,
+      (await waitForAtLeast(page.getByText("E2E Edited Concept Name"), 1)) >= 1,
       "edited concept name appears in a new active version"
     );
 
@@ -98,12 +106,11 @@ async function main() {
     await lockCandidate.getByTestId(`concept-lock-button-${lockKey}`).click();
     await page.waitForResponse((res) => res.url().includes("/select-moodboard") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
+    const unlockButton = page.locator(`[data-testid="concept-unlock-button-${lockKey}"]`);
+    await unlockButton.waitFor({ state: "visible", timeout: 8000 }).catch(() => {});
+    reporter.assert(await unlockButton.isVisible(), "locked concept now shows an Unlock control");
     reporter.assert(
-      await page.locator(`[data-testid="concept-unlock-button-${lockKey}"]`).isVisible(),
-      "locked concept now shows an Unlock control"
-    );
-    reporter.assert(
-      (await page.locator(`[data-testid="concept-edit-button-${lockKey}"]`).count()) === 0,
+      (await waitForCount(page.locator(`[data-testid="concept-edit-button-${lockKey}"]`), 0)) === 0,
       "locked concept no longer shows a direct Edit control (must unlock first)"
     );
 
@@ -113,7 +120,7 @@ async function main() {
     await page.waitForResponse((res) => res.url().includes("/source-products") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     const productCards = page.locator('[data-testid^="product-card-"]');
-    const productCount = await productCards.count();
+    const productCount = await waitForAtLeast(productCards, 1);
     reporter.assert(productCount >= 1, "product plan renders at least one product card", productCount);
 
     const firstProductId = await extractKey(productCards.nth(0), "product-card-");
@@ -121,7 +128,7 @@ async function main() {
     await page.waitForResponse((res) => res.url().includes(`/products/${firstProductId}`) && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     reporter.assert(
-      (await page.getByTestId(`product-reset-button-${firstProductId}`).count()) === 1,
+      (await waitForCount(page.getByTestId(`product-reset-button-${firstProductId}`), 1)) === 1,
       "approved product shows a Reset control (status changed)"
     );
 
@@ -131,7 +138,7 @@ async function main() {
       await page.waitForResponse((res) => res.url().includes(`/products/${secondProductId}`) && res.request().method() === "POST");
       await page.waitForLoadState("networkidle");
       reporter.assert(
-        (await page.getByTestId(`product-reset-button-${secondProductId}`).count()) === 1,
+        (await waitForCount(page.getByTestId(`product-reset-button-${secondProductId}`), 1)) === 1,
         "rejected product shows a Reset control (status changed)"
       );
     }
@@ -142,15 +149,16 @@ async function main() {
     await page.getByTestId("render-generate-button").click();
     await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
-    let renderCards = page.locator('[data-testid^="render-card-"]');
-    reporter.assert(await renderCards.count() === 1, "first render card appears after edit", await renderCards.count());
+    const renderCards = page.locator('[data-testid^="render-card-"]');
+    const firstRenderCount = await waitForCount(renderCards, 1);
+    reporter.assert(firstRenderCount === 1, "first render card appears after edit", firstRenderCount);
 
     await page.getByTestId("render-instructions-input").fill("Regenerate with a larger rug.");
     await page.getByTestId("render-generate-button").click();
     await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
-    renderCards = page.locator('[data-testid^="render-card-"]');
-    reporter.assert(await renderCards.count() === 2, "regeneration adds a second render card (history kept)", await renderCards.count());
+    const secondRenderCount = await waitForCount(renderCards, 2);
+    reporter.assert(secondRenderCount === 2, "regeneration adds a second render card (history kept)", secondRenderCount);
 
     // --- Chat: ask why, then request + confirm a revision ---------------------
     await page.getByTestId("tab-chat").click();
@@ -158,17 +166,16 @@ async function main() {
     await page.getByTestId("chat-send-button").click();
     await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
-    let chatCards = page.locator('[data-testid^="chat-message-card-"]');
-    reporter.assert(await chatCards.count() === 1, "first chat turn renders");
+    const chatCards = page.locator('[data-testid^="chat-message-card-"]');
+    reporter.assert((await waitForCount(chatCards, 1)) === 1, "first chat turn renders");
 
     await page.getByTestId("chat-message-input").fill("Make it moodier — darker walls and richer wood tones.");
     await page.getByTestId("chat-send-button").click();
     await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
-    chatCards = page.locator('[data-testid^="chat-message-card-"]');
-    reporter.assert(await chatCards.count() === 2, "second chat turn (revision request) renders");
+    reporter.assert((await waitForCount(chatCards, 2)) === 2, "second chat turn (revision request) renders");
     reporter.assert(
-      (await page.getByText("Proposal only").count()) >= 1,
+      (await waitForAtLeast(page.getByText("Proposal only"), 1)) >= 1,
       "revision-shaped chat turn is tagged as a proposal, not a silent mutation"
     );
   } finally {

@@ -143,7 +143,7 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
                   type="button"
                   data-testid={`photo-delete-button-${photo.id}`}
                   onClick={() => deletePhoto(photo)}
-                  className="rounded-md border border-atelier-taupe/30 p-2 text-atelier-charcoal transition hover:bg-atelier-linen"
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-atelier-taupe/30 p-2 text-atelier-charcoal transition hover:bg-atelier-linen"
                   aria-label="Delete photo"
                 >
                   <Trash2 className="h-4 w-4" />

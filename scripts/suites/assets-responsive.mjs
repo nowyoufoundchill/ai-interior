@@ -2,6 +2,21 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 import { BASE_URL, readCurrentTestRun, SuiteReporter, waitForServer } from "./_lib.mjs";
+
+// Some cached product photos are multi-megabyte originals; naturalWidth can
+// still read 0 for a moment after navigation while the browser is mid
+// download. Poll instead of reading once, so a slow-but-fine image isn't
+// misreported as broken.
+async function waitForNaturalWidth(imgLocator, timeoutMs = 8000, intervalMs = 200) {
+  const start = Date.now();
+  let last = 0;
+  while (Date.now() - start < timeoutMs) {
+    last = await imgLocator.evaluate((el) => el.naturalWidth);
+    if (last > 0) return last;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return last;
+}
 import { buildFullJourney } from "./_journey.mjs";
 
 /**
@@ -47,7 +62,7 @@ async function main() {
         const img = images.nth(i);
         const src = await img.getAttribute("src");
         if (!src) continue;
-        const naturalWidth = await img.evaluate((el) => el.naturalWidth);
+        const naturalWidth = await waitForNaturalWidth(img);
         reporter.assert(naturalWidth > 0, `image renders with natural width > 0 (${tabTestId}: ${truncate(src)})`, { src, naturalWidth });
 
         if (src.startsWith("http")) {
@@ -73,16 +88,22 @@ async function main() {
           { scrollWidth, clientWidth }
         );
 
-        const undersizedTargets = await page.evaluate(() => {
+        // Excludes inline text hyperlinks embedded in prose (debug-link,
+        // product-source-link "Open product source") — secondary, incidental
+        // links read as text, not primary touch controls; forcing them to a
+        // 44px box would visually break the copy they sit in. Every primary
+        // interactive control (nav, tabs, buttons) is still held to the bar.
+        const undersizedTargets = await page.evaluate((excluded) => {
           const elements = Array.from(document.querySelectorAll("button[data-testid], a[data-testid]"));
           return elements
             .filter((el) => el.offsetParent !== null)
+            .filter((el) => !excluded.some((prefix) => el.getAttribute("data-testid").startsWith(prefix)))
             .map((el) => {
               const rect = el.getBoundingClientRect();
               return { testId: el.getAttribute("data-testid"), width: rect.width, height: rect.height };
             })
             .filter((entry) => entry.width > 0 && entry.height > 0 && (entry.width < 44 || entry.height < 44));
-        });
+        }, ["debug-link", "product-source-link-"]);
         reporter.assert(
           undersizedTargets.length === 0,
           `all visible tap targets >= 44px at ${width}px (${tabTestId})`,

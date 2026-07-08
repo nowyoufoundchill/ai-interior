@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.label}
                   href={item.href}
                   data-testid={item.testId}
-                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-atelier-charcoal transition hover:bg-atelier-linen"
+                  className="flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm text-atelier-charcoal transition hover:bg-atelier-linen"
                 >
                   <Icon className="h-4 w-4" aria-hidden="true" />
                   {item.label}

@@ -124,7 +124,7 @@ export function RoomWorkspace(props: {
             type="button"
             data-testid={`tab-${TAB_TESTID[tab]}`}
             onClick={() => setActiveTab(tab)}
-            className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-semibold transition ${
+            className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-semibold transition ${
               activeTab === tab ? "bg-atelier-ink text-white" : "bg-white/60 text-atelier-charcoal hover:bg-atelier-linen"
             }`}
           >
@@ -400,7 +400,7 @@ function ConceptCard(props: {
                 props.onReharmonize(board.id, instructions);
                 setMode("none");
               }}
-              className="rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
             >
               {props.busy ? "Re-harmonizing" : "Create refined version"}
             </button>
@@ -408,7 +408,7 @@ function ConceptCard(props: {
               type="button"
               data-testid={`concept-reharmonize-cancel-${conceptKey}`}
               onClick={() => setMode("none")}
-              className="rounded-md px-3 py-2 text-sm text-atelier-charcoal"
+              className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm text-atelier-charcoal"
             >
               Cancel
             </button>
@@ -444,7 +444,7 @@ function ConceptCard(props: {
                 props.onEdit(board.id, { concept_name: editName, design_thesis: editThesis });
                 setMode("none");
               }}
-              className="rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
             >
               {props.busy ? "Saving" : "Save as new version"}
             </button>
@@ -452,7 +452,7 @@ function ConceptCard(props: {
               type="button"
               data-testid={`concept-edit-cancel-${conceptKey}`}
               onClick={() => setMode("none")}
-              className="rounded-md px-3 py-2 text-sm text-atelier-charcoal"
+              className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm text-atelier-charcoal"
             >
               Cancel
             </button>
@@ -468,7 +468,7 @@ function ConceptCard(props: {
               data-testid={`concept-unlock-button-${conceptKey}`}
               onClick={() => props.onUnlock(board.id)}
               disabled={props.busy}
-              className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
             >
               {props.busy ? "Working" : "Unlock concept"}
             </button>
@@ -478,7 +478,7 @@ function ConceptCard(props: {
               data-testid={`concept-lock-button-${conceptKey}`}
               onClick={() => props.onLock(board.id)}
               disabled={props.busy}
-              className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
             >
               {props.busy ? "Working" : isStale ? "Re-lock this concept" : "Lock this concept"}
             </button>
@@ -488,7 +488,7 @@ function ConceptCard(props: {
             data-testid={`concept-reharmonize-button-${conceptKey}`}
             onClick={() => setMode("reharmonize")}
             disabled={props.busy}
-            className="rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
           >
             Re-harmonize
           </button>
@@ -498,7 +498,7 @@ function ConceptCard(props: {
               data-testid={`concept-edit-button-${conceptKey}`}
               onClick={() => setMode("edit")}
               disabled={props.busy}
-              className="rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
             >
               Edit
             </button>
@@ -690,7 +690,7 @@ function ProductsPanel(props: {
                               data-testid={`product-approve-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "approve")}
-                              className="rounded-md border border-atelier-moss px-3 py-1.5 text-xs font-semibold text-atelier-moss transition hover:bg-atelier-moss hover:text-white disabled:opacity-60"
+                              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-moss px-3 py-1.5 text-xs font-semibold text-atelier-moss transition hover:bg-atelier-moss hover:text-white disabled:opacity-60"
                             >
                               {busy ? "Saving" : "Approve"}
                             </button>
@@ -701,7 +701,7 @@ function ProductsPanel(props: {
                               data-testid={`product-reject-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "reject")}
-                              className="rounded-md border border-atelier-taupe/40 px-3 py-1.5 text-xs font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+                              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-taupe/40 px-3 py-1.5 text-xs font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
                             >
                               {busy ? "Saving" : "Reject"}
                             </button>
@@ -712,7 +712,7 @@ function ProductsPanel(props: {
                               data-testid={`product-reset-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "reset")}
-                              className="rounded-md px-3 py-1.5 text-xs text-atelier-charcoal underline underline-offset-4 disabled:opacity-60"
+                              className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-1.5 text-xs text-atelier-charcoal underline underline-offset-4 disabled:opacity-60"
                             >
                               Reset
                             </button>
@@ -876,7 +876,7 @@ function ChatPanel(props: {
           data-testid="chat-send-button"
           onClick={props.onSend}
           disabled={props.isLoading}
-          className="flex w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+          className="flex min-h-11 w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
         >
           {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
           Save chat turn
@@ -947,7 +947,7 @@ function PanelHeader(props: {
           data-testid={props.actionTestId}
           onClick={props.onAction}
           disabled={props.disabled}
-          className="flex w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:cursor-not-allowed disabled:opacity-50"
         >
           {props.actionLabel.endsWith("ing") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
           {props.actionLabel}
