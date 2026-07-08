@@ -416,3 +416,25 @@
 ### Next Action
 - PRD v3 delta is complete; the Release Gate is green. Full detail in `/reports/release-2026-07-08.md`.
 - Next meaningful work is owner-directed: either address one of the open items above, provision a dedicated `.env.test` Supabase project for true test isolation, or move to a new feature/phase.
+
+## 2026-07-08 (continued 2) — Legacy production data found and removed; owner flags design-brain quality as next priority
+
+### Context
+- Immediately after the Release Gate went green, the owner opened the deployed Vercel page and reported it "still shows test rooms everywhere" and that the app "feels like AI slop... doesn't feel like a design intelligence brain."
+
+### Found
+- Audited production directly (not through the residue check, which only looks for `test_run_id IS NOT NULL` and was therefore structurally blind to this): **61 homes** existed in the live `homes` table, **all with `test_run_id = NULL`**, dated 2026-07-06/07 — before migration 005 or any teardown mechanism existed. These were Phase 0 spike/simulation-batch leftovers (`simulate-workflow-batch.mjs` 10-variant runs against the owner's real office photos, repeated many times) plus a few `"debug home"` entries, never cleaned up because nothing in the earlier sessions' work had a cleanup mechanism at all.
+- This is the direct cause of "test rooms everywhere": every Release Gate cycle's "zero residue" claim this session was true but narrow — it proved nothing *new* leaked, while 61 pre-existing untagged homes sat visible on the dashboard the entire time. Should have been caught by simply looking at the deployed app, not just trusting the automated check's scope.
+
+### Fixed
+- Inspected each home before proposing deletion; identified one (`"4 Forest Crt"`, no suffix, real style notes and constraints, a typo — not simulation-batch text) as likely the owner's real entry and proposed keeping it.
+- Owner explicitly confirmed via a direct question that it should be deleted too — no exceptions.
+- Deleted all 61 homes and cascaded children: 59 rooms, 230 photos, 108 mood boards, 75 products, 46 diagnoses, 2 renders, 169 `ai_runs` rows, 229 Storage objects. `npm run verify:live` confirmed schema/storage still healthy after; production `homes` table is now empty (a genuinely clean slate).
+- Cleanup scripts were throwaway (`scripts/_audit-prod.mjs`, `_check-keeper.mjs`, `_cleanup-legacy-test-data.mjs`), written for this one-time operation and deleted after use — not committed, not part of the repeatable test harness (this was a one-off data cleanup, not a suite).
+
+### Decision
+- Owner's assessment: everything built during the PRD v3 delta (test harness, 5 suites, invalidation-rule fixes, tap-target sizing, debug-panel/nav cleanup) is real and necessary, but none of it touches prompt quality, context-brain depth, or actual diagnosis/concept/product/render output — the thing being judged when the app is called "AI slop." Flagged as the next priority.
+- BUILD_PLAN.md updated with a new "Next Priority: Design Brain Quality" section listing the relevant existing architecture (prompts, context brain, style library, critic rubric, `design_preferences` taste graph) as an unscoped punch list, plus a suggested first move: run one real `AI_MODE=live` room through the full loop against real owner photos/brief and have the owner react directly to the output, since PRD v3 §12.5 already names this as the one thing no automated loop can verify.
+
+### Next Action
+- Awaiting owner direction on which design-brain area to prioritize first, or run the suggested real-cycle-plus-owner-reaction pass to get concrete, current feedback to work from.

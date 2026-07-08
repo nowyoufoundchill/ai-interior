@@ -5,6 +5,10 @@
 
 **PRD v3 delta is complete.** The Release Gate (§12.4) ran to green on 2026-07-08: Suite 1 55/55, Suite 2 21/21, Suite 3 (live) 19/19, Suite 4 62/62, Suite 5 31/32 screens ≥8/10 with zero named rubric violations. See `/reports/release-2026-07-08.md` for the full pass/fail matrix, every fix made, and open items for owner judgment.
 
+**Owner feedback after the gate went green (2026-07-08, same day):** the deployed app showed 61 leftover simulation/debug homes on the dashboard, and the owner's reaction was that the product "feels like AI slop... doesn't feel like a design intelligence brain." Both were real, fair findings:
+1. **Production cleanup (done):** the 61 homes were Phase 0 spike/simulation-batch leftovers from 2026-07-06/07, created before `test_run_id` tracking existed, so they were invisible to every "zero residue" check run during the Release Gate cycle (that check only ever looks for tagged rows — it was never a check against the dashboard itself). Audited and deleted with the owner's explicit, specifically-confirmed sign-off (61 homes, 59 rooms, 230 photos, 108 mood boards, 75 products, 46 diagnoses, 169 `ai_runs` rows, 229 Storage objects) — including the one home that looked like the owner's real entry, which the owner explicitly confirmed should also go. Production `homes` table is now empty; `verify:live` confirmed schema/storage still healthy after.
+2. **Design brain quality (not started — see below):** everything in the PRD v3 delta was testing/verification infrastructure and narrow correctness fixes. None of it touched prompt quality, context-brain depth, or actual diagnosis/concept/product/render output quality — the thing the owner is actually judging when they say "AI slop." Flagged by the owner as the next priority.
+
 What v3 adds on top of that, and what the rest of this file now tracks, is the delta:
 - a real test harness (`AI_MODE` mock/live, `.env.test`, `seed:test`/`teardown`, `test_run_id` residue tracking)
 - `data-testid` coverage on every interactive element and artifact card
@@ -33,6 +37,19 @@ See "## PRD v3 Delta Plan" further down for the active phase-by-phase tracking. 
 **Known process gap (still open, mitigated):** v3 §3 assumes a dedicated `.env.test` Supabase project so tests never touch production. Only one Supabase project exists today. The harness runs against the same project with strict `test_run_id` tagging (now verified complete across every artifact table, including `ai_runs` — see fix #5 in the release report) and a hard teardown + residue check after every cycle, confirmed clean after all 10 cycles run this session (8 mock + 2 live). This is documented risk, not silent scope-narrowing.
 
 **Open items for owner judgment** (PRD §12.5 — not resolvable by loops): no draggable before/after slider (static side-by-side ships instead); subtle concept-card hover affordance; Products tab filter row reads close to an admin panel to one reviewer pass; native web search/Tavily not wired into live product sourcing (feature addition, not a bug); no dedicated `.env.test` project. Full detail in the release report.
+
+## Next Priority: Design Brain Quality (flagged 2026-07-08 — not yet scoped)
+
+The owner's read after using the deployed app: it "doesn't feel like a design intelligence brain," feels like "AI slop... with a lot going on." This is a judgment about actual output quality and product feel, not about anything the verification suites above check (they check state-machine correctness and UI mechanics, not whether a diagnosis is insightful or a concept is genuinely distinctive and high-taste). Nothing below is scoped or committed yet — this is a punch list of the areas in the existing architecture that own this problem, for the owner to prioritize:
+
+- **Prompts** (`/prompts/{diagnosis,concepts,products,renders,chat,critic}/*.md`) — the actual instructions driving every AI call. Last touched for real content during the Phase 0 spike (2026-07-06/07); may need another real-photo iteration pass now that the full context-brain + critic pattern exists.
+- **Context brain** (`/lib/ai/context-brain/*`, `/lib/ai/design-portfolio.ts`) — property dossier, room intelligence, taste graph, design policy, and the annotated design portfolio. This is where "generic vs. specific to this room" gets decided; only validated once against one real office batch, never iterated against owner reactions to real diagnoses/concepts.
+- **Style library depth** (`lib/ai/style-library.ts`) — consolidated to the 6 PRD-named styles on 2026-07-08 with the full field set, but never re-validated against a real generation run since consolidation.
+- **Critic rubric calibration** (`lib/ai/critic-rubric.ts`, `lib/ai/critic.ts`) — scores concepts/diagnoses/products against fixed numeric anchors; never checked against whether the owner would agree with those scores on real output.
+- **`design_preferences` UI exists but has near-zero real data** — the taste graph is still mostly brief-bootstrapped rather than built from confirmed owner reactions to actual artifacts, which is the mechanism PRD v3 assumes will make output feel personal over time.
+- **A real, owner-judged live cycle has never happened.** Every live validation to date (Phase 0 spike batch, this session's two live smoke cycles) tested pipeline mechanics — real calls succeed, images get cached — not whether a real human liked the output. PRD v3 §12.5 names this explicitly as "the owner's 10%" that no loop can verify.
+
+**Suggested first move, pending owner direction:** run one real `AI_MODE=live` room through the full loop (diagnosis → 3 concepts → lock → products → render) against real owner-provided photos/brief, and have the owner react to it directly — that reaction is the actual eval harness for this work, not another automated suite.
 
 ## Completed Alignment Work
 - [x] Audited the current build against PRD v2 and identified v1 carryovers.
