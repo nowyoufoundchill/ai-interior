@@ -51,6 +51,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: boardError?.message ?? "Concept was not found for this room." }, { status: 404 });
   }
 
+  const { data: roomMeta } = await supabase.from("rooms").select("test_run_id").eq("id", roomId).maybeSingle();
+
   if (action === "unlock") {
     if (board.status !== "locked") {
       return NextResponse.json({ error: "Only a locked concept can be unlocked." }, { status: 400 });
@@ -67,14 +69,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
     // Unlocking removes the design contract, so downstream products/renders are
-    // no longer valid. They were already marked stale on lock; keep them stale
-    // and drop the room back to the concepts stage without a locked concept.
+    // no longer valid immediately (not only after a future re-lock). Mark them
+    // stale now and drop the room back to the concepts stage without a locked
+    // concept.
+    await supabase.from("products").update({ status: "stale" }).eq("room_id", roomId).neq("status", "rejected");
+    await supabase.from("renders").update({ status: "stale" }).eq("room_id", roomId).neq("status", "rejected");
     await supabase
       .from("rooms")
       .update({ selected_mood_board_id: null, status: "concepts", current_stage: "concepts" })
       .eq("id", roomId);
 
     return NextResponse.json({ mood_board: updated, downstream_invalidated: true });
+  }
+
+  // §4 invalidation table: "Mood board edit while locked | Not possible.
+  // Editing requires explicit unlock." Re-harmonize is not restricted here —
+  // the table names only direct field edits.
+  if (action === "edit" && board.status === "locked") {
+    return NextResponse.json(
+      { error: "This concept is locked. Unlock it first, then edit." },
+      { status: 400 }
+    );
   }
 
   // Both edit and reharmonize are append-only: they create a new concept
@@ -150,7 +165,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       origin,
       status: "draft",
       selected: false,
-      quality_score: nextConcept.quality_score
+      quality_score: nextConcept.quality_score,
+      test_run_id: roomMeta?.test_run_id ?? null
     })
     .select("*")
     .single();

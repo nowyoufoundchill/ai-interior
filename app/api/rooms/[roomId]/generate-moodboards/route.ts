@@ -54,7 +54,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
         origin: "generated",
         status: "draft",
         selected: false,
-        quality_score: concept.quality_score
+        quality_score: concept.quality_score,
+        test_run_id: room.test_run_id
       }))
     )
     .select("*");

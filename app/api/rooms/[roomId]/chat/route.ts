@@ -59,7 +59,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       assistant_response: revision.assistant_response,
       revision_type: revision.revision_type,
       state_before: stateBefore,
-      state_after: stateAfter
+      state_after: stateAfter,
+      test_run_id: room?.test_run_id ?? null
     })
     .select("*")
     .single();
@@ -72,14 +73,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       role: "user",
       content: revision.user_message,
       classified_intent: revision.revision_type,
-      referenced_artifact_ids: []
+      referenced_artifact_ids: [],
+      test_run_id: room?.test_run_id ?? null
     },
     {
       room_id: roomId,
       role: "assistant",
       content: revision.assistant_response,
       classified_intent: revision.revision_type,
-      referenced_artifact_ids: []
+      referenced_artifact_ids: [],
+      test_run_id: room?.test_run_id ?? null
     }
   ]);
 

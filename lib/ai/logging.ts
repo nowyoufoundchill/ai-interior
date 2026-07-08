@@ -20,8 +20,22 @@ export async function logAiRun(input: {
 }) {
   const supabase = createServerSupabaseClient();
 
+  // ai_runs has no direct signal of which test cycle produced it, but the
+  // room it's logged against does (rooms.test_run_id, set at seed:test time).
+  // Looking it up here — rather than requiring every AI service/route to
+  // thread a testRunId parameter through — is what makes the PRD v3 §12.2
+  // residue check ("zero rows/objects with any test_run_id in production")
+  // actually true for ai_runs instead of silently passing because the column
+  // was never populated.
+  let testRunId: string | null = null;
+  if (input.roomId) {
+    const { data } = await supabase.from("rooms").select("test_run_id").eq("id", input.roomId).maybeSingle();
+    testRunId = data?.test_run_id ?? null;
+  }
+
   const { error } = await supabase.from("ai_runs").insert({
     room_id: input.roomId,
+    test_run_id: testRunId,
     service_name: input.serviceName,
     prompt_version: input.promptVersion,
     provider: input.provider ?? "unknown",

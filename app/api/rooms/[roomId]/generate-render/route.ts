@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateImageEdit } from "@/lib/ai/gateway";
+import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
 import { isOpenAiConfigured } from "@/lib/ai/openai";
 import { renderPromptDirector } from "@/lib/ai/services";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
@@ -59,6 +59,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   }
 
   let fileUrl: string | null = null;
+  // A null image is expected whenever AI_MODE=mock (the gateway short-circuits
+  // to a mocked plan with no image) — that must fall through to the "edit plan
+  // saved" placeholder, not be treated as a live OpenAI failure. Only a live
+  // call that returns no image is a real, user-facing error.
+  const isLiveImageEdit = isOpenAiConfigured() && resolveAiMode() !== "mock";
 
   try {
     const imageBase64 = await generateImageEdit({
@@ -69,7 +74,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       sourceImageUrl: sourcePhoto.file_url
     });
 
-    if (isOpenAiConfigured() && !imageBase64) {
+    if (isLiveImageEdit && !imageBase64) {
       throw new Error("OpenAI image generation returned no image output.");
     }
 
@@ -90,7 +95,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Render image generation failed.";
-    if (isOpenAiConfigured()) {
+    if (isLiveImageEdit) {
       return NextResponse.json({ error: message }, { status: 500 });
     }
   }
@@ -119,7 +124,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       generated_image_path: fileUrl,
       status: "current",
       critique: plan.critique,
-      quality_score: plan.quality_score
+      quality_score: plan.quality_score,
+      test_run_id: room.test_run_id
     })
     .select("*")
     .single();

@@ -492,7 +492,7 @@ function ConceptCard(props: {
           >
             Re-harmonize
           </button>
-          {!isStale && (
+          {!isStale && !isLocked && (
             <button
               type="button"
               data-testid={`concept-edit-button-${conceptKey}`}

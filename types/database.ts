@@ -14,6 +14,7 @@ export type Database = {
           id: string;
           email: string | null;
           name: string | null;
+          test_run_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -21,6 +22,7 @@ export type Database = {
           id?: string;
           email?: string | null;
           name?: string | null;
+          test_run_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -41,6 +43,7 @@ export type Database = {
           style_notes: string | null;
           whole_home_palette: Json;
           whole_home_constraints: Json;
+          test_run_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -53,6 +56,7 @@ export type Database = {
           style_notes?: string | null;
           whole_home_palette?: Json;
           whole_home_constraints?: Json;
+          test_run_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -77,6 +81,7 @@ export type Database = {
           status: string;
           current_stage: string;
           selected_mood_board_id: string | null;
+          test_run_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -97,6 +102,7 @@ export type Database = {
           status?: string;
           current_stage?: string;
           selected_mood_board_id?: string | null;
+          test_run_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -113,6 +119,7 @@ export type Database = {
           angle_type: string | null;
           ai_caption: string | null;
           metadata: Json;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -124,6 +131,7 @@ export type Database = {
           angle_type?: string | null;
           ai_caption?: string | null;
           metadata?: Json;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["photos"]["Insert"]>;
@@ -139,6 +147,7 @@ export type Database = {
           source_photo_ids: Json;
           brief_snapshot: Json;
           quality_score: number | null;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -150,6 +159,7 @@ export type Database = {
           source_photo_ids?: Json;
           brief_snapshot?: Json;
           quality_score?: number | null;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["room_analyses"]["Insert"]>;
@@ -168,6 +178,7 @@ export type Database = {
           status: string;
           locked_fields: Json;
           quality_score: number | null;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -182,6 +193,7 @@ export type Database = {
           status?: string;
           locked_fields?: Json;
           quality_score?: number | null;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["mood_boards"]["Insert"]>;
@@ -208,6 +220,7 @@ export type Database = {
           risks: Json;
           alternatives: Json;
           status: string;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -230,6 +243,7 @@ export type Database = {
           risks?: Json;
           alternatives?: Json;
           status?: string;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;
@@ -253,6 +267,7 @@ export type Database = {
           status: string;
           critique: Json;
           quality_score: number | null;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -272,6 +287,7 @@ export type Database = {
           status?: string;
           critique?: Json;
           quality_score?: number | null;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["renders"]["Insert"]>;
@@ -286,6 +302,7 @@ export type Database = {
           revision_type: string;
           state_before: Json;
           state_after: Json;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -296,6 +313,7 @@ export type Database = {
           revision_type: string;
           state_before?: Json;
           state_after?: Json;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["revisions"]["Insert"]>;
@@ -308,6 +326,7 @@ export type Database = {
           scope_id: string;
           memory_type: string;
           content: Json;
+          test_run_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -317,6 +336,7 @@ export type Database = {
           scope_id: string;
           memory_type: string;
           content: Json;
+          test_run_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -341,6 +361,7 @@ export type Database = {
           token_estimate: number | null;
           cost_estimate: number | null;
           latency_ms: number | null;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -360,6 +381,7 @@ export type Database = {
           token_estimate?: number | null;
           cost_estimate?: number | null;
           latency_ms?: number | null;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["ai_runs"]["Insert"]>;
@@ -372,6 +394,7 @@ export type Database = {
           preference_type: string;
           label: string;
           details: Json;
+          test_run_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -381,6 +404,7 @@ export type Database = {
           preference_type: string;
           label: string;
           details?: Json;
+          test_run_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -395,6 +419,7 @@ export type Database = {
           content: string;
           classified_intent: string | null;
           referenced_artifact_ids: Json;
+          test_run_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -404,6 +429,7 @@ export type Database = {
           content: string;
           classified_intent?: string | null;
           referenced_artifact_ids?: Json;
+          test_run_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["chat_messages"]["Insert"]>;

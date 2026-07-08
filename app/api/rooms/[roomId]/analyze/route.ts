@@ -53,7 +53,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
         design_brief: room.design_brief,
         dimensions: room.dimensions
       },
-      quality_score: 82
+      quality_score: 82,
+      test_run_id: room.test_run_id
     })
     .select("*")
     .single();

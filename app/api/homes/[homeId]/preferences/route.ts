@@ -30,13 +30,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ hom
   }
 
   const supabase = createServerSupabaseClient();
+  const { data: homeMeta } = await supabase.from("homes").select("test_run_id").eq("id", homeId).maybeSingle();
   const { data, error } = await supabase
     .from("design_preferences")
     .insert({
       home_id: homeId,
       preference_type: preferenceType,
       label,
-      details: typeof body.details === "object" && body.details !== null ? body.details : {}
+      details: typeof body.details === "object" && body.details !== null ? body.details : {},
+      test_run_id: homeMeta?.test_run_id ?? null
     })
     .select("*")
     .single();

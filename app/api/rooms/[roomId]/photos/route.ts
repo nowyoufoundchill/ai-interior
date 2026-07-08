@@ -20,6 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const { roomId } = await params;
   const supabase = createServiceSupabaseClient();
   const contentType = request.headers.get("content-type") ?? "";
+  const { data: roomMeta } = await supabase.from("rooms").select("test_run_id").eq("id", roomId).maybeSingle();
 
   if (contentType.includes("multipart/form-data")) {
     const formData = await request.formData();
@@ -48,7 +49,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
         storage_path: storagePath,
         file_url: publicUrlData.publicUrl,
         label,
-        angle_type: label
+        angle_type: label,
+        test_run_id: roomMeta?.test_run_id ?? null
       })
       .select("*")
       .single();
@@ -58,6 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    await staleCurrentDiagnosis(supabase, roomId);
     await supabase.from("rooms").update({ status: "photos" }).eq("id", roomId);
     return NextResponse.json({ photo: data }, { status: 201 });
   }
@@ -65,11 +68,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const body = await request.json();
   const { data, error } = await supabase
     .from("photos")
-    .insert({ ...body, room_id: roomId })
+    .insert({ ...body, room_id: roomId, test_run_id: roomMeta?.test_run_id ?? null })
     .select("*")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await staleCurrentDiagnosis(supabase, roomId);
   await supabase.from("rooms").update({ status: "photos" }).eq("id", roomId);
   return NextResponse.json({ photo: data }, { status: 201 });
 }
@@ -114,9 +118,23 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ r
   const { error } = await supabase.from("photos").delete().eq("id", photoId).eq("room_id", roomId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  await staleCurrentDiagnosis(supabase, roomId);
   return NextResponse.json({ ok: true });
 }
 
 function stringFormValue(value: FormDataEntryValue | null) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/**
+ * PRD v3 §4 invalidation rule: new/changed photos mark the current diagnosis
+ * stale (kept, not deleted) so the owner knows to re-run it. Nothing else is
+ * touched here — concepts/products/renders only go stale when the diagnosis
+ * or mood board is actually re-run/re-locked, not merely on photo changes.
+ */
+async function staleCurrentDiagnosis(
+  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  roomId: string
+) {
+  await supabase.from("room_analyses").update({ status: "stale" }).eq("room_id", roomId).eq("status", "current");
 }

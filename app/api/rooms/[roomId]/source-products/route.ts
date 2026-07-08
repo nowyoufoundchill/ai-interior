@@ -120,7 +120,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
         reason_selected: product.reason_selected,
         risks: product.risks,
         alternatives: product.alternatives,
-        status: "suggested"
+        status: "suggested",
+        test_run_id: room.test_run_id
       }))
     )
     .select("*");
