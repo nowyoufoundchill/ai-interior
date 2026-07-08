@@ -10,8 +10,8 @@ The flagship moment is transforming the owner's real room photos into concept-al
 ## Current Reality
 - `docs/AI_Interior_Atelier_PRD_v3.md` supersedes v1 and v2 entirely and is the sole planning authority as of 2026-07-08. PRD v2 phases 0-6 (see below) were completed against the prior spec and are being carried forward, not redone, except where v3 changes the contract.
 - The app is single-household and private-first. **Owner decision (2026-07-08): Supabase Auth is explicitly not needed** ("just me and my wife") — this overrides PRD v3 §3's auth line. `/login` remains a no-op redirect to `/dashboard`. Revisit only if the owner asks for multi-user access.
-- PRD v3 adds requirements with no v2 equivalent: a real test harness (`AI_MODE` mock/live, `.env.test`, `seed:test`/`teardown`, `test_run_id` residue tracking, `data-testid` coverage), a consolidated 6-style library (currently 14 thin entries), and five verification suites run as repo skills, culminating in a Release Gate (v3 §12).
-- Chrome DevTools MCP (`chrome-devtools`, https://github.com/ChromeDevTools/chrome-devtools-mcp) was installed at user scope on 2026-07-08 (`claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`) and shows connected via `claude mcp list`. MCP tool sets load at session start, so it was not callable in the session that installed it. Any fresh session should have it available and should prefer it for suites 2/4/5; this session used Playwright (installed as a devDependency) as the interim driver — same intent (real browser, real clicks, real screenshots), different mechanism.
+- PRD v3's delta over v2 — a real test harness (`AI_MODE` mock/live, `seed:test`/`teardown`, `test_run_id` residue tracking, `data-testid` coverage), a consolidated 6-style library, and five verification suites run as repo skills — is **built and the Release Gate (§12.4) has run to green** as of 2026-07-08. See `/reports/release-2026-07-08.md`.
+- Chrome DevTools MCP (`chrome-devtools`, https://github.com/ChromeDevTools/chrome-devtools-mcp) is installed at user scope and connected per `claude mcp list`. The persisted `scripts/suites/*.mjs` (callable via `npm run suite:*`) use Playwright instead, since MCP browser tools are only invocable from an agent's own tool-calling loop, not a standalone script that must run unattended/repeatedly — prefer chrome-devtools MCP for ad hoc, in-conversation verification that isn't going into a reusable script.
 - The room workspace now uses `current_stage` semantics and append-only artifact handling for new writes.
 - The PRD-v2 alignment migration has been applied successfully to the live Supabase project through the GitHub workflow.
 - The AI layer now uses `/lib/schemas`, `/lib/ai/gateway.ts`, and repo-backed versioned prompt files under `/prompts`.
@@ -98,13 +98,13 @@ Phases 2-6 of `BUILD_PLAN.md` are now implemented and pass the type gate (`tsc -
 
 Remaining owner-side deploy actions: apply migration 004 via the GitHub->Supabase workflow + `verify:live`; run `npm run build` on Windows; commit from Windows (the sandbox mount is a stale snapshot this session).
 
-## Known Gaps Against PRD v3 (new, added 2026-07-08)
-- No test harness: no `AI_MODE` flag, no mock fixtures, no `.env.test`, no `seed:test`/`teardown`, no `test_run_id` column anywhere.
-- No `data-testid` coverage on interactive elements or artifact cards.
-- No debug state-assertion endpoint (needed for the Integrity suite to assert the §4 invalidation table).
-- Style library has 14 thin entries; PRD v3 §7 wants 6 deep ones (Lowcountry Coastal, Moody Coastal, Organic Modern, Modern Traditional, Masculine Executive, Boutique Hotel).
-- No verification suites/skills exist yet (Integrity, Functional E2E, Live API smoke, Assets & responsive, Design brain & feel) and no Release Gate has ever run.
-- No separate test Supabase project/branch exists; only one set of live credentials is configured in `.env.local`. Until a second Supabase project is provisioned, the test harness will run against the same project with strict `test_run_id` tagging + teardown rather than true environment isolation — flagged as a real residue risk until a dedicated test project exists.
+## PRD v3 status (updated 2026-07-08 — Release Gate green)
+All PRD v3 delta items are built and verified. `AI_MODE` mock/live harness, full `data-testid` coverage, the 6-style library, the debug state-assertion endpoint, and all 5 verification suites (`scripts/suites/*.mjs` + `.claude/skills/atelier-*`) exist and pass. The Release Gate (§12.4) ran to green: Suite 1 55/55, Suite 2 21/21, Suite 3 (live) 19/19, Suite 4 62/62, Suite 5 31/32 screens ≥8/10 with zero named rubric violations. Full detail, every fix made, and remaining owner-judgment items: `/reports/release-2026-07-08.md`.
+
+**Still open, by explicit scope decision (not oversights):**
+- No dedicated `.env.test` Supabase project — the harness runs against the same project as production, mitigated by `test_run_id` tagging (verified complete across every artifact table, including `ai_runs`, which had a real gap found and fixed this session) + teardown + a residue check confirmed clean after all 10 cycles run (8 mock + 2 live).
+- No draggable before/after slider (PRD §8) — a static side-by-side comparison ships instead.
+- Native web search / Tavily are not wired into the live production Product Scout route — only `/spike` exercises them; Suite 3 calls Tavily directly to prove connectivity. Wiring this in is a feature addition, not a bug fix.
 
 ## Known Gaps Against PRD v2 (historical — v2 is superseded)
 - The `room_analyses` physical table rename remains deferred as a destructive migration; app-facing language is already diagnosis-first.

@@ -367,3 +367,52 @@
 4. Run `npm run seed:test`, drive the suites against `AI_MODE=mock`, fix failures, reseed and re-run per §12.4 cycle discipline (never verify a fix against dirty state).
 5. One `AI_MODE=live` smoke cycle (Suite 3) against real Anthropic/OpenAI/Tavily.
 6. Write `/reports/release-{date}.md` and do the final BUILD_PLAN/PROJECT_BRAIN/SESSION_LOG sync.
+
+## 2026-07-08 (continued) — Verification suites built, Release Gate green
+
+### Context
+- Direct continuation of the same day's PRD v3 kickoff session, resuming from the "Resume point" above. Goal: execute PRD v3 §12 exactly as planned — write the 5 suites, run them to green, one live cycle, release report, final doc sync.
+- `claude mcp list` confirmed `chrome-devtools` connected at session start. In practice this session's suite scripts and ad hoc verification both used Playwright throughout — MCP browser tools are only callable from the agent's own tool-calling loop, not a standalone `npm run suite:*` script, so the persisted suites use Playwright regardless; screenshots were read directly via the Read tool for manual spot-checks between reviewer passes rather than driving a live MCP session.
+- Mid-session: a platform-side tool-safety-classifier outage blocked all Bash/PowerShell/WebFetch/ScheduleWakeup execution for an extended period (roughly 150 retry attempts over ~1.5 hours). Read/Write/Edit/Grep/Glob remained unaffected throughout, so that window was used to manually re-verify every edited file by direct code inspection rather than sitting idle. The owner suggested a 1-hour scheduled retry (suspecting a quota limit); a wakeup was scheduled via `ScheduleWakeup`, then cancelled and work resumed immediately once the owner said execution was no longer needed and confirmed available.
+
+### Built
+- **Shared suite infrastructure**: `scripts/suites/_lib.mjs` (`SuiteReporter` writing to `test-runs/suite-results/*.json`, `waitForServer`, `waitForCount`/`waitForAtLeast` polling helpers, `clickTabAndWait` — see Fixed below), `scripts/suites/_journey.mjs` (shared minimal state-builder: diagnosis → 3 concepts → lock → products → a render → a chat turn, used by Suites 4 and 5).
+- **Suite 1 — Integrity** (`integrity.mjs`, `.claude/skills/atelier-integrity/`): drives every §4 invalidation-table row through real API calls against the seeded room, asserting via `GET /api/debug/room-state/[roomId]` — new photo → diagnosis stale; diagnosis rerun → mood boards stale; edit while locked → 400; unlock → products/renders stale immediately; unlock+edit → new version, parent_version recorded; render regenerated → old kept stale, new current; nothing ever deleted. 55/55.
+- **Suite 2 — Functional E2E** (`e2e.mjs`, `atelier-e2e`): full room journey via `data-testid` only (diagnosis → generate/edit/re-harmonize/lock concepts → products approve/reject → render + regenerate → chat ask-why + revision-request), zero console errors, zero failed network requests. 21/21.
+- **Suite 3 — Live API smoke** (`live-smoke.mjs`, `atelier-live-smoke`): one real Anthropic diagnosis call, one real Anthropic product-sourcing + critic call (added mid-session so the cycle also proves a cached product image, per §12.4's literal wording), one real OpenAI image edit, one real Tavily search + extract, one deliberately bad request confirmed to return 400 and leave room state untouched. Tavily is called directly (not through the app) since native web search/Tavily aren't wired into production Product Scout yet — documented, not hidden. 19/19 across two live cycles (first proved the core 3-provider path at 16/16; second added the product-sourcing leg).
+- **Suite 4 — Assets & responsive** (`assets-responsive.mjs`, `atelier-assets-responsive`): every image HTTP 200 + real `naturalWidth`, then 390/768/1440px walk checking horizontal scroll and ≥44px tap targets (excluding inline prose hyperlinks by design, e.g. "Open product source"). Documented deviation: no draggable slider exists, so both Before/After images rendering correctly stands in for the touch-drag simulation. 62/62.
+- **Suite 5 — Design brain & feel** (`design-review.mjs`, `atelier-design-review`): captures 32 screenshots (5 tabs × empty/populated × 3 widths, plus hover and stale-badge states) plus full diagnosis/concept text for a specificity read. Scoring requires a fresh-context reviewer agent (a script cannot make that judgment) — three full reviewer passes plus one targeted re-score ran this session; see the release report for the complete history. Final: 31/32 screens ≥8/10, zero named rubric violations.
+
+### Fixed — real app bugs (found by building/running the suites, verified via reseed-and-rerun)
+1. `generate-render` treated a mock `null` image as a live OpenAI failure whenever real keys happened to be configured — our exact `seed:test`-falls-back-to-`.env.local` situation — causing spurious 500s in `AI_MODE=mock`.
+2. Photo add/delete never marked the current diagnosis `stale` (§4 row 1).
+3. Editing a **locked** concept was silently allowed instead of rejected (§4 row 4 requires explicit unlock first) — fixed at the API layer and the UI now hides the Edit button while locked.
+4. Unlocking left downstream products/renders non-stale until the *next* re-lock instead of immediately (§4 row 3).
+5. **Systemic residue-safety gap**: `logAiRun` and every route inserting into `room_analyses`/`mood_boards`/`products`/`renders`/`chat_messages`/`revisions`/`photos`/`design_preferences` never set `test_run_id` — meaning every automated test cycle would have permanently leaked rows into production while `check-test-residue.mjs` reported clean (the column existed from migration 005 but was never populated). Fixed by tagging every insert from the already-loaded room/home row; `types/database.ts` updated to include `test_run_id` on all 13 tables (previously untyped, which is how `tsc` never caught the gap). Verified via `teardown-test.mjs` actually removing rows on every subsequent run (e.g. `ai_runs: removed 22`) and `check-test-residue.mjs` staying clean.
+6. Tap targets across primary nav, room tabs, and nearly every concept/product/chat action button were under 44px (PRD §8) — `min-h-11` + proper flex centering applied throughout `room-workspace.tsx`, `app-shell.tsx`, `photo-uploader.tsx`.
+7. A visible "Debug runs: N · Open debug" line sat in the main room workspace stage panel, contradicting "hidden route... not an admin panel" (PRD §3/§8) — found by a fresh-context Suite 5 reviewer agent, removed; `/debug` itself is unaffected.
+8. Primary nav literally labeled "Dashboard" — same reviewer pass, renamed "Studio."
+9. Mock concept fixtures (`styleDirector()`) used one identical hardcoded palette + one templated sentence for all 3 concepts, and mock product fixtures (`buildProductPlanFixture()`) used one identical stock photo for all 6 products — both fail the "three concepts/products that feel the same" ban even in test mode, which would have made Suite 5 structurally unable to ever pass in mock mode. Each mock concept now has its own palette/thesis/layout/decor/budget text (drawn from its real style-library entry); each mock product has its own verified, category-matched placeholder photo (downloaded and visually confirmed before use, not guessed); the mock critic fixture now varies scores per concept instead of collapsing `quality_score` to one identical value.
+
+### Fixed — suite/capture-script bugs (not app bugs; confirmed via the debug endpoint or direct screenshot inspection that the app's real behavior was correct throughout)
+- `locator.count()` is a Playwright point-in-time snapshot with no auto-retry; added `waitForCount`/`waitForAtLeast` polling helpers used across `e2e.mjs`/`assets-responsive.mjs`.
+- Next.js's own aborted RSC prefetch requests (`?_rsc=...`, `net::ERR_ABORTED`, superseded by a newer navigation) were being misflagged as failed network requests in `e2e.mjs`.
+- Screenshots taken immediately after a pure tab-switch click (no network request, so `waitForLoadState("networkidle")` is not a real sync point) could capture mid-CSS-transition, making the wrong tab look "active" even though the underlying content was already correct — fixed with `clickTabAndWait()` (waits for a panel-specific marker, then a settle delay for the transition).
+- The shared journey builder never sent a chat message, so "populated chat" screenshots always looked identical to the empty state — added one chat turn.
+
+### Verified
+- `npm run typecheck` clean after every structural change.
+- Suite 1: 55/55. Suite 2: 21/21. Suite 4: 62/62. Suite 3 (live): 19/19 across two cycles. Suite 5: 31/32 screens ≥8/10, zero named rubric violations (one screen at 7/10 for a non-rubric hover-affordance note, not a §3/§11 violation).
+- Residue confirmed clean after every one of 10 cycles run this session (8 mock, 2 live) via `check-test-residue.mjs`.
+- `npm run verify:live` clean (migration 005 confirmed applied via GitHub Actions "Supabase DB Deploy #5", ~14s).
+
+### Current Warnings / Known Gaps (unchanged from before, now with mitigations proven working)
+- No dedicated `.env.test` Supabase project — mitigated by `test_run_id` tagging (now genuinely complete, see fix #5 above) + teardown + residue check, re-verified clean 10 times this session.
+- No draggable before/after slider (PRD §8) — static side-by-side ships instead; open item for owner judgment.
+- Native web search / Tavily not wired into live production Product Scout — only `/spike` and Suite 3's direct calls exercise them; wiring this in is a feature addition, not a bug fix, and stays out of scope.
+- Concept-card hover affordance is subtle (Suite 5 finding, non-rubric).
+- Products tab filter row reads close to an admin panel to one reviewer pass — a taste call for the owner, not unilaterally redesigned.
+
+### Next Action
+- PRD v3 delta is complete; the Release Gate is green. Full detail in `/reports/release-2026-07-08.md`.
+- Next meaningful work is owner-directed: either address one of the open items above, provision a dedicated `.env.test` Supabase project for true test isolation, or move to a new feature/phase.
