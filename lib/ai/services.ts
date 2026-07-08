@@ -197,6 +197,9 @@ const MOCK_CONCEPT_PROFILES: Array<{
   thesis: string;
   palette: { name: string; hex: string }[];
   whyMayReject: string;
+  layoutDirection: string;
+  decorDirection: string;
+  budgetStrategy: string;
 }> = [
   {
     conceptName: "Tidewater Study",
@@ -208,7 +211,10 @@ const MOCK_CONCEPT_PROFILES: Array<{
       { name: "Natural oak", hex: "#b9895a" },
       { name: "Sea grass green", hex: "#8a9a6b" }
     ],
-    whyMayReject: "It may feel too light and airy if the desired outcome is darker or more enclosed."
+    whyMayReject: "It may feel too light and airy if the desired outcome is darker or more enclosed.",
+    layoutDirection: "Float the main desk toward the window wall to work with natural light; keep circulation to the interior side clear.",
+    decorDirection: "One or two woven or ceramic pieces with visible handwork; nothing glossy or overly polished.",
+    budgetStrategy: "Invest in the desk and task lighting; keep rug and accessories mid-range."
   },
   {
     conceptName: "Dusk Harbor Room",
@@ -220,7 +226,10 @@ const MOCK_CONCEPT_PROFILES: Array<{
       { name: "Natural oak", hex: "#a67b4d" },
       { name: "Blackened bronze", hex: "#3b342c" }
     ],
-    whyMayReject: "It may feel too dark or reserved if the desired outcome is bright and high-energy."
+    whyMayReject: "It may feel too dark or reserved if the desired outcome is bright and high-energy.",
+    layoutDirection: "Anchor the room with a substantial desk or console against the darkest wall, balanced by a layered lighting plan.",
+    decorDirection: "Fewer, larger objects — one oversized art piece and one sculptural accent rather than many small ones.",
+    budgetStrategy: "Invest in lighting layers and one statement material moment; save on secondary seating."
   },
   {
     conceptName: "Quiet Organic Atelier",
@@ -232,7 +241,10 @@ const MOCK_CONCEPT_PROFILES: Array<{
       { name: "Charcoal", hex: "#3a3a38" },
       { name: "Sage", hex: "#8a9482" }
     ],
-    whyMayReject: "It may feel too restrained if the desired outcome is highly colorful or maximal."
+    whyMayReject: "It may feel too restrained if the desired outcome is highly colorful or maximal.",
+    layoutDirection: "Keep the center of the room open; push storage and secondary pieces to the perimeter for a calm, uncluttered feel.",
+    decorDirection: "A single large plant and one soft textile layer (throw or woven basket); resist adding more than that.",
+    budgetStrategy: "Invest in the anchor seating piece and rug texture; keep storage and lighting simple and functional."
   }
 ];
 
@@ -249,12 +261,12 @@ export async function styleDirector(input: {
       palette: profile.palette,
       materials: style.materials.slice(0, 6),
       furniture_direction: style.furniture_silhouettes.join(", "),
-      layout_direction: "Anchor the main function first, then add storage, lighting, and one strong secondary seating or styling moment.",
+      layout_direction: profile.layoutDirection,
       lighting_direction: style.lighting_types.join(", "),
       art_direction: style.art_direction.join(", "),
-      decor_direction: "Use fewer, better objects with visible texture and a reason to be in the room.",
+      decor_direction: profile.decorDirection,
       plant_direction: style.plants.join(", "),
-      budget_strategy: "Invest in the main workhorse piece, lighting, and rug scale; save on accessories and secondary tables.",
+      budget_strategy: profile.budgetStrategy,
       why_it_works: `${style.summary} This reading of ${style.style_name.toLowerCase()} gives ${input.room.name} a clear, specific point of view.`,
       why_user_may_reject_it: profile.whyMayReject,
       risk_profile: style.common_mistakes.slice(0, 3),

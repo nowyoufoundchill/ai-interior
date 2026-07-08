@@ -2,19 +2,24 @@ import type { ConceptCritique, DiagnosisCritique, MoodBoardConcept, ProductCriti
 
 export function buildConceptCritiqueFixture(concepts: MoodBoardConcept[]): ConceptCritique {
   return {
-    per_concept: concepts.map((concept) => ({
+    // A small deterministic per-index offset keeps mock quality_score from
+    // collapsing to one identical value across all 3 concepts (found by a
+    // design-review pass: identical-looking concepts undermine the point of
+    // using mock mode to verify differentiation), without pretending this is
+    // a real per-concept judgment.
+    per_concept: concepts.map((concept, index) => ({
       concept_name: concept.concept_name,
       scores: {
-        style_clarity: 74,
-        room_fit: 72,
+        style_clarity: 74 - index,
+        room_fit: 72 + index,
         functional_fit: 70,
-        scale_realism: 70,
-        color_material_cohesion: 74,
+        scale_realism: 70 + index,
+        color_material_cohesion: 74 - index,
         luxury_signal: 70,
-        originality: 68,
+        originality: 68 + index * 2,
         practicality: 72,
         budget_alignment: 70,
-        whole_home_alignment: 72
+        whole_home_alignment: 72 - index
       },
       issues: ["Mock critique only — no model call made. Provide a room + real concepts to score for real."]
     })),
