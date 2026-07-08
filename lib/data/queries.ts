@@ -59,6 +59,22 @@ export async function getHome(homeId: string) {
   return data as HomeDetail;
 }
 
+export type DesignPreference = Database["public"]["Tables"]["design_preferences"]["Row"];
+
+export async function getDesignPreferences(homeId: string): Promise<DesignPreference[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("design_preferences")
+    .select("*")
+    .eq("home_id", homeId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as DesignPreference[];
+}
+
 export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceData> {
   const supabase = createServerSupabaseClient();
 

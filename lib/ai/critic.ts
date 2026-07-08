@@ -1,5 +1,15 @@
-import { conceptCritiqueSchema, diagnosisCritiqueSchema, type ConceptCritique, type DiagnosisCritique, type MoodBoardConcept, type RoomAnalysis } from "@/lib/schemas";
-import { conceptCritiqueJsonSchema, diagnosisCritiqueJsonSchema } from "@/lib/schemas/json";
+import {
+  conceptCritiqueSchema,
+  diagnosisCritiqueSchema,
+  productCritiqueSchema,
+  type ConceptCritique,
+  type DiagnosisCritique,
+  type MoodBoardConcept,
+  type ProductCritique,
+  type ProductPlanItem,
+  type RoomAnalysis
+} from "@/lib/schemas";
+import { conceptCritiqueJsonSchema, diagnosisCritiqueJsonSchema, productCritiqueJsonSchema } from "@/lib/schemas/json";
 import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
 import { SCALE_ANCHORS, CRITIC_DIMENSION_GUIDANCE } from "@/lib/ai/critic-rubric";
 
@@ -78,6 +88,50 @@ export async function critiqueDiagnosis(input: {
       missing_factors: [],
       regeneration_needed: false,
       regeneration_focus: []
+    })
+  });
+}
+
+/**
+ * Independent product-plan critic. Mirrors the concept/diagnosis critics: runs
+ * through the gateway (so it is logged to ai_runs and visible in /debug), scores
+ * the product plan against the locked concept and typed room reality, and never
+ * mutates state. Authoritative but non-blocking for now, matching the concept
+ * critic convention (no unbounded auto-regeneration).
+ */
+export async function critiqueProducts(input: {
+  roomId: string;
+  products: ProductPlanItem[];
+  concept: unknown;
+  diagnosis?: unknown;
+  contextBrain: unknown;
+  provider?: GatewayProvider;
+}): Promise<ProductCritique> {
+  return runStructuredTask({
+    roomId: input.roomId,
+    serviceName: "Product Critic",
+    provider: input.provider ?? "anthropic",
+    promptPath: "prompts/critic/score-products.v1.md",
+    schemaName: "product_critique",
+    schema: productCritiqueJsonSchema,
+    zodSchema: productCritiqueSchema,
+    maxTokens: 4096,
+    taskInput: {
+      task: "Score this product plan against the locked concept and the real room as an independent, tough reviewer.",
+      products: input.products,
+      locked_concept: input.concept,
+      diagnosis: input.diagnosis,
+      context_brain: input.contextBrain,
+      scale_anchors: SCALE_ANCHORS
+    },
+    mock: () => ({
+      concept_fit_score: 74,
+      scale_realism_score: 72,
+      budget_discipline_score: 73,
+      coverage_score: 75,
+      strengths: ["Plan covers the core categories for the concept."],
+      issues: ["Mock critique only — no model call made."],
+      gaps: []
     })
   });
 }

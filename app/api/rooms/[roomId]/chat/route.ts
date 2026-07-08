@@ -83,18 +83,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     }
   ]);
 
-  if (revision.revision_type === "memory_update") {
-    await supabase.from("design_memories").insert({
-      scope: "room",
-      scope_id: roomId,
-      memory_type: "chat_preference",
-      content: {
-        user_message: revision.user_message,
-        assistant_response: revision.assistant_response,
-        state_after: revision.state_after
-      } as Json
-    });
-  }
+  // Chat no longer silently mutates taste state. A preference the owner states
+  // in chat is surfaced as a proposal (revision_type "memory_update"); the owner
+  // confirms it explicitly via the home-level Design preferences UI, which is the
+  // single source of truth for the taste graph. design_memories is no longer
+  // written from chat.
 
   return NextResponse.json({ revision: data });
 }

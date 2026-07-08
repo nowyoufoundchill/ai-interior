@@ -1,0 +1,156 @@
+{
+  "apiBaseUrl": "http://localhost:3000",
+  "base": {
+    "home": {
+      "name": "4 Forest Crt Workflow Simulation",
+      "region": "Isle of Palms, Charleston",
+      "home_type": "Full Renovation",
+      "style_notes": "Coastal, but not tacky. Classy, modern, light, warm, relaxed, and high end.",
+      "whole_home_palette": ["white", "rattan", "beige", "light blue", "sandy"],
+      "whole_home_constraints": ["Kid-friendly in mind", "Somewhat similar theme throughout the house."]
+    },
+    "room": {
+      "name": "Office",
+      "room_type": "office",
+      "purpose": "Focused work on computers, Zoom calls, and audio calls all day.",
+      "budget_range": "Flexible for the right pieces.",
+      "dimensions": {
+        "width_ft": 11,
+        "length_ft": 14,
+        "notes": "3 windows and 3 doors in the space, mindful not to block."
+      },
+      "style_preferences": ["high-end modern coastal", "executive", "tailored", "masculine", "warm luxury"],
+      "color_preferences": ["warm white", "sand", "weathered oak", "muted blue-gray", "charcoal"],
+      "constraints": [
+        "Do not block 3 windows or 3 doors.",
+        "Room must support all-day screen work and calls.",
+        "Avoid cheesy beach decor, nautical cliches, and anything tacky."
+      ],
+      "existing_items": [],
+      "design_brief": "Create a high-end modern coastal home office with a masculine executive feel. It should feel refined, architectural, and expensive, not theme-driven. Use the natural light, white shell, and oak floors as strengths. If a typical beach-house move would cheapen the room, reject it in favor of something better suited to the property and location."
+    }
+  },
+  "photos": [
+    {
+      "path": "spike/input-images/IMG_1126.jpg",
+      "label": "Entry corner with center window and side windows"
+    },
+    {
+      "path": "spike/input-images/IMG_1127.jpg",
+      "label": "Wall with two doors"
+    },
+    {
+      "path": "spike/input-images/IMG_1128.jpg",
+      "label": "Long wall with main doorway and secondary door"
+    },
+    {
+      "path": "spike/input-images/IMG_1129.jpg",
+      "label": "Window wall showing all three windows"
+    }
+  ],
+  "variants": [
+    {
+      "name": "Balanced Modern Coastal Executive",
+      "slug": "balanced-modern-coastal-executive",
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "index": 0 },
+      "runRender": false
+    },
+    {
+      "name": "Masculine Walnut Coastal Executive",
+      "slug": "masculine-walnut-coastal-executive",
+      "home": {
+        "style_notes": "Sophisticated coastal luxury with slightly deeper masculine contrast in private rooms. Modern, tailored, warm, and collected."
+      },
+      "room": {
+        "design_brief": "Create a high-end modern coastal office with a stronger masculine executive bend. Think refined coastal architecture, deep walnut, darker contrast, and tailored materials rather than literal beach styling. Use the room, daylight, and Charleston-area context to recommend against anything too casual or obvious."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Entry corner" },
+      "runRender": false
+    },
+    {
+      "name": "Lighter Architectural Coastal Studio",
+      "slug": "lighter-architectural-coastal-studio",
+      "room": {
+        "design_brief": "Create a brighter, more architectural version of luxury modern coastal for this office. It should still feel masculine and high end, but lighter, cleaner, and more design-forward than clubby. Let the location and window light matter, and avoid recommending dark heavy moves if they would fight the room."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Window wall" },
+      "runRender": false
+    },
+    {
+      "name": "Pushback First Coastal Judge",
+      "slug": "pushback-first-coastal-judge",
+      "room": {
+        "design_brief": "Act like a strong design director, not a yes-man. Create a high-end modern coastal office with executive polish, but if any of my instincts would cheapen the room, make it too beachy, or fight the architecture, explicitly recommend against them and choose what suits the property better."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "index": 0 },
+      "runRender": false
+    },
+    {
+      "name": "Charleston Vernacular Fit",
+      "slug": "charleston-vernacular-fit",
+      "home": {
+        "style_notes": "Modern Charleston coastal: airy, warm, elevated, architectural, rooted in place, never kitschy."
+      },
+      "room": {
+        "design_brief": "Create an office that feels right for an elevated coastal property near Charleston. Let geography influence material choices, palette restraint, and level of formality. Avoid generic beach-house moves and anything that would feel imported from the wrong region."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Window wall" },
+      "runRender": false
+    },
+    {
+      "name": "Acoustics and Calls First",
+      "slug": "acoustics-and-calls-first",
+      "room": {
+        "design_brief": "Prioritize an all-day professional work environment for screens, Zoom, and audio calls, but still make it feel like a luxury modern coastal executive office. The design should solve glare, echo, and camera backdrop quality without looking technical or corporate."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Entry corner" },
+      "runRender": false
+    },
+    {
+      "name": "Luxury Without Theme Decor",
+      "slug": "luxury-without-theme-decor",
+      "room": {
+        "design_brief": "Create a luxury office that reads subtly coastal through atmosphere, materials, and light rather than obvious decor. No rope, no shells, no driftwood styling, no striped beach clichés. It should feel expensive, masculine, collected, and current."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "index": 0 },
+      "runRender": false
+    },
+    {
+      "name": "Warm Minimal Executive",
+      "slug": "warm-minimal-executive",
+      "room": {
+        "design_brief": "Create a warm minimal executive office: modern coastal in spirit, but edited, architectural, and low-clutter. Favor stronger built quality, calmer styling, and fewer larger gestures over many decorative moves."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Long wall" },
+      "runRender": false
+    },
+    {
+      "name": "Collected Coastal Heritage",
+      "slug": "collected-coastal-heritage",
+      "room": {
+        "design_brief": "Blend high-end coastal refinement with a slightly more collected, heritage executive mood. It should still feel modern and masculine, but with more soul, depth, and editorial character than a generic clean modern office."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Entry corner" },
+      "runRender": false
+    },
+    {
+      "name": "Design Dissent Stress Test",
+      "slug": "design-dissent-stress-test",
+      "room": {
+        "design_brief": "Challenge my taste if needed. I think I want high-end modern coastal with masculine executive energy, but I want the design system to overrule me when the room, property, daylight, or plan suggests a better answer. Be opinionated, practical, and specific."
+      },
+      "selectConcept": "highest_quality",
+      "renderPhoto": { "labelIncludes": "Window wall" },
+      "runRender": false
+    }
+  ]
+}

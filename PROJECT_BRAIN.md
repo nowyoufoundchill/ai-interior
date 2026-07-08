@@ -86,8 +86,20 @@ The flagship moment is transforming the owner's real room photos into concept-al
 - Keep secrets in `.env.local` or platform env configuration only.
 - Apply Supabase changes through repo migrations, not dashboard-only edits.
 
+## Build status against PRD v2 (updated 2026-07-07)
+Phases 2-6 of `BUILD_PLAN.md` are now implemented and pass the type gate (`tsc --noEmit` on a clean reconstruction; `next build` must be run on Windows). Highlights:
+- Phase 2: append-only concept lock/unlock/edit/re-harmonize (`app/api/rooms/[roomId]/moodboards/[boardId]/route.ts` + `refineConcept`); shared `StatusBadge`/`StaleNotice`; diagnosis-first UI language.
+- Phase 3: renders are in-place photo edits — photo-edit language throughout, per-edit instructions wired into `renderPromptDirector`, before/after UI, preservation/critic history.
+- Phase 4: `productSourcingAgent` uses the full context brain + a real `Product Critic` (`critiqueProducts`); best-effort product image caching (`products.cached_image_path`); approve/reject controls; rationale-first, typed-dimension-aware prompt.
+- Phase 5: `design_preferences` is now the primary taste source (home-level UI + API + taste-graph wiring, outranking brief fields); chat is advisory only and never mutates state (proposes + requires explicit confirmation); `design_memories` is no longer written or used as a taste source.
+- Phase 6: RLS/API audit done; grant-based private model confirmed (all access server-side via service role; browser client unused). Added `004_prd_v2_access_hardening.sql` to close a default-grant gap on the PRD-v2 tables and prevent recurrence.
+
+Remaining owner-side deploy actions: apply migration 004 via the GitHub->Supabase workflow + `verify:live`; run `npm run build` on Windows; commit from Windows (the sandbox mount is a stale snapshot this session).
+
 ## Known Gaps Against PRD v2
-- Concept edit/unlock/re-harmonize flows are not built yet.
+- The `room_analyses` physical table rename remains deferred as a destructive migration; app-facing language is already diagnosis-first.
+- API routes still have no per-user auth (single-household private mode, auth intentionally deferred). This must be revisited before any multi-tenant or public deployment.
+- Product/render critics are logged but non-blocking (no auto-regeneration), matching the concept-critic convention; tightening these into gated loops is future work.
 - `design_preferences` exists only in the new migration path, not in live UI behavior yet; the taste graph is currently bootstrapped from brief fields only, not from confirmed owner reactions.
 - Chat still stores `revisions` and legacy memory records alongside the new `chat_messages` direction.
 - The app still uses legacy naming such as `room_analyses` in multiple places.

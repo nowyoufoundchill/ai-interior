@@ -19,12 +19,17 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .limit(1)
     .maybeSingle();
 
+  const { data: designPreferences } = home
+    ? await supabase.from("design_preferences").select("preference_type, label").eq("home_id", home.id)
+    : { data: [] };
+
   let concepts;
   try {
     concepts = await moodBoardGenerator({
       room,
       home,
-      analysis: latestDiagnosis?.analysis
+      analysis: latestDiagnosis?.analysis,
+      designPreferences: designPreferences ?? []
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Mood board generation failed.";

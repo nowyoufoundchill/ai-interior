@@ -161,6 +161,16 @@ export const conceptCritiqueSchema = z.object({
   differentiation_notes: z.string()
 });
 
+export const productCritiqueSchema = z.object({
+  concept_fit_score: z.number().min(0).max(100),
+  scale_realism_score: z.number().min(0).max(100),
+  budget_discipline_score: z.number().min(0).max(100),
+  coverage_score: z.number().min(0).max(100),
+  strengths: z.array(z.string()),
+  issues: z.array(z.string()),
+  gaps: z.array(z.string())
+});
+
 export const diagnosisCritiqueDimensionsSchema = z.object({
   room_specificity: z.number().min(0).max(100),
   downstream_usefulness: z.number().min(0).max(100),
@@ -189,3 +199,4 @@ export type DesignMemory = z.infer<typeof designMemorySchema>;
 export type DesignCriticScore = z.infer<typeof designCriticSchema>;
 export type ConceptCritique = z.infer<typeof conceptCritiqueSchema>;
 export type DiagnosisCritique = z.infer<typeof diagnosisCritiqueSchema>;
+export type ProductCritique = z.infer<typeof productCritiqueSchema>;

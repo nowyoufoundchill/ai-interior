@@ -320,6 +320,21 @@ export const diagnosisCritiqueJsonSchema = {
   required: ["scores", "strengths", "issues", "missing_factors", "regeneration_needed", "regeneration_focus"]
 } as const;
 
+export const productCritiqueJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    concept_fit_score: score,
+    scale_realism_score: score,
+    budget_discipline_score: score,
+    coverage_score: score,
+    strengths: stringArray,
+    issues: stringArray,
+    gaps: stringArray
+  },
+  required: ["concept_fit_score", "scale_realism_score", "budget_discipline_score", "coverage_score", "strengths", "issues", "gaps"]
+} as const;
+
 export const revisionJsonSchema = {
   type: "object",
   additionalProperties: false,

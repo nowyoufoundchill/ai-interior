@@ -32,19 +32,35 @@ const UNIVERSAL_BANNED_CLICHES = [
   "generic marketing language in place of a specific design rationale ('elevated', 'timeless', 'curated' used without a concrete reason)"
 ];
 
+export type ConfirmedPreference = {
+  preference_type: string;
+  label: string;
+};
+
 export function buildTasteGraph(input: {
   stylePreferences?: unknown;
   colorPreferences?: unknown;
   constraints?: unknown;
   homeStyleNotes?: string | null;
   wholeHomeConstraints?: unknown;
+  designPreferences?: ConfirmedPreference[];
 }): TasteGraph {
   const stylePrefs = toStringArray(input.stylePreferences);
   const colorPrefs = toStringArray(input.colorPreferences);
   const roomConstraints = toStringArray(input.constraints);
   const homeConstraints = toStringArray(input.wholeHomeConstraints);
 
+  // Confirmed, home-level design_preferences are the primary taste source and
+  // outrank first-brief wording, since they reflect explicit owner decisions
+  // rather than an initial guess. Brief fields remain as a lower-confidence
+  // fallback. design_memories is no longer a taste source.
+  const confirmed = (input.designPreferences ?? []).filter((preference) => preference.label?.trim());
+  const confirmedStyles = confirmed.filter((preference) => ["style", "color", "material", "preference"].includes(preference.preference_type));
+  const confirmedAvoid = confirmed.filter((preference) => preference.preference_type === "avoid");
+  const confirmedConstraints = confirmed.filter((preference) => preference.preference_type === "constraint");
+
   const preferred_styles: TastePreference[] = [
+    ...confirmedStyles.map((preference) => ({ label: preference.label, confidence: 0.95, source: "design_preferences" as const })),
     ...stylePrefs.map((label) => ({ label, confidence: 0.85, source: "brief" as const })),
     ...colorPrefs.map((label) => ({ label: `color direction: ${label}`, confidence: 0.7, source: "brief" as const }))
   ];
@@ -55,9 +71,9 @@ export function buildTasteGraph(input: {
 
   return {
     preferred_styles,
-    banned_cliches: UNIVERSAL_BANNED_CLICHES,
-    standing_constraints: [...roomConstraints, ...homeConstraints],
-    formality_balance: inferFormalityBalance(stylePrefs),
+    banned_cliches: [...confirmedAvoid.map((preference) => preference.label), ...UNIVERSAL_BANNED_CLICHES],
+    standing_constraints: [...confirmedConstraints.map((preference) => preference.label), ...roomConstraints, ...homeConstraints],
+    formality_balance: inferFormalityBalance([...confirmedStyles.map((preference) => preference.label), ...stylePrefs]),
     ai_may_disagree_when: [
       "A literal reading of the brief would produce a cliche on the banned list above.",
       "A styling choice would violate a typed dimension, block a door/window, or ignore a stated circulation constraint.",

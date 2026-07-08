@@ -20,11 +20,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .maybeSingle();
 
   if (!selectedMoodBoard) {
-    return NextResponse.json({ error: "Select a mood board before generating a render prompt." }, { status: 400 });
+    return NextResponse.json({ error: "Lock a concept before editing a room photo." }, { status: 400 });
   }
 
   if (typeof body.source_photo_id !== "string") {
-    return NextResponse.json({ error: "Select a source photo before generating a render prompt." }, { status: 400 });
+    return NextResponse.json({ error: "Select a source photo before editing it." }, { status: 400 });
   }
 
   const { data: sourcePhoto } = await supabase.from("photos").select("*").eq("id", body.source_photo_id).eq("room_id", roomId).maybeSingle();
@@ -50,10 +50,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       room,
       analysis: latestDiagnosis?.analysis,
       selectedMoodBoard,
-      sourcePhoto
+      sourcePhoto,
+      userInstructions: typeof body.instructions === "string" ? body.instructions : undefined
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Render prompt generation failed.";
+    const message = error instanceof Error ? error.message : "Photo edit planning failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 

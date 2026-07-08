@@ -24,7 +24,8 @@ const PROMPT_FILE_URLS: Record<string, URL> = {
   "prompts/renders/compose-render-plan.v1.md": new URL("../../prompts/renders/compose-render-plan.v1.md", import.meta.url),
   "prompts/chat/design-chat.v1.md": new URL("../../prompts/chat/design-chat.v1.md", import.meta.url),
   "prompts/critic/score-artifact.v1.md": new URL("../../prompts/critic/score-artifact.v1.md", import.meta.url),
-  "prompts/critic/score-diagnosis.v1.md": new URL("../../prompts/critic/score-diagnosis.v1.md", import.meta.url)
+  "prompts/critic/score-diagnosis.v1.md": new URL("../../prompts/critic/score-diagnosis.v1.md", import.meta.url),
+  "prompts/critic/score-products.v1.md": new URL("../../prompts/critic/score-products.v1.md", import.meta.url)
 };
 
 export async function loadPrompt(relativePath: string): Promise<VersionedPrompt> {

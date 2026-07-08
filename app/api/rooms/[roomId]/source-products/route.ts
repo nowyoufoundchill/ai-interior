@@ -1,6 +1,58 @@
 import { NextResponse } from "next/server";
 import { productSourcingAgent } from "@/lib/ai/services";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
+
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/gif": "gif"
+};
+
+/**
+ * Best-effort caching of hotlinked product images into our own Storage bucket so
+ * the UI does not depend on external retailer hotlinks staying alive. Failures
+ * are non-fatal: the product keeps its original `image_url` and simply has no
+ * `cached_image_path`. Bounded by a short per-image timeout so a slow retailer
+ * cannot stall the request.
+ */
+async function cacheProductImages(roomId: string, products: { id: string; image_url: string | null }[]) {
+  const service = createServiceSupabaseClient();
+
+  await Promise.all(
+    products.map(async (product) => {
+      if (!product.image_url || !/^https?:\/\//i.test(product.image_url)) return;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const response = await fetch(product.image_url, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!response.ok) return;
+
+        const contentType = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+        const extension = IMAGE_EXTENSIONS[contentType];
+        if (!extension) return;
+
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!bytes.length) return;
+
+        const storagePath = `${roomId}/products/${product.id}.${extension}`;
+        const { error: uploadError } = await service.storage.from("room-photos").upload(storagePath, bytes, {
+          contentType,
+          cacheControl: "3600",
+          upsert: true
+        });
+        if (uploadError) return;
+
+        const { data: publicUrlData } = service.storage.from("room-photos").getPublicUrl(storagePath);
+        await service.from("products").update({ cached_image_path: publicUrlData.publicUrl }).eq("id", product.id).eq("room_id", roomId);
+      } catch {
+        // Non-fatal: fall back to the original hotlinked image_url.
+      }
+    })
+  );
+}
 
 export async function POST(_: Request, { params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await params;
@@ -30,13 +82,18 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .limit(1)
     .maybeSingle();
 
+  const { data: designPreferences } = home
+    ? await supabase.from("design_preferences").select("preference_type, label").eq("home_id", home.id)
+    : { data: [] };
+
   let products;
   try {
     products = await productSourcingAgent({
       room,
       home,
       analysis: latestDiagnosis?.analysis,
-      selectedMoodBoard
+      selectedMoodBoard,
+      designPreferences: designPreferences ?? []
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Product sourcing failed.";
@@ -70,7 +127,15 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  await cacheProductImages(roomId, (data ?? []).map((product) => ({ id: product.id, image_url: product.image_url })));
+
   await supabase.from("rooms").update({ status: "products", current_stage: "executing" }).eq("id", roomId);
 
-  return NextResponse.json({ products: data });
+  const { data: refreshed } = await supabase
+    .from("products")
+    .select("*")
+    .eq("room_id", roomId)
+    .in("id", (data ?? []).map((product) => product.id));
+
+  return NextResponse.json({ products: refreshed ?? data });
 }

@@ -36,7 +36,7 @@ import { deriveRoomIntelligence } from "@/lib/ai/context-brain/room-intelligence
 import { buildTasteGraph } from "@/lib/ai/context-brain/taste-graph";
 import { DESIGN_DISSENT_POLICY } from "@/lib/ai/context-brain/design-policy";
 import { DESIGN_PORTFOLIO } from "@/lib/ai/design-portfolio";
-import { critiqueConcepts, critiqueDiagnosis, overallScore } from "@/lib/ai/critic";
+import { critiqueConcepts, critiqueDiagnosis, critiqueProducts, overallScore } from "@/lib/ai/critic";
 
 type RoomLike = {
   id: string;
@@ -282,7 +282,12 @@ function selectRelevantStyles(input: { room: RoomLike; home?: HomeLike | null })
   return withDepthFirst.slice(0, 5);
 }
 
-function buildContextBrain(input: { room: RoomLike; home?: HomeLike | null; analysis?: unknown }) {
+function buildContextBrain(input: {
+  room: RoomLike;
+  home?: HomeLike | null;
+  analysis?: unknown;
+  designPreferences?: { preference_type: string; label: string }[];
+}) {
   const analysis = (input.analysis ?? null) as Partial<RoomAnalysis> | null;
 
   const dimensions = (input.room.dimensions ?? null) as {
@@ -305,7 +310,8 @@ function buildContextBrain(input: { room: RoomLike; home?: HomeLike | null; anal
       colorPreferences: input.room.color_preferences,
       constraints: input.room.constraints,
       homeStyleNotes: input.home?.style_notes ?? null,
-      wholeHomeConstraints: input.home?.whole_home_constraints
+      wholeHomeConstraints: input.home?.whole_home_constraints,
+      designPreferences: input.designPreferences
     }),
     design_policy: DESIGN_DISSENT_POLICY,
     style_library: selectRelevantStyles({ room: input.room, home: input.home }),
@@ -411,6 +417,7 @@ export async function moodBoardGenerator(input: {
   analysis?: unknown;
   provider?: GatewayProvider;
   skipCritic?: boolean;
+  designPreferences?: { preference_type: string; label: string }[];
 }): Promise<MoodBoardConcept[]> {
   const mockConcepts = await styleDirector({ room: input.room });
   const contextBrain = buildContextBrain(input);
@@ -488,6 +495,52 @@ export async function moodBoardGenerator(input: {
   });
 }
 
+/**
+ * Re-harmonizes a single existing concept: regenerates one improved version of
+ * a concept while keeping its core identity (style anchor, palette temperature,
+ * formality). Used by the concept re-harmonize flow so owners can refine a
+ * direction without discarding it or regenerating the whole set. Append-only at
+ * the route layer — this only produces the refined concept object.
+ */
+export async function refineConcept(input: {
+  room: RoomLike;
+  home?: HomeLike | null;
+  analysis?: unknown;
+  baseConcept: MoodBoardConcept;
+  instructions?: string;
+  provider?: GatewayProvider;
+}): Promise<MoodBoardConcept> {
+  const contextBrain = buildContextBrain(input);
+  const generationContextBrain = compactContextBrainForGeneration(contextBrain);
+  const provider = input.provider ?? "anthropic";
+
+  return runStructuredTask({
+    roomId: input.room.id,
+    serviceName: "Concept Re-harmonizer",
+    provider,
+    promptPath: "prompts/concepts/generate-room-concept.v1.md",
+    schemaName: "mood_board_concept_reharmonized",
+    schema: moodBoardJsonSchema,
+    zodSchema: moodBoardSchema,
+    maxTokens: 4096,
+    taskInput: {
+      task: "Refine and re-harmonize one existing room concept while preserving its core identity.",
+      room: input.room,
+      home: input.home,
+      diagnosis: input.analysis,
+      context_brain: generationContextBrain,
+      base_concept: input.baseConcept,
+      refinement_instructions:
+        input.instructions?.trim() ||
+        "Tighten and elevate this concept. Keep its style anchor, palette temperature, and formality, and resolve any generic, under-scaled, or under-specified moments.",
+      slot_goal:
+        "Return a single improved version of the base concept that stays recognizably the same design direction but is more specific, better scaled, and more cohesive.",
+      required_style_anchor: input.baseConcept.style_keywords[0] ?? null
+    },
+    mock: () => ({ ...input.baseConcept })
+  });
+}
+
 export async function productSourcingAgent(input?: {
   room?: RoomLike;
   home?: HomeLike | null;
@@ -495,6 +548,8 @@ export async function productSourcingAgent(input?: {
   selectedMoodBoard?: MoodBoardLike | null;
   provider?: GatewayProvider;
   tools?: unknown[];
+  skipCritic?: boolean;
+  designPreferences?: { preference_type: string; label: string }[];
 }): Promise<ProductPlanItem[]> {
   const provider = input?.provider ?? "anthropic";
   const products = [
@@ -534,8 +589,13 @@ export async function productSourcingAgent(input?: {
     return mockProducts;
   }
 
+  const room = input.room;
+  const contextBrain = buildContextBrain({ room, home: input.home, analysis: input.analysis, designPreferences: input.designPreferences });
+  const productContextBrain = compactContextBrainForGeneration(contextBrain);
+  const lockedConcept = input.selectedMoodBoard.concept_data;
+
   const output = await runStructuredTask({
-    roomId: input.room.id,
+    roomId: room.id,
     serviceName: "Product Sourcing Agent",
     provider,
     promptPath: "prompts/products/source-product-plan.v1.md",
@@ -544,15 +604,19 @@ export async function productSourcingAgent(input?: {
     zodSchema: briefProductListSchema,
     maxTokens: 12288,
     taskInput: {
-      task: "Generate a product sourcing plan for the selected concept.",
-      room: input.room,
+      task: "Generate a product sourcing plan that executes the locked concept for this specific room.",
+      room,
       home: input.home,
-      analysis: input.analysis,
-      selected_mood_board: input.selectedMoodBoard,
+      diagnosis: input.analysis,
+      locked_concept: lockedConcept,
+      context_brain: productContextBrain,
+      typed_dimensions: room.dimensions ?? null,
       success_criteria: [
-        "Include at least six products covering anchor furniture, rug/textile, lighting, art/decor, storage or utility, and plant/accessory.",
-        "Use dimensions as target guidance when exact dimensions are unknown.",
-        "Use URLs as retailer home or search URLs when exact product URLs are not verified.",
+        "Every product must execute the locked concept's palette temperature, materials, formality, and risk profile — lead with that rationale in reason_selected, not generic decorating language.",
+        "Treat the room's typed dimensions as ground truth for scale: size anchor pieces (desk, seating, rug) to the real room and note the target dimension in dimensions.",
+        "Include at least six products covering anchor furniture, rug/textile, lighting, art/decor, storage or utility, and plant/accessory, with no duplicate roles.",
+        "Respect the concept's budget strategy: invest where it matters, save elsewhere, and explain any premium pick.",
+        "Use retailer home or search URLs when exact product URLs are not verified; never claim live stock.",
         "Include purchase risks such as scale, finish variation, lead time, and stock verification."
       ]
     },
@@ -560,7 +624,27 @@ export async function productSourcingAgent(input?: {
     mock: () => ({ products: mockProducts })
   });
 
-  return output.products.map((product) => productSchema.parse(product));
+  const sourcedProducts = output.products.map((product) => productSchema.parse(product));
+
+  if (!input.skipCritic) {
+    // Authoritative, non-blocking critic pass. Logged to ai_runs via the gateway
+    // (visible in /debug) but does not mutate or filter the plan, matching the
+    // concept critic convention.
+    try {
+      await critiqueProducts({
+        roomId: room.id,
+        products: sourcedProducts,
+        concept: lockedConcept,
+        diagnosis: input.analysis,
+        contextBrain: compactContextBrainForCritic(contextBrain),
+        provider
+      });
+    } catch {
+      // A critic failure must never block a completed product plan.
+    }
+  }
+
+  return sourcedProducts;
 }
 
 export async function scaleAndFitEvaluator(input: {
@@ -577,14 +661,17 @@ export async function renderPromptDirector(input: {
   analysis?: unknown;
   selectedMoodBoard?: MoodBoardLike | null;
   sourcePhoto?: PhotoLike | null;
+  userInstructions?: string;
   provider?: GatewayProvider;
 }): Promise<RenderPlan> {
   const provider = input.provider ?? "anthropic";
+  const userInstructions = input.userInstructions?.trim() || null;
   const mockPlan = renderPlanSchema.parse({
     source_photo_id: input.sourcePhotoId,
     mood_board_id: input.moodBoardId,
     render_prompt:
-      "Create a realistic interior design mockup that preserves the room architecture, camera angle, windows, doors, floor plane, and ceiling while applying the selected concept through paint, furniture, lighting, art, rug, and styling.",
+      "Edit this real room photo in place: keep the existing architecture, camera angle, windows, doors, floor plane, and ceiling exactly, and restyle only the paint, furniture, lighting, art, rug, and styling to match the locked concept." +
+      (userInstructions ? ` Owner edit request: ${userInstructions}` : ""),
     preservation_constraints: ["Preserve architecture", "Preserve camera angle", "Preserve window and door locations"],
     transformation_instructions: ["Layer lighting", "Add right-scaled furniture", "Use palette and materials from the selected mood board"],
     negative_instructions: ["No distorted room geometry", "No blocked doors", "No unrealistic furniture scale", "No generic beach decor"],
@@ -612,9 +699,11 @@ export async function renderPromptDirector(input: {
       source_photo: input.sourcePhoto,
       source_photo_id: input.sourcePhotoId ?? "",
       mood_board_id: input.moodBoardId ?? "",
+      user_regeneration_instructions: userInstructions,
       success_criteria: [
-        "Preserve walls, doors, windows, floor plane, ceiling, fixed architecture, and camera angle.",
+        "This is a photo edit of a real room, not a text-to-image generation: preserve walls, doors, windows, floor plane, ceiling, fixed architecture, and camera angle.",
         "Apply only reversible design changes unless explicitly requested.",
+        "Honor the owner's regeneration instructions when provided, without violating the preservation constraints.",
         "List negative instructions that reduce distorted geometry and unrealistic scale."
       ]
     },
@@ -774,3 +863,4 @@ function toArray(value: unknown): string[] {
 const briefProductListSchema = z.object({
   products: z.array(productSchema)
 });
+// end of services

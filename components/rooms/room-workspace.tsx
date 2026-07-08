@@ -38,6 +38,12 @@ export function RoomWorkspace(props: {
 
   const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
   const latestDiagnosis = props.diagnoses[0];
+  const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
+  // A diagnosis rerun marks every prior concept stale. If concepts exist but
+  // none are active, the concept set is stale relative to the current diagnosis.
+  const conceptsStale = props.moodBoards.length > 0 && activeConcepts.length === 0;
+  const productsStale = props.products.length > 0 && props.products.every((product) => product.status === "stale");
+  const rendersStale = props.renders.length > 0 && props.renders.every((render) => render.status === "stale");
 
   async function runAction(label: string, url: string, body?: Record<string, unknown>) {
     setLoadingAction(label);
@@ -140,9 +146,17 @@ export function RoomWorkspace(props: {
         <ConceptPanel
           moodBoards={props.moodBoards}
           hasDiagnosis={Boolean(latestDiagnosis)}
+          conceptsStale={conceptsStale}
           loadingAction={loadingAction}
           onGenerate={() => runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`)}
           onLock={(id) => runAction("select", `/api/rooms/${props.room.id}/select-moodboard`, { mood_board_id: id })}
+          onUnlock={(id) => runAction(`concept-${id}`, `/api/rooms/${props.room.id}/moodboards/${id}`, { action: "unlock" })}
+          onReharmonize={(id, instructions) =>
+            runAction(`concept-${id}`, `/api/rooms/${props.room.id}/moodboards/${id}`, { action: "reharmonize", instructions })
+          }
+          onEdit={(id, updates) =>
+            runAction(`concept-${id}`, `/api/rooms/${props.room.id}/moodboards/${id}`, { action: "edit", updates })
+          }
         />
       )}
 
@@ -150,8 +164,13 @@ export function RoomWorkspace(props: {
         <ProductsPanel
           products={props.products}
           hasLockedConcept={Boolean(lockedMoodBoard)}
+          isStale={productsStale}
           isLoading={loadingAction === "products"}
+          loadingAction={loadingAction}
           onGenerate={() => runAction("products", `/api/rooms/${props.room.id}/source-products`)}
+          onSetStatus={(productId, action) =>
+            runAction(`product-${productId}`, `/api/rooms/${props.room.id}/products/${productId}`, { action })
+          }
         />
       )}
 
@@ -160,8 +179,9 @@ export function RoomWorkspace(props: {
           renders={props.renders}
           photos={props.photos}
           hasLockedConcept={Boolean(lockedMoodBoard)}
+          isStale={rendersStale}
           isLoading={loadingAction === "render"}
-          onGenerate={(photoId) => runAction("render", `/api/rooms/${props.room.id}/generate-render`, { source_photo_id: photoId })}
+          onGenerate={(photoId, instructions) => runAction("render", `/api/rooms/${props.room.id}/generate-render`, { source_photo_id: photoId, instructions })}
         />
       )}
 
@@ -201,13 +221,22 @@ function DiagnosisPanel(props: {
       ) : !props.diagnosis ? (
         <EmptyState text="Generate the first room diagnosis after photos and dimensions have been added." />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
+          <div className="flex items-center gap-3 text-sm text-atelier-charcoal">
+            <span className="atelier-label">Diagnosis v{props.diagnosis.version ?? 1}</span>
+            <StatusBadge status={props.diagnosis.status} />
+            <span className="text-xs text-atelier-charcoal/70">
+              Regenerating the diagnosis marks existing concepts stale.
+            </span>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
           <InfoBlock title="Room Summary" value={String(diagnosis.room_summary ?? "")} />
           <InfoBlock title="Recommended Strategy" value={String(diagnosis.recommended_strategy ?? "")} />
           <ListBlock title="Opportunities" items={toStringArray(diagnosis.opportunities)} />
           <ListBlock title="Design Risks" items={toStringArray(diagnosis.design_risks)} />
           <ListBlock title="Constraints" items={toStringArray(diagnosis.constraints)} />
           <ListBlock title="Uncertainties" items={toStringArray(diagnosis.uncertainties)} />
+          </div>
         </div>
       )}
     </section>
@@ -217,81 +246,252 @@ function DiagnosisPanel(props: {
 function ConceptPanel(props: {
   moodBoards: MoodBoard[];
   hasDiagnosis: boolean;
+  conceptsStale: boolean;
   loadingAction: string | null;
   onGenerate: () => void;
   onLock: (id: string) => void;
+  onUnlock: (id: string) => void;
+  onReharmonize: (id: string, instructions: string) => void;
+  onEdit: (id: string, updates: Record<string, unknown>) => void;
 }) {
+  const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
+  const staleConcepts = props.moodBoards.filter((board) => board.status === "stale");
+
   return (
     <section className="grid gap-5">
       <PanelHeader
         eyebrow="Concept directions"
         title="Three distinct concept directions"
-        actionLabel={props.loadingAction === "moodboards" ? "Generating" : "Generate concepts"}
+        actionLabel={props.loadingAction === "moodboards" ? "Generating" : props.moodBoards.length ? "Regenerate concepts" : "Generate concepts"}
         disabled={!props.hasDiagnosis || props.loadingAction === "moodboards"}
         icon={Palette}
         onAction={props.onGenerate}
       />
+      {props.conceptsStale && (
+        <StaleNotice text="Your diagnosis changed since these concepts were generated. Regenerate concepts so directions reflect the current room diagnosis." />
+      )}
       {!props.hasDiagnosis ? (
         <EmptyState text="Generate three design directions after the room diagnosis is ready." />
       ) : props.moodBoards.length === 0 ? (
         <EmptyState text="No concepts have been generated yet." />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {props.moodBoards.map((board) => {
-            const concept = asRecord(board.concept_data);
-            const palette = Array.isArray(concept.palette) ? concept.palette : [];
-            return (
-              <article key={board.id} className="atelier-card grid gap-4 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="atelier-label">Version {board.version ?? "n/a"}</p>
-                    <h3 className="mt-2 font-serif text-2xl">{board.concept_name}</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
-                      {board.status}
-                    </span>
-                    {board.status === "locked" && <Check className="h-5 w-5 text-atelier-moss" />}
-                  </div>
-                </div>
-                <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.design_thesis ?? "")}</p>
-                <div className="flex gap-2">
-                  {palette.slice(0, 5).map((item, index) => {
-                    const swatch = asRecord(item);
-                    return (
-                      <span
-                        key={`${board.id}-${index}`}
-                        className="h-9 w-9 rounded-full border border-atelier-taupe/20"
-                        style={{ backgroundColor: String(swatch.hex ?? "#f7f2ea") }}
-                        title={String(swatch.name ?? "Palette")}
-                      />
-                    );
-                  })}
-                </div>
-                <ListBlock title="Materials" items={toStringArray(concept.materials).slice(0, 5)} compact />
-                <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.why_it_works ?? "")}</p>
-                <button
-                  type="button"
-                  onClick={() => props.onLock(board.id)}
-                  disabled={board.status === "locked"}
-                  className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {board.status === "locked" ? "Locked concept" : "Lock this concept"}
-                </button>
-              </article>
-            );
-          })}
+        <div className="grid gap-6">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {(activeConcepts.length ? activeConcepts : staleConcepts).map((board) => (
+              <ConceptCard
+                key={board.id}
+                board={board}
+                busy={props.loadingAction === `concept-${board.id}` || props.loadingAction === "select"}
+                onLock={props.onLock}
+                onUnlock={props.onUnlock}
+                onReharmonize={props.onReharmonize}
+                onEdit={props.onEdit}
+              />
+            ))}
+          </div>
+          {activeConcepts.length > 0 && staleConcepts.length > 0 && (
+            <details className="rounded-md border border-atelier-taupe/20 bg-white/40 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-atelier-charcoal">
+                Previous versions ({staleConcepts.length})
+              </summary>
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                {staleConcepts.map((board) => (
+                  <ConceptCard
+                    key={board.id}
+                    board={board}
+                    busy={props.loadingAction === `concept-${board.id}`}
+                    onLock={props.onLock}
+                    onUnlock={props.onUnlock}
+                    onReharmonize={props.onReharmonize}
+                    onEdit={props.onEdit}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
     </section>
   );
 }
 
+function ConceptCard(props: {
+  board: MoodBoard;
+  busy: boolean;
+  onLock: (id: string) => void;
+  onUnlock: (id: string) => void;
+  onReharmonize: (id: string, instructions: string) => void;
+  onEdit: (id: string, updates: Record<string, unknown>) => void;
+}) {
+  const { board } = props;
+  const concept = asRecord(board.concept_data);
+  const palette = Array.isArray(concept.palette) ? concept.palette : [];
+  const [mode, setMode] = useState<"none" | "reharmonize" | "edit">("none");
+  const [instructions, setInstructions] = useState("");
+  const [editName, setEditName] = useState(board.concept_name);
+  const [editThesis, setEditThesis] = useState(String(concept.design_thesis ?? ""));
+
+  const isLocked = board.status === "locked";
+  const isStale = board.status === "stale";
+
+  return (
+    <article className={`atelier-card grid gap-4 p-5 ${isStale ? "opacity-70" : ""}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="atelier-label">
+            Version {board.version ?? "n/a"}
+            {board.parent_version ? ` · from v${board.parent_version}` : ""}
+          </p>
+          <h3 className="mt-2 font-serif text-2xl">{board.concept_name}</h3>
+          <p className="mt-1 text-xs text-atelier-charcoal/70">{originLabel(board.origin)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge status={board.status} />
+          {isLocked && <Check className="h-5 w-5 text-atelier-moss" />}
+        </div>
+      </div>
+      <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.design_thesis ?? "")}</p>
+      <div className="flex gap-2">
+        {palette.slice(0, 5).map((item, index) => {
+          const swatch = asRecord(item);
+          return (
+            <span
+              key={`${board.id}-${index}`}
+              className="h-9 w-9 rounded-full border border-atelier-taupe/20"
+              style={{ backgroundColor: String(swatch.hex ?? "#f7f2ea") }}
+              title={String(swatch.name ?? "Palette")}
+            />
+          );
+        })}
+      </div>
+      <ListBlock title="Materials" items={toStringArray(concept.materials).slice(0, 5)} compact />
+      <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.why_it_works ?? "")}</p>
+
+      {mode === "reharmonize" && (
+        <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
+          <span className="atelier-label">Re-harmonize direction</span>
+          <textarea
+            className="atelier-field"
+            rows={3}
+            value={instructions}
+            onChange={(event) => setInstructions(event.target.value)}
+            placeholder="Optional: keep the palette but make it more formal, resolve the empty corner, add a stronger lighting layer..."
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={props.busy}
+              onClick={() => {
+                props.onReharmonize(board.id, instructions);
+                setMode("none");
+              }}
+              className="rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+            >
+              {props.busy ? "Re-harmonizing" : "Create refined version"}
+            </button>
+            <button type="button" onClick={() => setMode("none")} className="rounded-md px-3 py-2 text-sm text-atelier-charcoal">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "edit" && (
+        <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
+          <span className="atelier-label">Edit concept</span>
+          <input className="atelier-field" value={editName} onChange={(event) => setEditName(event.target.value)} placeholder="Concept name" />
+          <textarea
+            className="atelier-field"
+            rows={3}
+            value={editThesis}
+            onChange={(event) => setEditThesis(event.target.value)}
+            placeholder="Design thesis"
+          />
+          <p className="text-xs text-atelier-charcoal/70">Saves as a new draft version; the current version is kept in history.</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={props.busy}
+              onClick={() => {
+                props.onEdit(board.id, { concept_name: editName, design_thesis: editThesis });
+                setMode("none");
+              }}
+              className="rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+            >
+              {props.busy ? "Saving" : "Save as new version"}
+            </button>
+            <button type="button" onClick={() => setMode("none")} className="rounded-md px-3 py-2 text-sm text-atelier-charcoal">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "none" && (
+        <div className="flex flex-wrap gap-2">
+          {isLocked ? (
+            <button
+              type="button"
+              onClick={() => props.onUnlock(board.id)}
+              disabled={props.busy}
+              className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
+            >
+              {props.busy ? "Working" : "Unlock concept"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => props.onLock(board.id)}
+              disabled={props.busy}
+              className="rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
+            >
+              {props.busy ? "Working" : isStale ? "Re-lock this concept" : "Lock this concept"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setMode("reharmonize")}
+            disabled={props.busy}
+            className="rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+          >
+            Re-harmonize
+          </button>
+          {!isStale && (
+            <button
+              type="button"
+              onClick={() => setMode("edit")}
+              disabled={props.busy}
+              className="rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function originLabel(origin: string) {
+  switch (origin) {
+    case "reharmonized":
+      return "Re-harmonized direction";
+    case "edited":
+      return "Owner-edited direction";
+    case "generated":
+    default:
+      return "Generated direction";
+  }
+}
+
 function ProductsPanel(props: {
   products: Product[];
   hasLockedConcept: boolean;
+  isStale: boolean;
   isLoading: boolean;
+  loadingAction: string | null;
   onGenerate: () => void;
+  onSetStatus: (productId: string, action: string) => void;
 }) {
   const [category, setCategory] = useState("All");
   const [maxPrice, setMaxPrice] = useState("");
@@ -320,6 +520,9 @@ function ProductsPanel(props: {
         icon={Package}
         onAction={props.onGenerate}
       />
+      {props.isStale && (
+        <StaleNotice text="The locked concept changed, so this product plan is stale. Regenerate products to match the current locked concept." />
+      )}
       {!props.hasLockedConcept ? (
         <EmptyState text="Lock a concept before sourcing products." />
       ) : props.products.length === 0 ? (
@@ -360,14 +563,14 @@ function ProductsPanel(props: {
             {filteredProducts.map((product) => {
               const scores = asRecord(product.scores);
               return (
-                <article key={product.id} className="atelier-card overflow-hidden">
-                  {product.image_url && <img src={product.image_url} alt="" className="aspect-[4/3] w-full object-cover" />}
+                <article key={product.id} className={`atelier-card overflow-hidden ${product.status === "rejected" ? "opacity-60" : ""}`}>
+                  {(product.cached_image_path ?? product.image_url) && (
+                    <img src={product.cached_image_path ?? product.image_url ?? ""} alt="" className="aspect-[4/3] w-full object-cover" />
+                  )}
                   <div className="grid gap-3 p-5">
                     <div className="flex items-center justify-between gap-3">
                       <p className="atelier-label">{product.category}</p>
-                      <span className="rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
-                        {product.status}
-                      </span>
+                      <StatusBadge status={product.status} />
                     </div>
                     <h3 className="font-serif text-xl">{product.name}</h3>
                     <p className="text-sm text-atelier-charcoal">
@@ -399,6 +602,43 @@ function ProductsPanel(props: {
                         Open product source
                       </a>
                     )}
+                    {(() => {
+                      const busy = props.loadingAction === `product-${product.id}`;
+                      return (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {product.status !== "approved" && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => props.onSetStatus(product.id, "approve")}
+                              className="rounded-md border border-atelier-moss px-3 py-1.5 text-xs font-semibold text-atelier-moss transition hover:bg-atelier-moss hover:text-white disabled:opacity-60"
+                            >
+                              {busy ? "Saving" : "Approve"}
+                            </button>
+                          )}
+                          {product.status !== "rejected" && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => props.onSetStatus(product.id, "reject")}
+                              className="rounded-md border border-atelier-taupe/40 px-3 py-1.5 text-xs font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+                            >
+                              {busy ? "Saving" : "Reject"}
+                            </button>
+                          )}
+                          {(product.status === "approved" || product.status === "rejected") && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => props.onSetStatus(product.id, "reset")}
+                              className="rounded-md px-3 py-1.5 text-xs text-atelier-charcoal underline underline-offset-4 disabled:opacity-60"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </article>
               );
@@ -414,55 +654,108 @@ function RendersPanel(props: {
   renders: Render[];
   photos: Photo[];
   hasLockedConcept: boolean;
+  isStale: boolean;
   isLoading: boolean;
-  onGenerate: (photoId?: string) => void;
+  onGenerate: (photoId?: string, instructions?: string) => void;
 }) {
   const [sourcePhotoId, setSourcePhotoId] = useState(props.photos[0]?.id ?? "");
+  const [instructions, setInstructions] = useState("");
 
   return (
     <section className="grid gap-5">
       <PanelHeader
-        eyebrow="Mockup studio"
-        title="Render prompts and saved mockups"
-        actionLabel={props.isLoading ? "Preparing" : "Generate render"}
+        eyebrow="Photo edit studio"
+        title="Restyle your real room photos"
+        actionLabel={props.isLoading ? "Editing" : "Edit this photo"}
         disabled={!props.hasLockedConcept || props.photos.length === 0 || props.isLoading}
         icon={Wand2}
-        onAction={() => props.onGenerate(sourcePhotoId || undefined)}
+        onAction={() => props.onGenerate(sourcePhotoId || undefined, instructions || undefined)}
       />
+      {props.isStale && (
+        <StaleNotice text="The locked concept changed, so these photo edits are stale. Re-edit from the current locked concept and a source photo." />
+      )}
       {!props.hasLockedConcept ? (
-        <EmptyState text="Lock the active concept before generating a render." />
+        <EmptyState text="Lock the active concept before editing a room photo." />
       ) : props.photos.length === 0 ? (
-        <EmptyState text="Select a source photo before generating a mockup." />
+        <EmptyState text="Add a source photo before editing it." />
       ) : (
         <div className="grid gap-4">
-          <label className="grid max-w-xl gap-2">
-            <span className="atelier-label">Source photo</span>
-            <select className="atelier-field" value={sourcePhotoId} onChange={(event) => setSourcePhotoId(event.target.value)}>
-              {props.photos.map((photo) => (
-                <option key={photo.id} value={photo.id}>
-                  {photo.label ?? "Room photo"}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="grid gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-4 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="atelier-label">Source photo</span>
+              <select className="atelier-field" value={sourcePhotoId} onChange={(event) => setSourcePhotoId(event.target.value)}>
+                {props.photos.map((photo) => (
+                  <option key={photo.id} value={photo.id}>
+                    {photo.label ?? "Room photo"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2">
+              <span className="atelier-label">Edit instructions (optional)</span>
+              <textarea
+                className="atelier-field"
+                rows={2}
+                value={instructions}
+                onChange={(event) => setInstructions(event.target.value)}
+                placeholder="Keep my leather chair, make the walls darker, add a larger rug..."
+              />
+            </label>
+          </div>
+          <p className="text-xs text-atelier-charcoal/70">
+            Every edit preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the locked concept plus your instructions.
+          </p>
           {props.renders.length === 0 ? (
-            <EmptyState text="Generate a render for the locked concept." />
+            <EmptyState text="Edit a source photo to see a before/after for the locked concept." />
           ) : (
             <div className="grid gap-4">
-              {props.renders.map((render) => (
-                <article key={render.id} className="atelier-card overflow-hidden">
-                  {render.file_url && <img src={render.file_url} alt="Generated room render" className="aspect-[4/3] w-full object-cover" />}
-                  <div className="grid gap-3 p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="atelier-label">Version {render.mood_board_version ?? "n/a"}</p>
-                      <span className="rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
-                        {render.status}
-                      </span>
+              {props.renders.map((render) => {
+                const sourcePhoto = props.photos.find((photo) => photo.id === render.source_photo_id);
+                const critique = asRecord(render.critique);
+                return (
+                  <article key={render.id} className="atelier-card overflow-hidden">
+                    <div className="grid gap-1 md:grid-cols-2">
+                      <figure className="grid gap-1">
+                        <figcaption className="atelier-label px-4 pt-4">Before</figcaption>
+                        {sourcePhoto?.file_url ? (
+                          <img src={sourcePhoto.file_url} alt="Source room photo" className="aspect-[4/3] w-full object-cover" />
+                        ) : (
+                          <div className="flex aspect-[4/3] items-center justify-center bg-atelier-linen text-xs text-atelier-charcoal">Source photo unavailable</div>
+                        )}
+                      </figure>
+                      <figure className="grid gap-1">
+                        <figcaption className="atelier-label px-4 pt-4">After</figcaption>
+                        {render.file_url ? (
+                          <img src={render.file_url} alt="Edited room photo" className="aspect-[4/3] w-full object-cover" />
+                        ) : (
+                          <div className="flex aspect-[4/3] items-center justify-center bg-atelier-linen text-xs text-atelier-charcoal">Image pending — edit plan saved</div>
+                        )}
+                      </figure>
                     </div>
-                    <p className="text-sm leading-6 text-atelier-charcoal">{render.render_prompt ?? render.prompt}</p>
-                  </div>
-                </article>
-              ))}
+                    <div className="grid gap-3 p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="atelier-label">Concept v{render.mood_board_version ?? "n/a"}</p>
+                        <StatusBadge status={render.status} />
+                      </div>
+                      <p className="text-sm leading-6 text-atelier-charcoal">{render.render_prompt ?? render.prompt}</p>
+                      {render.user_regeneration_instructions && (
+                        <p className="text-sm text-atelier-charcoal">
+                          <span className="font-semibold text-atelier-ink">Your instructions:</span> {render.user_regeneration_instructions}
+                        </p>
+                      )}
+                      <details className="text-sm text-atelier-charcoal">
+                        <summary className="cursor-pointer font-semibold text-atelier-ink">Preservation &amp; edit details</summary>
+                        <div className="mt-3 grid gap-3">
+                          <ListBlock title="Preserved" items={toStringArray(render.preservation_constraints)} compact />
+                          <ListBlock title="Applied changes" items={toStringArray(render.transformation_instructions)} compact />
+                          <ListBlock title="Avoided" items={toStringArray(render.negative_instructions)} compact />
+                          <ListBlock title="Critic notes" items={toStringArray(critique.notes)} compact />
+                        </div>
+                      </details>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
@@ -500,20 +793,46 @@ function ChatPanel(props: {
         </button>
       </div>
       {props.revisions.length === 0 ? (
-        <EmptyState text="The room chat will explain stored rationale and save confirmed revision requests." />
+        <EmptyState text="The room chat explains stored rationale and proposes next steps. It never changes your design on its own — you confirm reruns and preferences yourself." />
       ) : (
         <div className="grid gap-4">
-          {props.revisions.map((revision) => (
-            <article key={revision.id} className="atelier-card grid gap-3 p-5">
-              <p className="atelier-label">{revision.revision_type.replaceAll("_", " ")}</p>
-              <p className="font-semibold text-atelier-ink">{revision.user_message}</p>
-              <p className="text-sm leading-6 text-atelier-charcoal">{revision.assistant_response}</p>
-            </article>
-          ))}
+          {props.revisions.map((revision) => {
+            const proposal = proposalHint(revision.revision_type);
+            return (
+              <article key={revision.id} className="atelier-card grid gap-3 p-5">
+                <p className="atelier-label">{revision.revision_type.replaceAll("_", " ")}</p>
+                <p className="font-semibold text-atelier-ink">{revision.user_message}</p>
+                <p className="text-sm leading-6 text-atelier-charcoal">{revision.assistant_response}</p>
+                {proposal && (
+                  <p className="rounded-md border border-atelier-taupe/30 bg-atelier-linen/60 px-3 py-2 text-xs text-atelier-charcoal">
+                    Proposal only — {proposal}
+                  </p>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
   );
+}
+
+function proposalHint(revisionType: string): string | null {
+  switch (revisionType) {
+    case "style_revision":
+    case "whole_home_check":
+      return "confirm by re-harmonizing or regenerating in the Concepts tab.";
+    case "product_revision":
+    case "budget_revision":
+      return "confirm by regenerating in the Products tab.";
+    case "render_revision":
+    case "layout_revision":
+      return "confirm by editing a photo in the Renders tab.";
+    case "memory_update":
+      return "add it to your home Design preferences to make it stick.";
+    default:
+      return null;
+  }
 }
 
 function PanelHeader(props: {
@@ -565,6 +884,26 @@ function ListBlock({ title, items, compact = false }: { title: string; items: st
         ))}
       </ul>
     </article>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const tone =
+    status === "locked"
+      ? "bg-atelier-moss/15 text-atelier-moss"
+      : status === "stale"
+        ? "bg-amber-100 text-amber-800"
+        : status === "rejected"
+          ? "bg-rose-100 text-rose-700"
+          : status === "approved"
+            ? "bg-atelier-moss/15 text-atelier-moss"
+            : "bg-atelier-linen text-atelier-charcoal";
+  return <span className={`rounded-md px-3 py-1 text-xs font-semibold capitalize ${tone}`}>{status}</span>;
+}
+
+function StaleNotice({ text }: { text: string }) {
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{text}</div>
   );
 }
 

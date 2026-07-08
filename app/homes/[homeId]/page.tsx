@@ -4,8 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, Plus } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { PreferencesManager } from "@/components/homes/preferences-manager";
 import { ROOM_STATUSES } from "@/lib/constants";
-import { getHome } from "@/lib/data/queries";
+import { getDesignPreferences, getHome } from "@/lib/data/queries";
 
 export default async function HomeDetailPage({ params }: { params: Promise<{ homeId: string }> }) {
   const { homeId } = await params;
@@ -14,6 +15,7 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
   if (!home) notFound();
 
   const rooms = Array.isArray(home.rooms) ? home.rooms : [];
+  const preferences = await getDesignPreferences(homeId).catch(() => []);
 
   return (
     <AppShell>
@@ -37,6 +39,8 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
             </div>
           </div>
         </section>
+
+        <PreferencesManager homeId={home.id} initialPreferences={preferences} />
 
         <section className="grid gap-4">
           <div className="flex items-end justify-between gap-4">

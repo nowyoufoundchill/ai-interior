@@ -223,3 +223,103 @@
 ### Next Action
 - Continue Phase 2 by addressing diagnosis-first naming cleanup and concept edit/unlock/re-harmonize flows.
 - Re-run a live room/spike diagnosis pass when useful to inspect the new `Diagnosis Critic` entries in `/debug`.
+
+## 2026-07-07 — Phase 2 completion (concept lifecycle + stale UX)
+
+### Built
+- `refineConcept` in `lib/ai/services.ts`: append-only single-concept re-harmonizer that keeps a concept's identity (style anchor, palette temperature, formality) while improving specificity/scale; routes through the gateway with a mock fallback.
+- New route `app/api/rooms/[roomId]/moodboards/[boardId]/route.ts` with three append-only actions:
+  - `unlock`: locked concept → `unlocked`, clears `rooms.selected_mood_board_id`, drops room to `concepts` stage; downstream products/renders stay stale.
+  - `edit`: whitelisted string/array-field edits merged onto the base concept, validated via `moodBoardSchema`, inserted as a new `draft` version (`origin: edited`, `parent_version` set); source marked stale; if source was locked, room lock is dropped.
+  - `reharmonize`: `refineConcept` output inserted as a new `draft` version (`origin: reharmonized`); same stale/lock handling.
+- Room workspace UI (`components/rooms/room-workspace.tsx`):
+  - Shared `StatusBadge` (color-coded: locked/approved green, stale amber, rejected rose) and `StaleNotice`.
+  - `ConceptCard` component with lock/unlock, inline re-harmonize (with instructions), and inline edit; active concepts shown first, stale ones collapsed under "Previous versions"; origin + parent-version labels.
+  - Concepts action flips to "Regenerate concepts" once concepts exist; a stale-notice appears when a diagnosis rerun invalidated the concept set.
+  - Products/Renders panels show stale notices when the locked concept changed; product/render status now use `StatusBadge`.
+  - Diagnosis panel surfaces `Diagnosis vN` + current/stale status and notes that reruns mark concepts stale (diagnosis-first language).
+
+### Verified
+- `npm run typecheck` passes clean on a faithful reconstruction of the working tree (clean `git archive HEAD` + the same edits reapplied + Linux SWC shim) at `/tmp/verify`.
+- Behavioral failure gates hold by construction: diagnosis rerun marks concepts stale only; concept lifecycle uses status transitions and append-only inserts (no destructive deletes); product/render generation still binds to `status = 'locked'` only.
+
+### Environment limitation (important for future sessions)
+- The bash sandbox mount for this repo is a stale/partial snapshot this session: in-place edits to already-tracked files (e.g. `lib/ai/services.ts`, `components/rooms/room-workspace.tsx`) appear truncated when read via the shell/`git`, while brand-new files sync correctly. The file tools (Read/Write/Edit) operate on the real, complete files. Do NOT `git commit` from the bash sandbox this session — it would persist the truncated shell view. Commit from the Windows host where the real files live.
+- `next build` cannot run in the Linux sandbox: `node_modules` contains Windows-only native binaries and the source sits on an mmap-incompatible mount, so `next build` dies with SIGBUS. Type checking is the reliable in-sandbox gate (via the reconstruction harness); run `next build` on Windows.
+
+### Next Action
+- Phase 3 (Renders): photo-edit language throughout, explicit regeneration-instructions input wired into `renderPromptDirector`, before/after comparison UI, clearer render history with preservation constraints and critic notes.
+
+## 2026-07-07 — Phase 3 completion (renders as photo edits)
+
+### Built
+- `renderPromptDirector` (`lib/ai/services.ts`) now accepts `userInstructions`, embeds them in the render prompt, passes them through `taskInput.user_regeneration_instructions`, and its success criteria explicitly frame the task as an in-place photo edit (not text-to-image).
+- `generate-render` route passes `userInstructions` from the request body into the director and uses photo-edit error copy.
+- Renders tab rebuilt as a "Photo edit studio": per-edit instructions textarea, before/after image comparison (source photo vs. edited image, with a graceful placeholder when no image is returned), and a collapsible "Preservation & edit details" section showing preserved constraints, applied changes, avoided artifacts, and critic notes. Owner instructions are shown on each saved edit.
+
+### Verified
+- `npm run typecheck` passes clean on the `/tmp/verify` reconstruction harness after Phase 3 edits.
+- Failure gate holds: the render route still requires a locked concept (`mood_boards.status = 'locked'`) and a source photo that belongs to the room; generation is an edit of the real photo, never concept-free text-to-image.
+
+### Next Action
+- Phase 4 (Products): give `productSourcingAgent` the same context-brain + critic depth, cached product image path handling, approved/rejected controls and stale badges, and rationale-first typed-dimension-aware outputs.
+
+## 2026-07-07 — Phase 4 completion (product sourcing depth + controls)
+
+### Built
+- `productCritiqueSchema` / `productCritiqueJsonSchema` and a real `critiqueProducts` critic (`lib/ai/critic.ts`, `prompts/critic/score-products.v1.md`, registered in `lib/ai/prompts.ts`) scoring concept fit, scale realism, budget discipline, and coverage. Logged to `ai_runs` via the gateway; authoritative but non-blocking.
+- `productSourcingAgent` now builds the context brain, passes a compact brain + typed dimensions + the locked concept into the task, uses rationale-first / dimension-aware success criteria, and runs the product critic (skippable, wrapped so a critic failure never blocks a completed plan).
+- `source-product-plan.v1.md` rewritten with an explicit decision hierarchy and concept-execution rationale requirements.
+- Best-effort product image caching in the source-products route (`cacheProductImages`): re-hosts hotlinked images into the `room-photos` bucket, sets `products.cached_image_path`, non-fatal on failure; response re-reads products so the UI gets cached paths.
+- New product status route (`approve`/`reject`/`reset`) and UI controls on each product card; rejected items dim; UI prefers `cached_image_path ?? image_url`.
+
+### Verified
+- `npm run typecheck` passes clean on the `/tmp/verify` reconstruction harness after Phase 4 edits.
+- Failure gate holds: product generation requires a locked concept and stamps `mood_board_version`; relock marks prior products stale (except rejected); stale badges/notice remain visible.
+
+### Next Action
+- Phase 5 (Design chat + preferences): move the room workspace off `design_memories` as the primary taste model, add home-level preferences UI backed by `design_preferences`, and make chat propose reruns/preference updates with explicit confirmation instead of silent mutation.
+
+## 2026-07-07 — Phase 5 completion (preferences as taste model, chat as advisor)
+
+### Built
+- `buildTasteGraph` now accepts confirmed `design_preferences` as its primary, highest-confidence taste source (0.95), with brief fields as fallback; avoid/constraint types feed banned_cliches/standing_constraints. Threaded through `buildContextBrain` and into `moodBoardGenerator` and `productSourcingAgent`; `generate-moodboards` and `source-products` routes fetch the home's preferences and pass them.
+- Home-level preferences: `PreferencesManager` client component on the home page, new API routes `app/api/homes/[homeId]/preferences/route.ts` (GET/POST) and `.../[preferenceId]/route.ts` (DELETE), and a `getDesignPreferences` query. This is now the single source of truth for the taste graph.
+- Chat is advisory only: the chat route no longer writes `design_memories`; the chat prompt (`design-chat.v1.md`) instructs explain-from-artifacts + propose + never-claim-applied; the Chat UI tags actionable turns "Proposal only — confirm in the … tab".
+
+### Verified
+- `npm run typecheck` passes clean on the `/tmp/verify` reconstruction harness after Phase 5 edits.
+- Failure gate holds: chat loads all stored artifacts for rationale and cannot mutate design state; reruns and preference changes require explicit owner action in the relevant tab / home preferences UI.
+
+### Next Action
+- Phase 6 (Hardening): audit RLS/API exposure against current Supabase guidance; final typecheck/build; confirm docs, schema, runtime behavior, and debug visibility all match PRD v2.
+
+## 2026-07-07 — Phase 6 completion (access audit + hardening)
+
+### Audited
+- Data-access model is grant-based and private: 001 granted all table privileges to anon/authenticated; 002 revoked them. All runtime access is server-side via the service role (`createServerSupabaseClient`/`createServiceSupabaseClient`); `createBrowserSupabaseClient` is defined but unused, and no client component reads tables directly (all go through server API routes).
+- Gap found: 002's blanket revoke ran before 003 created `design_preferences`/`chat_messages`, so those tables can retain Supabase's default anon grants.
+
+### Built
+- `supabase/migrations/004_prd_v2_access_hardening.sql` (additive, idempotent): re-revokes all table/routine/sequence privileges from anon/authenticated (now covering the PRD-v2 tables) and sets `alter default privileges` so future public objects are server-only by default. Keeps `grant usage on schema public` so the room-photos storage read policy still resolves.
+
+### Verified
+- `npm run typecheck` passes clean on the full `/tmp/verify` reconstruction (all phases 2-6 applied).
+
+### Remaining owner-side deploy actions (not blockers to the code work, but required before "release-ready")
+1. Apply `004_prd_v2_access_hardening.sql` through the GitHub -> Supabase workflow, then re-run `npm run verify:live`.
+2. Run `npm run build` on the Windows host (the Linux sandbox cannot build — Windows-only native SWC binary + mmap-incompatible mount).
+3. Commit this session's changes from the Windows host (the bash sandbox mount is a stale/partial snapshot this session; do not commit from the sandbox). Changed/added files this session:
+   - `lib/ai/services.ts`, `lib/ai/critic.ts`, `lib/ai/prompts.ts`, `lib/ai/context-brain/taste-graph.ts`
+   - `lib/schemas/index.ts`, `lib/schemas/json.ts`, `lib/data/queries.ts`
+   - `components/rooms/room-workspace.tsx`, `components/homes/preferences-manager.tsx` (new)
+   - `app/homes/[homeId]/page.tsx`
+   - `app/api/rooms/[roomId]/moodboards/[boardId]/route.ts` (new), `app/api/rooms/[roomId]/products/[productId]/route.ts` (new)
+   - `app/api/homes/[homeId]/preferences/route.ts` (new), `app/api/homes/[homeId]/preferences/[preferenceId]/route.ts` (new)
+   - `app/api/rooms/[roomId]/generate-render/route.ts`, `.../generate-moodboards/route.ts`, `.../source-products/route.ts`, `.../chat/route.ts`
+   - `prompts/products/source-product-plan.v1.md`, `prompts/chat/design-chat.v1.md`, `prompts/critic/score-products.v1.md` (new)
+   - `supabase/migrations/004_prd_v2_access_hardening.sql` (new)
+   - Docs: `BUILD_PLAN.md`, `PROJECT_BRAIN.md`, `SESSION_LOG.md`
+
+### Result
+- Phases 2-6 of the PRD-v2 build plan are implemented and pass the type gate. The remaining work is the three owner-side deploy actions above.
