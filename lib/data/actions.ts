@@ -23,7 +23,8 @@ export async function createHomeAction(formData: FormData) {
       home_type: formText(formData, "home_type"),
       style_notes: formText(formData, "style_notes"),
       whole_home_palette: commaList(formText(formData, "whole_home_palette")),
-      whole_home_constraints: commaList(formText(formData, "whole_home_constraints"))
+      whole_home_constraints: commaList(formText(formData, "whole_home_constraints")),
+      value_band: formText(formData, "value_band") || null
     })
     .select("id")
     .single();

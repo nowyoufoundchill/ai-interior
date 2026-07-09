@@ -264,9 +264,13 @@ export function resolveRegionalTrendBrief(
   const haystack = (region ?? "").toLowerCase();
   if (!haystack) return null;
 
-  const brief = TREND_BRIEFS.find((entry) =>
+  // Refresh ritual: multiple briefs may match a region across years. Always
+  // resolve to the NEWEST matching brief by `authored` date, so appending a new
+  // annual brief (never overwriting the old one) automatically supersedes it
+  // while the prior brief is retained for audit/provenance. See docs/TREND_REFRESH.md.
+  const brief = TREND_BRIEFS.filter((entry) =>
     entry.region_match.split("|").some((pattern) => haystack.includes(pattern))
-  );
+  ).sort((a, b) => b.authored.localeCompare(a.authored))[0];
   if (!brief) return null;
 
   const matched_sub_region =
@@ -307,6 +311,30 @@ export function resolveTierRegister(
  * the applicable sub-region, and the current rejection list — the parts that
  * change *judgment*, not the full provenance dump.
  */
+/**
+ * Compact the brief for the *diagnosis* pass. Diagnosis should read the room in
+ * current-market terms — e.g. flag that an all-white shell "reads dated in
+ * 2026" — so it needs the direction of travel and the rejection list, but not
+ * the palette/material vocabulary or maker provenance (those are generation
+ * concerns). Deliberately smaller than the generation slice.
+ */
+export function compactTrendBriefForDiagnosis(resolved: ResolvedTrendBrief) {
+  return {
+    as_of: `${resolved.brief_id} (authored ${resolved.authored}${resolved.is_stale ? ", STALE — refresh" : ""})`,
+    headline: resolved.headline,
+    direction_of_travel: resolved.directional_theses.map((t) => ({ move: t.move, instead_of: t.instead_of })),
+    reads_dated_now: resolved.reject_now,
+    applies_here: resolved.matched_sub_region
+      ? { sub_region: resolved.matched_sub_region.name, reads_as: resolved.matched_sub_region.reads_as }
+      : null,
+    // Diagnosis names what currently reads wrong; it does not prescribe the
+    // fix — that is the concept director's job, downstream of the decision
+    // hierarchy. Trend never overrides a measurement or a diagnosed constraint.
+    usage_note:
+      "Use this only to frame existing conditions in current-market terms (e.g. note when a finish reads dated). Do not prescribe a redesign or override a measured constraint."
+  };
+}
+
 export function compactTrendBriefForGeneration(resolved: ResolvedTrendBrief, homeValueBand?: string | null) {
   const tier = resolveTierRegister(resolved, homeValueBand);
   return {

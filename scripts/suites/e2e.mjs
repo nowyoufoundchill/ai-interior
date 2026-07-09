@@ -1,5 +1,20 @@
 import { chromium } from "playwright";
-import { BASE_URL, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForCount, waitForServer } from "./_lib.mjs";
+import { BASE_URL, getRoomState, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForCount, waitForServer } from "./_lib.mjs";
+
+// Phase 9 governance extensions: mirrors the sc-luxury-2026 reject_now list
+// (lib/ai/context-brain/trend-intelligence.ts) as a cheap sanity check that no
+// approved-region concept ships an on-reject-now cliché. The authoritative
+// enforcement is the critic's reject_now_violations + bounded regeneration on
+// live runs; this is the mock-mode backstop.
+const REJECT_NOW_SIGNALS = [
+  "all-white",
+  "grey-and-white",
+  "gray-and-white",
+  "nautical",
+  "tiki",
+  "beach house theming",
+  "high-gloss ultra-modern"
+];
 
 /**
  * PRD v3 §12.1 Suite 2 — Functional E2E. Drives the real browser through the
@@ -180,6 +195,54 @@ async function main() {
     reporter.assert(
       (await waitForAtLeast(page.getByText("Proposal only"), 1)) >= 1,
       "revision-shaped chat turn is tagged as a proposal, not a silent mutation"
+    );
+    // --- Phase 9 governance asserts (against the journeyed room state) ------
+    const finalState = await getRoomState(roomId);
+
+    // Only scan the AFFIRMATIVE design fields — a concept naming a cliché in
+    // risk_profile / why_user_may_reject_it is correctly warning against it, not
+    // committing it, so those fields are excluded.
+    const affirmativeText = (finalState.mood_boards ?? [])
+      .map((board) => {
+        const c = board.concept_data ?? {};
+        const paletteNames = Array.isArray(c.palette) ? c.palette.map((p) => p?.name ?? "").join(" ") : "";
+        return [
+          c.design_thesis,
+          c.furniture_direction,
+          c.layout_direction,
+          c.lighting_direction,
+          c.art_direction,
+          c.decor_direction,
+          c.plant_direction,
+          c.why_it_works,
+          paletteNames,
+          Array.isArray(c.materials) ? c.materials.join(" ") : "",
+          Array.isArray(c.style_keywords) ? c.style_keywords.join(" ") : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+      })
+      .join(" ")
+      .toLowerCase();
+    const rejectHits = REJECT_NOW_SIGNALS.filter((signal) => affirmativeText.includes(signal));
+    reporter.assert(rejectHits.length === 0, "governance: no concept lands on a reject_now cliché", rejectHits);
+
+    const persistedProducts = finalState.products ?? [];
+    const productsMissingImage = persistedProducts.filter((p) => !p.cached_image_path && !p.image_url);
+    reporter.assert(
+      persistedProducts.length > 0 && productsMissingImage.length === 0,
+      "governance: every persisted product carries an image (no dead-image product persisted)",
+      { count: persistedProducts.length, missing: productsMissingImage.length }
+    );
+
+    const rendersWithDoorGuard = (finalState.renders ?? []).filter((r) => {
+      const guardText = JSON.stringify([r.negative_instructions, r.preservation_constraints, r.render_prompt]).toLowerCase();
+      return /door/.test(guardText);
+    });
+    reporter.assert(
+      (finalState.renders ?? []).length > 0 && rendersWithDoorGuard.length === (finalState.renders ?? []).length,
+      "governance: every render instruction set carries a door-preservation/clearance guard",
+      { renders: (finalState.renders ?? []).length, guarded: rendersWithDoorGuard.length }
     );
   } finally {
     reporter.assert(consoleErrors.length === 0, "zero new console errors across the whole journey", consoleErrors);

@@ -361,12 +361,15 @@ function ConceptCard(props: {
   const conceptKey = board.version ?? board.id;
 
   return (
-    <article data-testid={`concept-card-${conceptKey}`} className={`atelier-card grid gap-4 p-5 ${isStale ? "opacity-70" : ""}`}>
+    <article
+      data-testid={`concept-card-${conceptKey}`}
+      className={`atelier-card grid gap-4 p-5 ${isLocked ? "atelier-approved" : ""} ${isStale ? "opacity-70" : ""}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="atelier-label">
-            Version {board.version ?? "n/a"}
-            {board.parent_version ? ` · from v${board.parent_version}` : ""}
+          <p className={isLocked ? "atelier-eyebrow" : "atelier-label"}>
+            {isLocked ? "Approved direction" : `Version ${board.version ?? "n/a"}`}
+            {!isLocked && board.parent_version ? ` · from v${board.parent_version}` : ""}
           </p>
           <h3 className="mt-2 font-serif text-2xl">{board.concept_name}</h3>
           <p className="mt-1 text-xs text-atelier-charcoal/70">{originLabel(board.origin)}</p>
@@ -377,21 +380,12 @@ function ConceptCard(props: {
         </div>
       </div>
       <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.design_thesis ?? "")}</p>
-      <div className="flex gap-2">
-        {palette.slice(0, 5).map((item, index) => {
-          const swatch = asRecord(item);
-          return (
-            <span
-              key={`${board.id}-${index}`}
-              className="h-9 w-9 rounded-full border border-atelier-taupe/20"
-              style={{ backgroundColor: String(swatch.hex ?? "#f7f2ea") }}
-              title={String(swatch.name ?? "Palette")}
-            />
-          );
-        })}
+      <PaletteStrip boardId={board.id} palette={palette} />
+      <MaterialSwatches materials={toStringArray(concept.materials).slice(0, 6)} />
+      <div>
+        <p className="atelier-label">Why it works</p>
+        <p className="mt-2 text-sm leading-6 text-atelier-charcoal">{String(concept.why_it_works ?? "")}</p>
       </div>
-      <ListBlock title="Materials" items={toStringArray(concept.materials).slice(0, 5)} compact />
-      <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.why_it_works ?? "")}</p>
 
       {mode === "reharmonize" && (
         <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
@@ -817,23 +811,39 @@ function RendersPanel(props: {
                 const critique = asRecord(render.critique);
                 return (
                   <article key={render.id} data-testid={`render-card-${render.id}`} className="atelier-card overflow-hidden">
-                    <div className="grid gap-1 md:grid-cols-2">
-                      <figure className="grid gap-1">
-                        <figcaption className="atelier-label px-4 pt-4">Before</figcaption>
+                    {/* Image-first hero: the transformed room is the flagship
+                        artifact, shown large; the source photo sits beneath as a
+                        smaller labeled "before" reference. */}
+                    <figure className="relative">
+                      <figcaption className="atelier-eyebrow absolute left-4 top-4 z-10 rounded-full bg-atelier-paper/85 px-3 py-1 shadow-soft">
+                        After · {props.conceptName ?? "Approved direction"}
+                      </figcaption>
+                      {render.file_url ? (
+                        <img src={render.file_url} alt="Edited room photo" className="aspect-[16/10] w-full object-cover" />
+                      ) : (
+                        <div className="flex aspect-[16/10] items-center justify-center bg-atelier-linen text-xs text-atelier-charcoal">
+                          Image pending — edit plan saved
+                        </div>
+                      )}
+                    </figure>
+                    <div className="flex items-center gap-3 border-b border-atelier-taupe/15 px-5 py-3">
+                      <figure className="flex items-center gap-3">
+                        <figcaption className="atelier-label">Before</figcaption>
                         {sourcePhoto?.file_url ? (
-                          <img src={sourcePhoto.file_url} alt="Source room photo" className="aspect-[4/3] w-full object-cover" />
+                          <img
+                            src={sourcePhoto.file_url}
+                            alt="Source room photo"
+                            className="h-14 w-20 rounded border border-atelier-taupe/25 object-cover"
+                          />
                         ) : (
-                          <div className="flex aspect-[4/3] items-center justify-center bg-atelier-linen text-xs text-atelier-charcoal">Source photo unavailable</div>
+                          <div className="flex h-14 w-20 items-center justify-center rounded bg-atelier-linen text-[0.6rem] text-atelier-charcoal">
+                            No source
+                          </div>
                         )}
                       </figure>
-                      <figure className="grid gap-1">
-                        <figcaption className="atelier-label px-4 pt-4">After</figcaption>
-                        {render.file_url ? (
-                          <img src={render.file_url} alt="Edited room photo" className="aspect-[4/3] w-full object-cover" />
-                        ) : (
-                          <div className="flex aspect-[4/3] items-center justify-center bg-atelier-linen text-xs text-atelier-charcoal">Image pending — edit plan saved</div>
-                        )}
-                      </figure>
+                      <p className="text-xs leading-5 text-atelier-charcoal/70">
+                        Your real {sourcePhoto?.label ?? "room"} photo, restyled in place — architecture, camera, windows and doors preserved.
+                      </p>
                     </div>
                     <div className="grid gap-3 p-5">
                       <div className="flex items-center justify-between gap-3">
@@ -1027,6 +1037,45 @@ function ListBlock({ title, items, compact = false }: { title: string; items: st
         ))}
       </ul>
     </article>
+  );
+}
+
+function PaletteStrip({ boardId, palette }: { boardId: string; palette: unknown[] }) {
+  const swatches = palette.slice(0, 6).map((item) => asRecord(item));
+  if (!swatches.length) return null;
+  return (
+    <div>
+      <p className="atelier-label">Palette</p>
+      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {swatches.map((swatch, index) => {
+          const hex = String(swatch.hex ?? "#f7f2ea");
+          const name = String(swatch.name ?? "Tone");
+          return (
+            <div key={`${boardId}-sw-${index}`} className="grid gap-1">
+              <span className="atelier-swatch" style={{ backgroundColor: hex }} title={`${name} ${hex}`} />
+              <span className="text-[0.7rem] font-medium leading-tight text-atelier-charcoal">{name}</span>
+              <span className="text-[0.65rem] uppercase tracking-wide text-atelier-taupe">{hex}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MaterialSwatches({ materials }: { materials: string[] }) {
+  if (!materials.length) return null;
+  return (
+    <div>
+      <p className="atelier-label">Materials</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {materials.map((material) => (
+          <span key={material} className="atelier-chip">
+            {material}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

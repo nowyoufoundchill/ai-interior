@@ -41,6 +41,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .limit(1)
     .maybeSingle();
 
+  const { data: home } = await supabase.from("homes").select("*").eq("id", room.home_id).maybeSingle();
+  const { data: designPreferences } = home
+    ? await supabase.from("design_preferences").select("preference_type, label").eq("home_id", home.id)
+    : { data: null };
+
   let plan;
   try {
     plan = await renderPromptDirector({
@@ -48,9 +53,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       sourcePhotoId: body.source_photo_id,
       moodBoardId: selectedMoodBoard.id,
       room,
+      home,
       analysis: latestDiagnosis?.analysis,
       selectedMoodBoard,
       sourcePhoto,
+      designPreferences: designPreferences ?? undefined,
       userInstructions: typeof body.instructions === "string" ? body.instructions : undefined
     });
   } catch (error) {

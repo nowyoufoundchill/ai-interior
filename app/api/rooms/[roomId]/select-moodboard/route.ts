@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { assessConceptCoherence, coherenceBlockMessage } from "@/lib/ai/concept-coherence";
+import { moodBoardSchema } from "@/lib/schemas";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
@@ -13,13 +15,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const supabase = createServerSupabaseClient();
   const { data: targetMoodBoard, error: targetError } = await supabase
     .from("mood_boards")
-    .select("id")
+    .select("id, concept_data")
     .eq("id", moodBoardId)
     .eq("room_id", roomId)
     .single();
 
   if (targetError || !targetMoodBoard) {
     return NextResponse.json({ error: targetError?.message ?? "Mood board was not found for this room." }, { status: 404 });
+  }
+
+  // Phase 6 coherence gate: the approved direction is the sole downstream
+  // contract, so an internally incoherent concept (garbled finish token,
+  // materials/thesis contradiction, degenerate fields) can never reach
+  // "Approved." This is the systemic guard against the oceanwash-class bug.
+  const parsedConcept = moodBoardSchema.safeParse(targetMoodBoard.concept_data);
+  if (!parsedConcept.success) {
+    return NextResponse.json(
+      { error: "This concept's data is malformed and can't be approved. Re-harmonize it, then approve." },
+      { status: 400 }
+    );
+  }
+  const coherence = assessConceptCoherence(parsedConcept.data);
+  if (!coherence.coherent) {
+    return NextResponse.json({ error: coherenceBlockMessage(coherence), coherence_violations: coherence.violations }, { status: 400 });
   }
 
   const { error: clearError } = await supabase

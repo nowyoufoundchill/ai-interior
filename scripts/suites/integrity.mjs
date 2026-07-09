@@ -110,17 +110,9 @@ async function main() {
   state = await getRoomState(roomId);
   reporter.assert(state.derived.locked_mood_board_version === boardToLock.version, "lock1: locked version matches the board we locked", state.derived);
 
-  const products1 = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/source-products`, { method: "POST" });
-  reporter.assert(products1.ok, "POST /source-products succeeds against the locked concept", products1.body);
-
-  state = await getRoomState(roomId);
-  reporter.assert(state.products.length > 0, "products: at least one product created", state.products);
-  reporter.assert(
-    state.products.every((p) => p.mood_board_version === boardToLock.version),
-    "products: every product stamped with the locked concept version",
-    state.products
-  );
-
+  // Render BEFORE products: product sourcing is gated behind both an approved
+  // direction and a completed render record (Phase 5). Generate the render
+  // first so the product gate is satisfied.
   const photosResp = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/photos`);
   const sourcePhotoId = photosResp.body.photos[0].id;
 
@@ -137,6 +129,17 @@ async function main() {
     state.renders.every((r) => r.mood_board_version === boardToLock.version || r.status === "stale"),
     "renders: current render stamped with the locked concept version",
     state.renders
+  );
+
+  const products1 = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/source-products`, { method: "POST" });
+  reporter.assert(products1.ok, "POST /source-products succeeds against the locked concept", products1.body);
+
+  state = await getRoomState(roomId);
+  reporter.assert(state.products.length > 0, "products: at least one product created", state.products);
+  reporter.assert(
+    state.products.every((p) => p.mood_board_version === boardToLock.version),
+    "products: every product stamped with the locked concept version",
+    state.products
   );
 
   // --- §4 Row 4: editing a locked concept is not possible ----------------

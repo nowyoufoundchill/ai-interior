@@ -154,11 +154,24 @@ export const conceptCritiqueSchema = z.object({
     z.object({
       concept_name: z.string(),
       scores: criticDimensionsSchema,
-      issues: z.array(z.string())
+      issues: z.array(z.string()),
+      // Regionally-current governance: the specific `reject_now` items (from
+      // trend_intelligence) that this concept lands on. A non-empty list is a
+      // genericness FAILURE, not a taste preference — it triggers a bounded
+      // regeneration in moodBoardGenerator. Empty array when no brief matches.
+      reject_now_violations: z.array(z.string()),
+      // Phase 3 layout-violation layer: blocking spatial-constraint breaches
+      // (furniture in a diagnosed door/no-go zone, blocking an active path).
+      // A non-empty list is a BLOCKING failure, not advice.
+      layout_violations: z.array(z.string())
     })
   ),
   concept_differentiation_score: z.number().min(0).max(100),
-  differentiation_notes: z.string()
+  differentiation_notes: z.string(),
+  // How current/regionally-right the set reads against the direction of travel.
+  // Low currency (with the direction data present) reads as generic luxury.
+  currency_score: z.number().min(0).max(100),
+  currency_notes: z.string()
 });
 
 export const productCritiqueSchema = z.object({
@@ -169,6 +182,20 @@ export const productCritiqueSchema = z.object({
   strengths: z.array(z.string()),
   issues: z.array(z.string()),
   gaps: z.array(z.string())
+});
+
+export const renderCritiqueSchema = z.object({
+  preservation_score: z.number().min(0).max(100),
+  constraint_adherence_score: z.number().min(0).max(100),
+  density_discipline_score: z.number().min(0).max(100),
+  realism_score: z.number().min(0).max(100),
+  // Release-blocking breaches: an instruction that blocks a diagnosed door or
+  // active path, backlights a call user against a window bank, drifts the fixed
+  // architecture/camera, warps/duplicates objects, or overfills past the object
+  // budget. A non-empty list gates the render (one bounded plan regeneration).
+  blocking_violations: z.array(z.string()),
+  issues: z.array(z.string()),
+  notes: z.array(z.string())
 });
 
 export const diagnosisCritiqueDimensionsSchema = z.object({
@@ -200,3 +227,4 @@ export type DesignCriticScore = z.infer<typeof designCriticSchema>;
 export type ConceptCritique = z.infer<typeof conceptCritiqueSchema>;
 export type DiagnosisCritique = z.infer<typeof diagnosisCritiqueSchema>;
 export type ProductCritique = z.infer<typeof productCritiqueSchema>;
+export type RenderCritique = z.infer<typeof renderCritiqueSchema>;

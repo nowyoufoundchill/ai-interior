@@ -25,6 +25,16 @@ export function HomeForm() {
           <span className="atelier-label">Whole-home palette</span>
           <input data-testid="home-palette-input" name="whole_home_palette" className="atelier-field" placeholder="warm white, oak, moss, brass" />
         </label>
+        <label className="grid gap-2">
+          <span className="atelier-label">Property value band</span>
+          <select data-testid="home-value-band-input" name="value_band" className="atelier-field" defaultValue="">
+            <option value="">Prefer not to say</option>
+            <option value="$1m-$3m">$1m – $3m — edited luxury</option>
+            <option value="$3m-$6m">$3m – $6m — authored, full-service</option>
+            <option value="$6m-$10m">$6m – $10m — fully authored, whole-system</option>
+          </select>
+          <span className="text-xs text-atelier-charcoal/60">Sets the level of authorship concepts target. Optional.</span>
+        </label>
       </div>
 
       <label className="grid gap-2">

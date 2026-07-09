@@ -41,3 +41,30 @@ select {
 .atelier-card {
   @apply rounded-md border border-atelier-taupe/20 bg-atelier-paper shadow-soft;
 }
+
+/* Phase 8 editorial layer ------------------------------------------------- */
+
+/* Premium treatment for the single approved direction: a warm brass frame and
+   a faint paper-gold wash so the chosen concept reads final and set-apart from
+   the working drafts, not just another card with a green badge. */
+.atelier-approved {
+  @apply border-atelier-brass/50 shadow-soft;
+  background-image: linear-gradient(180deg, rgba(176, 138, 76, 0.06), rgba(255, 250, 243, 0.9));
+  box-shadow: 0 0 0 1px rgba(176, 138, 76, 0.25), 0 18px 60px rgba(59, 57, 51, 0.11);
+}
+
+/* A single labeled palette swatch: color chip with its name + hex beneath, so
+   a concept reads like a studio board instead of anonymous colored dots. */
+.atelier-swatch {
+  @apply h-12 w-full rounded-md border border-atelier-taupe/25;
+}
+
+/* Material / keyword chip styled as a tactile swatch, not a bare list item. */
+.atelier-chip {
+  @apply inline-flex items-center rounded-full border border-atelier-taupe/30 bg-white/70 px-3 py-1 text-xs font-medium text-atelier-charcoal;
+}
+
+/* Small caps eyebrow used above editorial section titles. */
+.atelier-eyebrow {
+  @apply text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-atelier-brass;
+}

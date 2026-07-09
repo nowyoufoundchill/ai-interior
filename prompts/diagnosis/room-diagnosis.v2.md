@@ -15,6 +15,9 @@ Produce structured diagnosis data that will be used downstream to generate room 
 - Photos provide visual evidence for architecture, materials, lighting, existing furniture, and layout cues.
 - If evidence is missing or ambiguous, say so in `uncertainties` instead of guessing.
 
+## Current-market framing
+When `context_brain.trend_intelligence` is present, frame existing conditions in current-market terms where it is honest to do so: if a diagnosed finish or scheme appears on `reads_dated_now`, note that it reads dated in `opportunities` or `design_risks` (e.g. "the all-white shell reads dated for this market"). Do NOT prescribe a redesign or override a measured constraint — naming what currently reads wrong is a diagnosis observation; choosing the fix is the concept phase's job. When `trend_intelligence` is null, do not invent a trend story.
+
 ## What good output looks like
 - `room_summary` should name the room's actual design problem and opportunity, not generic decor language.
 - `architecture`, `lighting`, and `materials` should focus on facts that change concept direction, furniture scale, circulation, focal points, and render realism.

@@ -22,10 +22,12 @@ const PROMPT_FILE_URLS: Record<string, URL> = {
   "prompts/concepts/generate-room-concept.v1.md": new URL("../../prompts/concepts/generate-room-concept.v1.md", import.meta.url),
   "prompts/products/source-product-plan.v1.md": new URL("../../prompts/products/source-product-plan.v1.md", import.meta.url),
   "prompts/renders/compose-render-plan.v1.md": new URL("../../prompts/renders/compose-render-plan.v1.md", import.meta.url),
+  "prompts/renders/compose-render-plan.v2.md": new URL("../../prompts/renders/compose-render-plan.v2.md", import.meta.url),
   "prompts/chat/design-chat.v1.md": new URL("../../prompts/chat/design-chat.v1.md", import.meta.url),
   "prompts/critic/score-artifact.v1.md": new URL("../../prompts/critic/score-artifact.v1.md", import.meta.url),
   "prompts/critic/score-diagnosis.v1.md": new URL("../../prompts/critic/score-diagnosis.v1.md", import.meta.url),
-  "prompts/critic/score-products.v1.md": new URL("../../prompts/critic/score-products.v1.md", import.meta.url)
+  "prompts/critic/score-products.v1.md": new URL("../../prompts/critic/score-products.v1.md", import.meta.url),
+  "prompts/critic/score-render.v1.md": new URL("../../prompts/critic/score-render.v1.md", import.meta.url)
 };
 
 export async function loadPrompt(relativePath: string): Promise<VersionedPrompt> {

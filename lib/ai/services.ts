@@ -17,6 +17,7 @@ import {
   type RenderPlan,
   type RevisionResult,
   type RoomAnalysis,
+  type ConceptCritique,
   type DiagnosisCritique,
   type WholeHomeContext
 } from "@/lib/schemas";
@@ -33,12 +34,16 @@ import { resolveAiMode, runStructuredTask, type GatewayProvider } from "@/lib/ai
 import { logAiRun } from "@/lib/ai/logging";
 import { styleLibrary, type StyleProfile } from "@/lib/ai/style-library";
 import { resolvePropertyDossier } from "@/lib/ai/context-brain/property-dossier";
-import { resolveRegionalTrendBrief, compactTrendBriefForGeneration } from "@/lib/ai/context-brain/trend-intelligence";
+import {
+  resolveRegionalTrendBrief,
+  compactTrendBriefForGeneration,
+  compactTrendBriefForDiagnosis
+} from "@/lib/ai/context-brain/trend-intelligence";
 import { deriveRoomIntelligence } from "@/lib/ai/context-brain/room-intelligence";
 import { buildTasteGraph } from "@/lib/ai/context-brain/taste-graph";
 import { DESIGN_DISSENT_POLICY } from "@/lib/ai/context-brain/design-policy";
 import { DESIGN_PORTFOLIO } from "@/lib/ai/design-portfolio";
-import { critiqueConcepts, critiqueDiagnosis, critiqueProducts, overallScore } from "@/lib/ai/critic";
+import { critiqueConcepts, critiqueDiagnosis, critiqueProducts, critiqueRender, overallScore } from "@/lib/ai/critic";
 import { buildDiagnosisFixture } from "@/lib/ai/fixtures/diagnosis";
 import { buildProductPlanFixture } from "@/lib/ai/fixtures/products";
 import { buildRenderPlanFixture } from "@/lib/ai/fixtures/renders";
@@ -68,6 +73,7 @@ type HomeLike = {
   style_notes: string | null;
   whole_home_palette?: unknown;
   whole_home_constraints?: unknown;
+  value_band?: string | null;
 };
 
 type PhotoLike = {
@@ -288,7 +294,7 @@ export async function styleDirector(input: {
  * from.
  */
 function selectRelevantStyles(input: { room: RoomLike; home?: HomeLike | null }): StyleProfile[] {
-  const text = [
+  const ownerText = [
     ...toArray(input.room.style_preferences),
     ...toArray(input.room.color_preferences),
     input.home?.style_notes ?? ""
@@ -296,13 +302,32 @@ function selectRelevantStyles(input: { room: RoomLike; home?: HomeLike | null })
     .join(" ")
     .toLowerCase();
 
+  // Trend sub-region bias (Phase 2 task 4): the same state is not one taste
+  // market. Fold the resolved sub-region's reads_as + palette bias into the
+  // scoring text so a coastal Lowcountry address favors the coastal styles and
+  // an inland/lake address favors heavier wood/stone/gallery styles — without
+  // overriding an explicit owner preference (owner text is weighted higher).
+  const resolvedTrend = resolveRegionalTrendBrief(input.home?.region ?? null);
+  const subRegionText = resolvedTrend?.matched_sub_region
+    ? [resolvedTrend.matched_sub_region.reads_as, ...resolvedTrend.matched_sub_region.palette_bias].join(" ").toLowerCase()
+    : "";
+
   const scored = styleLibrary.map((style) => {
-    const nameHit = text.includes(style.style_name.toLowerCase());
+    const nameHit = ownerText.includes(style.style_name.toLowerCase());
     const keywordHits = [...style.pairs_well_with, style.style_name].filter((keyword) =>
-      text.includes(keyword.toLowerCase())
+      ownerText.includes(keyword.toLowerCase())
+    ).length;
+    // Sub-region only nudges (weight 2 for a name hit, 1 per keyword) so an
+    // explicit owner style preference (weight 5) always wins.
+    const subRegionNameHit = subRegionText.includes(style.style_name.toLowerCase());
+    const subRegionKeywordHits = [...style.pairs_well_with, style.style_name].filter((keyword) =>
+      subRegionText.includes(keyword.toLowerCase())
     ).length;
     const depthBonus = style.proportion_rules ? 1 : 0;
-    return { style, score: (nameHit ? 5 : 0) + keywordHits + depthBonus };
+    return {
+      style,
+      score: (nameHit ? 5 : 0) + keywordHits + (subRegionNameHit ? 2 : 0) + subRegionKeywordHits + depthBonus
+    };
   });
 
   const ranked = scored.sort((a, b) => b.score - a.score).map((entry) => entry.style);
@@ -348,7 +373,11 @@ function buildContextBrain(input: {
     // Dated, sourced trend picture for this region (null when no brief matches,
     // so we never invent a trend story). Lower priority than room reality and
     // the owner's taste graph — it informs the point of view, not the rules.
-    trend_intelligence: resolveRegionalTrendBrief(input.home?.region ?? null)
+    trend_intelligence: resolveRegionalTrendBrief(input.home?.region ?? null),
+    // Owner-facing property value band; sets which price-tier register the
+    // trend brain targets (edited luxury vs fully authored). Null falls back to
+    // the safe middle register inside resolveTierRegister.
+    home_value_band: input.home?.value_band ?? null
   };
 }
 
@@ -395,7 +424,7 @@ function compactContextBrainForGeneration(contextBrain: ReturnType<typeof buildC
     // 2026" and "generic luxury." Concepts must reflect the direction of
     // travel and avoid everything in `reject_now`.
     trend_intelligence: contextBrain.trend_intelligence
-      ? compactTrendBriefForGeneration(contextBrain.trend_intelligence)
+      ? compactTrendBriefForGeneration(contextBrain.trend_intelligence, contextBrain.home_value_band)
       : null
   };
 }
@@ -448,7 +477,44 @@ function compactContextBrainForDiagnosis(contextBrain: ReturnType<typeof buildCo
     design_policy: {
       priority_order: contextBrain.design_policy.priority_order,
       rule: contextBrain.design_policy.rule
-    }
+    },
+    // A compact, current-market slice so the diagnosis can frame existing
+    // conditions in 2026 terms (e.g. "all-white shell reads dated") without
+    // prescribing the redesign. Null when no regional brief matches.
+    trend_intelligence: contextBrain.trend_intelligence
+      ? compactTrendBriefForDiagnosis(contextBrain.trend_intelligence)
+      : null
+  };
+}
+
+function compactContextBrainForRender(contextBrain: ReturnType<typeof buildContextBrain>) {
+  return {
+    property_dossier: {
+      local_luxury_register: contextBrain.property_dossier.local_luxury_register,
+      what_reads_as_wrong_here: contextBrain.property_dossier.what_reads_as_wrong_here.slice(0, 4)
+    },
+    // Full room intelligence including the typed constraint_set — the render
+    // director needs the no-go zones, door clearances, and camera-backdrop
+    // logic verbatim, not a summary.
+    room_intelligence: contextBrain.room_intelligence,
+    taste_graph: {
+      preferred_styles: contextBrain.taste_graph.preferred_styles.slice(0, 6),
+      standing_constraints: contextBrain.taste_graph.standing_constraints.slice(0, 8),
+      formality_balance: contextBrain.taste_graph.formality_balance
+    },
+    // Lighting + luxury mechanics are exactly what a render needs to make a
+    // material read expensive under the room's real light.
+    style_library: contextBrain.style_library.slice(0, 3).map((style) => ({
+      style_name: style.style_name,
+      color_palette: style.color_palette.slice(0, 5),
+      materials: style.materials.slice(0, 5),
+      lighting_types: style.lighting_types.slice(0, 4),
+      lighting_layers: style.lighting_layers ?? null,
+      luxury_mechanics: style.luxury_mechanics?.slice(0, 3) ?? []
+    })),
+    trend_intelligence: contextBrain.trend_intelligence
+      ? compactTrendBriefForGeneration(contextBrain.trend_intelligence, contextBrain.home_value_band)
+      : null
   };
 }
 
@@ -458,6 +524,54 @@ function shouldRegenerateDiagnosis(critique: DiagnosisCritique) {
   }
 
   return overallScore(critique.scores) < 72;
+}
+
+/**
+ * Decide whether a concept set must be regenerated once, and with what focus.
+ * Returns null when the set passes governance (no regeneration). Blocking
+ * conditions, in priority order:
+ *  - any concept lands on a `reject_now` item (regionally-current genericness);
+ *  - the set reads generic against the direction of travel (low currency);
+ *  - the set fails the differentiation bar.
+ */
+function buildConceptRegenerationFeedback(critique: ConceptCritique): string | null {
+  const layoutViolations = critique.per_concept
+    .filter((entry) => (entry.layout_violations?.length ?? 0) > 0)
+    .map((entry) => `- "${entry.concept_name}" breaks a blocking spatial constraint: ${entry.layout_violations.join("; ")}`);
+
+  const violations = critique.per_concept
+    .filter((entry) => (entry.reject_now_violations?.length ?? 0) > 0)
+    .map((entry) => `- "${entry.concept_name}" lands on reject_now: ${entry.reject_now_violations.join("; ")}`);
+
+  const lowCurrency = critique.currency_score < 70;
+  const lowDifferentiation = critique.concept_differentiation_score < 70;
+
+  if (!layoutViolations.length && !violations.length && !lowCurrency && !lowDifferentiation) {
+    return null;
+  }
+
+  const parts: string[] = ["The previous concept set failed governance and must be regenerated. Fix, specifically:"];
+  if (layoutViolations.length) {
+    parts.push(
+      `LAYOUT VIOLATIONS (blocking — fix first): these place furniture in a diagnosed door/no-go zone or block an active path. Re-plan the layout to keep every no-go zone and circulation path clear:\n${layoutViolations.join("\n")}`
+    );
+  }
+  if (violations.length) {
+    parts.push(
+      `These concepts landed on the regional reject_now list (treat as genericness failures, not options — remove them entirely):\n${violations.join("\n")}`
+    );
+  }
+  if (lowCurrency) {
+    parts.push(
+      `Currency scored ${critique.currency_score}/100: ${critique.currency_notes || "the set reads generic luxury, not authored for this region this year."} Pull each concept toward at least one current direction-of-travel move and cite its mechanism.`
+    );
+  }
+  if (lowDifferentiation) {
+    parts.push(
+      `Differentiation scored ${critique.concept_differentiation_score}/100: ${critique.differentiation_notes} Make the concepts differ in style anchor, palette temperature, formality, and risk profile — not just name.`
+    );
+  }
+  return parts.join("\n\n");
 }
 
 export async function moodBoardGenerator(input: {
@@ -528,9 +642,17 @@ export async function moodBoardGenerator(input: {
 
   let critique = await critiqueConcepts({ roomId: input.room.id, concepts, contextBrain: criticContextBrain, provider });
 
-  // The critic remains authoritative, but automatic regeneration is disabled
-  // for now so the real office workflow can complete within practical batch
-  // and route time limits during Phase 0 validation.
+  // Governance enforcement (Phase 2): a concept landing on a `reject_now` item,
+  // a set that reads generic against the direction of travel, or a set that
+  // fails the differentiation bar is a genericness FAILURE, not a taste
+  // preference. Do ONE bounded regeneration with targeted feedback, then
+  // re-score — mirroring the existing single-retry convention (never an
+  // unbounded loop).
+  const regenerationFeedback = buildConceptRegenerationFeedback(critique);
+  if (regenerationFeedback) {
+    concepts = await generateSet(regenerationFeedback);
+    critique = await critiqueConcepts({ roomId: input.room.id, concepts, contextBrain: criticContextBrain, provider });
+  }
 
   // Replace the model's self-reported quality_score (observed to drift onto a
   // 0-10 convention against a 0-100 schema) with the critic's calibrated
@@ -1075,15 +1197,75 @@ export async function scaleAndFitEvaluator(input: {
   return input.product.scores;
 }
 
+/**
+ * Compute a hard object budget for a render: how many discrete furniture + decor
+ * pieces this room and concept should carry. Driven by room size (floor area) ×
+ * concept restraint × property tier register. Directly fixes the "too full"
+ * render — a restraint concept in a small room gets a small budget, not
+ * desk+lounge+credenza+plant+lamp+art.
+ */
+function computeObjectBudget(input: {
+  floorAreaSqft: number | null;
+  concept: unknown;
+  tierInteriorCharacter?: string | null;
+}) {
+  const concept = asRecord(input.concept);
+  const restraintText = [
+    concept.design_thesis,
+    concept.decor_direction,
+    concept.layout_direction,
+    ...(Array.isArray(concept.style_keywords) ? concept.style_keywords : []),
+    ...(Array.isArray(concept.risk_profile) ? concept.risk_profile : [])
+  ]
+    .filter((v): v is string => typeof v === "string")
+    .join(" ")
+    .toLowerCase();
+
+  const isRestraint = /restraint|quiet|uncluttered|minimal|negative space|pared|sparse|calm|edited|less is more|breathing room/.test(
+    restraintText
+  );
+  const isLayered = /layered|maximal|collected|rich|abundant|gallery wall|eclectic|more is more|saturated/.test(restraintText);
+
+  // Base cap by floor area (discrete furniture + decor objects visible in frame).
+  const area = input.floorAreaSqft;
+  let base = area == null ? 6 : area < 120 ? 4 : area < 200 ? 6 : area < 350 ? 8 : 10;
+
+  let posture: "restraint" | "balanced" | "layered" = "balanced";
+  if (isRestraint && !isLayered) {
+    posture = "restraint";
+    base = Math.max(3, base - 2);
+  } else if (isLayered && !isRestraint) {
+    posture = "layered";
+    base = base + 1;
+  }
+
+  return {
+    max_objects: base,
+    posture,
+    basis: `${area == null ? "unknown area" : `${area} sq ft`} × ${posture} concept${
+      input.tierInteriorCharacter ? ` × tier: ${input.tierInteriorCharacter}` : ""
+    }`,
+    guidance:
+      posture === "restraint"
+        ? "Restraint concept: prefer proportion and negative space over object count. Do not add a piece just because it would be nice."
+        : posture === "layered"
+          ? "Layered concept: more objects are acceptable, but every added piece must earn its place and stay in scale."
+          : "Balanced concept: a considered, non-crowded object count sized to the room."
+  };
+}
+
 export async function renderPromptDirector(input: {
   roomId: string;
   sourcePhotoId?: string;
   moodBoardId?: string;
   room?: RoomLike;
+  home?: HomeLike | null;
   analysis?: unknown;
   selectedMoodBoard?: MoodBoardLike | null;
   sourcePhoto?: PhotoLike | null;
   userInstructions?: string;
+  skipCritic?: boolean;
+  designPreferences?: { preference_type: string; label: string }[];
   provider?: GatewayProvider;
 }): Promise<RenderPlan> {
   const provider = input.provider ?? "anthropic";
@@ -1094,39 +1276,113 @@ export async function renderPromptDirector(input: {
     userInstructions
   });
 
-  return runStructuredTask({
-    roomId: input.roomId,
-    serviceName: "Render Prompt Director",
-    provider,
-    promptPath: "prompts/renders/compose-render-plan.v1.md",
-    schemaName: "render_plan",
-    schema: renderPlanJsonSchema,
-    zodSchema: renderPlanSchema,
-    taskInput: {
-      task: "Create a render prompt plan for this room and source photo.",
-      room_id: input.roomId,
-      room: input.room,
-      analysis: input.analysis,
-      selected_mood_board: input.selectedMoodBoard,
-      source_photo: input.sourcePhoto,
-      source_photo_id: input.sourcePhotoId ?? "",
-      mood_board_id: input.moodBoardId ?? "",
-      user_regeneration_instructions: userInstructions,
-      success_criteria: [
-        "This is a photo edit of a real room, not a text-to-image generation: preserve walls, doors, windows, floor plane, ceiling, fixed architecture, and camera angle.",
-        "Apply only reversible design changes unless explicitly requested.",
-        "Honor the owner's regeneration instructions when provided, without violating the preservation constraints.",
-        "List negative instructions that reduce distorted geometry and unrealistic scale."
-      ]
-    },
-    mock: () => mockPlan
-  }).then((output) =>
-    renderPlanSchema.parse({
-      ...output,
-      source_photo_id: output.source_photo_id || undefined,
-      mood_board_id: output.mood_board_id || undefined
-    })
-  );
+  // Full context brain (Phase 4): property dossier, room intelligence + the
+  // Phase 3 constraint set, taste graph, Phase 2 trend intelligence, and the
+  // style library's lighting/luxury mechanics all reach the render director.
+  const contextBrain = input.room
+    ? buildContextBrain({ room: input.room, home: input.home, analysis: input.analysis, designPreferences: input.designPreferences })
+    : null;
+  const renderContextBrain = contextBrain ? compactContextBrainForRender(contextBrain) : null;
+  const objectBudget = computeObjectBudget({
+    floorAreaSqft: contextBrain?.room_intelligence.floor_area_sqft ?? null,
+    concept: input.selectedMoodBoard?.concept_data,
+    tierInteriorCharacter: renderContextBrain?.trend_intelligence?.tier_register?.interior_character ?? null
+  });
+
+  const generatePlan = (criticFeedback?: string) =>
+    runStructuredTask({
+      roomId: input.roomId,
+      serviceName: criticFeedback ? "Render Prompt Director Regeneration" : "Render Prompt Director",
+      provider,
+      promptPath: "prompts/renders/compose-render-plan.v2.md",
+      schemaName: "render_plan",
+      schema: renderPlanJsonSchema,
+      zodSchema: renderPlanSchema,
+      maxTokens: 6144,
+      taskInput: {
+        task: "Create a render prompt plan for this room and source photo.",
+        room_id: input.roomId,
+        room: input.room,
+        analysis: input.analysis,
+        selected_mood_board: input.selectedMoodBoard,
+        source_photo: input.sourcePhoto,
+        source_photo_id: input.sourcePhotoId ?? "",
+        mood_board_id: input.moodBoardId ?? "",
+        context_brain: renderContextBrain,
+        object_budget: objectBudget,
+        user_regeneration_instructions: userInstructions,
+        critic_feedback: criticFeedback ?? null,
+        success_criteria: [
+          "This is a photo edit of a real room, not a text-to-image generation: preserve walls, doors, windows, floor plane, ceiling, fixed architecture, and camera angle.",
+          "Keep every no_go_zone and door clearance in room_intelligence.constraint_set clear; orient a call-room seat away from the window bank.",
+          "Stay within object_budget; a restraint concept in a small room stays sparse.",
+          "Name the exact surfaces being changed and what the light does to the materials.",
+          "Honor the owner's regeneration instructions when provided, without violating the preservation constraints or the constraint set."
+        ]
+      },
+      mock: () => mockPlan
+    }).then((output) =>
+      renderPlanSchema.parse({
+        ...output,
+        source_photo_id: output.source_photo_id || undefined,
+        mood_board_id: output.mood_board_id || undefined
+      })
+    );
+
+  let plan = await generatePlan();
+
+  // Gated Render Critic (Phase 4): review the plan against the constraint set +
+  // preservation contract + object budget BEFORE the image is generated. One
+  // bounded regeneration on blocking violations, mirroring the concept critic.
+  if (!input.skipCritic && contextBrain) {
+    try {
+      let critique = await critiqueRender({
+        roomId: input.roomId,
+        plan,
+        contextBrain: renderContextBrain,
+        objectBudget,
+        userInstructions,
+        provider
+      });
+
+      if (critique.blocking_violations.length) {
+        const feedback = `The previous render plan had BLOCKING violations that must be fixed:\n${critique.blocking_violations
+          .map((v) => `- ${v}`)
+          .join("\n")}\nRe-plan so none remain, without violating the preservation contract or the object budget.`;
+        plan = await generatePlan(feedback);
+        critique = await critiqueRender({
+          roomId: input.roomId,
+          plan,
+          contextBrain: renderContextBrain,
+          objectBudget,
+          userInstructions,
+          provider
+        });
+      }
+
+      // Fold the critic's verdict into the plan's own critique so it is
+      // persisted and visible, and floor the quality score when blocking
+      // violations survived the one bounded retry (so a door-blocking or
+      // backlit plan cannot present as a high-quality "current" render).
+      const residual = critique.blocking_violations;
+      plan = renderPlanSchema.parse({
+        ...plan,
+        critique: {
+          notes: [
+            ...plan.critique.notes,
+            ...critique.notes,
+            ...(residual.length ? residual.map((v) => `BLOCKING (unresolved): ${v}`) : ["Render Critic: no blocking spatial violations."])
+          ],
+          score: residual.length ? Math.min(plan.critique.score, 45) : plan.critique.score
+        },
+        quality_score: residual.length ? Math.min(plan.quality_score, 45) : plan.quality_score
+      });
+    } catch {
+      // A critic failure must never block a completed render plan.
+    }
+  }
+
+  return plan;
 }
 
 /**

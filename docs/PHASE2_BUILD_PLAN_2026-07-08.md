@@ -58,7 +58,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 2 — Design Brain: Taste & Trend Intelligence  🟡 *(v1 landed; extend)*
+## Phase 2 — Design Brain: Taste & Trend Intelligence  ✅ *(completed 2026-07-09)*
+
+> All 5 completion tasks landed: `homes.value_band` (migration 006 + form/query/type wiring), diagnosis trend slice, `reject_now` as blocking critic governance with one bounded regeneration, sub-region style bias, and the documented refresh ritual (`docs/TREND_REFRESH.md`) + newest-brief resolver. Runtime-verified; live concept-read folded into the Phase 9 owner cycle. See SESSION_LOG 2026-07-09.
 
 **Objective:** make the brain execute like a designer who *reads the market* — regional, current, sourced taste as data.
 
@@ -82,7 +84,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 3 — Constraint-Enforcing Room Intelligence  ⬜
+## Phase 3 — Constraint-Enforcing Room Intelligence  ✅ *(completed 2026-07-09)*
+
+> `deriveRoomConstraints` → typed `RoomIntelligence.constraint_set` (door clearances + swing arcs, window-operation zones, circulation, camera/backdrop, named no-go zones, each with severity + provenance), threaded into concept gen + critic (blocking `layout_violations` + bounded regen) + render director. See SESSION_LOG 2026-07-09.
 
 **Objective:** turn room understanding into **hard, machine-checkable constraints**, so "don't block a door/window/walkway" is a release-blocking rule, not prose (PHASE2_PLAN Stream B).
 
@@ -97,7 +101,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 4 — Render Director Rebuild + Judgment  ⬜
+## Phase 4 — Render Director Rebuild + Judgment  ✅ *(completed 2026-07-09)*
+
+> Full context brain + constraint set + computed `objectBudget` (size × restraint × tier) into a photographer/stylist-POV v2 prompt; gated Render Critic (`score-render.v1`) blocks door/path block, backlit call seat, architectural drift, warping, and overfill with one bounded plan regen + score floor. See SESSION_LOG 2026-07-09.
 
 **Objective:** upgrade the flagship artifact to use the full brain and make mature spatial decisions (addresses Finding 5).
 
@@ -115,7 +121,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 5 — Real Product Sourcing  ⬜
+## Phase 5 — Real Product Sourcing  ✅ *(v1 landed 2026-07-09)*
+
+> Tavily sourcing gated behind approved direction + render; products persist only after source-URL + image validation and re-host to `cached_image_path`; Product Critic sees the approved render. Live product-quality read remains a Phase 9 owner item. See SESSION_LOG 2026-07-09.
 
 **Objective:** products become real, buyable, image-loading execution support (Finding 1, backend) — positioned *after* the render loop.
 
@@ -132,7 +140,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 6 — Concept Coherence & Critic Enforcement  ⬜
+## Phase 6 — Concept Coherence & Critic Enforcement  ✅ *(completed 2026-07-09)*
+
+> Deterministic `concept-coherence.ts` (garbled finish token / materials contradiction / degenerate fields) enforced at the approval gate (`select-moodboard` blocks an incoherent lock) with a bounded single-pass repair at edit/reharmonize. Runtime-verified against the real `oceanwash` bug. See SESSION_LOG 2026-07-09.
 
 **Objective:** the approved direction can never be incoherent or nonsense (Finding 3, systemic).
 
@@ -147,7 +157,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 7 — Design Chat as Real Collaboration  ⬜
+## Phase 7 — Design Chat as Real Collaboration  ✅ *(v1 landed 2026-07-09)*
+
+> Chat renders the real `chat_messages` thread; passes approved direction/current render/prior thread/last requested change into the turn; writes owner+designer messages; stays advisory (no silent mutation); long-running progress state. See SESSION_LOG 2026-07-09.
 
 **Objective:** chat feels like collaborating with a designer and actually works (Finding 2, full).
 
@@ -163,7 +175,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 8 — Editorial Presentation Layer  ⬜
+## Phase 8 — Editorial Presentation Layer  ✅ *(completed 2026-07-09)*
+
+> Annotated concept boards (labeled palette strips name+hex + material swatch chips), premium `.atelier-approved` state for the approved direction, image-first render hero, reusable design-language classes in `globals.css`. All `data-testid` preserved. Visual gate (Suite 5 + owner) folds into Phase 9. See SESSION_LOG 2026-07-09.
 
 **Objective:** close the "sophistication gap" (the SC-2026 poster) — taste *presentation*, not just taste *knowledge*. Also the deep half of Finding 6.
 
@@ -180,7 +194,9 @@ The reasoning layer is already strong (diagnosis, concept distinctiveness, rende
 
 ---
 
-## Phase 9 — Owner-Judged Live Cycle & Eval Harness  ⬜
+## Phase 9 — Owner-Judged Live Cycle & Eval Harness  🟡 *(automated backstops landed 2026-07-09; owner live cycle pending)*
+
+> Suite extensions landed (reject_now-absence, no-dead-image-product, render door-guard asserts; Integrity 55/55, E2E 25/25, residue clean). The owner-judged live cycle — the real gate — is prepped in `docs/PHASE9_OWNER_CYCLE.md` and awaits the owner (apply migration 006 first). See SESSION_LOG 2026-07-09.
 
 **Objective:** measure the way the owner actually experiences the app (PHASE2_PLAN Stream G). This is the real gate.
 

@@ -43,6 +43,7 @@ export type Database = {
           style_notes: string | null;
           whole_home_palette: Json;
           whole_home_constraints: Json;
+          value_band: string | null;
           test_run_id: string | null;
           created_at: string;
           updated_at: string;
@@ -56,6 +57,7 @@ export type Database = {
           style_notes?: string | null;
           whole_home_palette?: Json;
           whole_home_constraints?: Json;
+          value_band?: string | null;
           test_run_id?: string | null;
           created_at?: string;
           updated_at?: string;

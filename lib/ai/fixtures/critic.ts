@@ -1,4 +1,4 @@
-import type { ConceptCritique, DiagnosisCritique, MoodBoardConcept, ProductCritique } from "@/lib/schemas";
+import type { ConceptCritique, DiagnosisCritique, MoodBoardConcept, ProductCritique, RenderCritique } from "@/lib/schemas";
 
 export function buildConceptCritiqueFixture(concepts: MoodBoardConcept[]): ConceptCritique {
   return {
@@ -21,10 +21,18 @@ export function buildConceptCritiqueFixture(concepts: MoodBoardConcept[]): Conce
         budget_alignment: 70,
         whole_home_alignment: 72 - index
       },
-      issues: ["Mock critique only — no model call made. Provide a room + real concepts to score for real."]
+      issues: ["Mock critique only — no model call made. Provide a room + real concepts to score for real."],
+      // Mock concepts are authored to avoid the reject_now list, so no
+      // violations here — real detection needs a live critic call.
+      reject_now_violations: [],
+      // Mock concepts do not place furniture in a no-go zone; real layout-
+      // violation detection needs a live critic call.
+      layout_violations: []
     })),
     concept_differentiation_score: 65,
-    differentiation_notes: "Mock differentiation score — real scoring requires a live critic call."
+    differentiation_notes: "Mock differentiation score — real scoring requires a live critic call.",
+    currency_score: 72,
+    currency_notes: "Mock currency score — real regional-currency scoring requires a live critic call."
   };
 }
 
@@ -42,6 +50,21 @@ export function buildDiagnosisCritiqueFixture(): DiagnosisCritique {
     missing_factors: [],
     regeneration_needed: false,
     regeneration_focus: []
+  };
+}
+
+export function buildRenderCritiqueFixture(): RenderCritique {
+  return {
+    preservation_score: 82,
+    constraint_adherence_score: 80,
+    density_discipline_score: 78,
+    realism_score: 80,
+    // Mock render plans are authored to preserve architecture and respect the
+    // constraint set, so no blocking violations — real detection needs a live
+    // critic call against the actual plan.
+    blocking_violations: [],
+    issues: ["Mock render critique only — no model call made."],
+    notes: ["Preservation and constraint adherence assumed from the mock plan."]
   };
 }
 

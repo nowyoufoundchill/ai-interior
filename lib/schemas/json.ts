@@ -295,15 +295,25 @@ export const conceptCritiqueJsonSchema = {
         properties: {
           concept_name: { type: "string" },
           scores: criticDimensionsJsonSchema,
-          issues: stringArray
+          issues: stringArray,
+          reject_now_violations: stringArray,
+          layout_violations: stringArray
         },
-        required: ["concept_name", "scores", "issues"]
+        required: ["concept_name", "scores", "issues", "reject_now_violations", "layout_violations"]
       }
     },
     concept_differentiation_score: score,
-    differentiation_notes: { type: "string" }
+    differentiation_notes: { type: "string" },
+    currency_score: score,
+    currency_notes: { type: "string" }
   },
-  required: ["per_concept", "concept_differentiation_score", "differentiation_notes"]
+  required: [
+    "per_concept",
+    "concept_differentiation_score",
+    "differentiation_notes",
+    "currency_score",
+    "currency_notes"
+  ]
 } as const;
 
 export const diagnosisCritiqueJsonSchema = {
@@ -333,6 +343,29 @@ export const productCritiqueJsonSchema = {
     gaps: stringArray
   },
   required: ["concept_fit_score", "scale_realism_score", "budget_discipline_score", "coverage_score", "strengths", "issues", "gaps"]
+} as const;
+
+export const renderCritiqueJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    preservation_score: score,
+    constraint_adherence_score: score,
+    density_discipline_score: score,
+    realism_score: score,
+    blocking_violations: stringArray,
+    issues: stringArray,
+    notes: stringArray
+  },
+  required: [
+    "preservation_score",
+    "constraint_adherence_score",
+    "density_discipline_score",
+    "realism_score",
+    "blocking_violations",
+    "issues",
+    "notes"
+  ]
 } as const;
 
 export const revisionJsonSchema = {

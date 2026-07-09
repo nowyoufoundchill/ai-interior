@@ -498,3 +498,95 @@
 
 ### Next Action
 - Recommended next phase: Phase 3 + Phase 4 together (constraint engine + render director), because the live chat already reasons about density/openings, but render/product quality still needs hard spatial constraints and render-aware judgment to become systemic.
+
+## 2026-07-09 (continued) — Autonomous Phase 2→9 completion pass
+
+Owner directive: work through every remaining phase of `docs/PHASE2_BUILD_PLAN_2026-07-08.md` from the top without further input, recording tasks and gates for each. Status at start: Phase 1 ✅, Phase 2 v1 🟡, Phase 5/7 v1 ✅ (2026-07-09), Phases 3/4/6/8/9 ⬜.
+
+### Phase 2 — Design Brain completion (all 5 build-plan tasks)
+
+**Tasks landed:**
+1. **Home value-band data model.** `supabase/migrations/006_home_value_band.sql` (additive, nullable `homes.value_band`). Wired through `types/database.ts` (homes Row/Insert), `components/forms/home-form.tsx` (a select: `$1m-$3m` / `$3m-$6m` / `$6m-$10m` / prefer-not-to-say), `lib/data/actions.ts` (`createHomeAction` insert), and `lib/ai/services.ts` (`HomeLike.value_band`; `buildContextBrain` now returns `home_value_band`; `compactContextBrainForGeneration` passes it to `compactTrendBriefForGeneration`) so `resolveTierRegister` is exact instead of defaulting to the middle register. `getHomes`/`getRoomWorkspace` already `select("*")`, so no query change needed.
+2. **Diagnosis trend slice.** New `compactTrendBriefForDiagnosis` in `trend-intelligence.ts` (headline + direction-of-travel + `reads_dated_now` + sub-region, no palette/maker dump) wired into `compactContextBrainForDiagnosis`; `prompts/diagnosis/room-diagnosis.v2.md` gained a "Current-market framing" block (name what reads dated in opportunities/risks; never prescribe the fix or override a measurement; null → no trend story).
+3. **reject_now governance (now blocking).** Extended `conceptCritiqueSchema` + `conceptCritiqueJsonSchema` + critic fixture with per-concept `reject_now_violations` and set-level `currency_score`/`currency_notes`; `prompts/critic/score-artifact.v1.md` now populates them (landing on a reject_now item lowers originality/luxury_signal, not just a note). `moodBoardGenerator` runs `buildConceptRegenerationFeedback(critique)` and does **one bounded regeneration** (mirrors the existing single-retry convention) when any concept violates reject_now, currency < 70, or differentiation < 70 — re-scoring after. **Also fixed a latent gap:** the currency requirement the prior session added to `generate-room-concepts.v2.md` (plural) was never in the prompt actually used — `moodBoardGenerator`/`refineConcept` call `generate-room-concept.v1.md` (singular). Added the Currency requirement + `trend_intelligence` to that prompt so it is really in effect.
+4. **Style-library sub-region bias.** `selectRelevantStyles` now folds the resolved trend sub-region's `reads_as` + `palette_bias` into scoring (weight 2 name / 1 keyword) so a coastal address favors the coastal styles and an inland/lake address favors heavier wood/stone/gallery styles — but an explicit owner style preference (weight 5) always wins.
+5. **Refresh ritual.** Resolver now selects the **newest** matching brief by `authored` date (append-never-overwrite supersedes automatically; old briefs retained for audit). Documented the full ritual in `docs/TREND_REFRESH.md` (deep-research → new brief object → verify resolution → read one live generation; staleness safety net; optional scheduled reminder).
+
+**Gates:**
+- `npm.cmd run typecheck` clean.
+- Runtime resolver check (compiled `trend-intelligence.ts` standalone, exercised in node): Charleston→"Coastal Lowcountry & islands", Lake Keowee→"Inland / Upstate & lake", Austin→`null` (no invented trend). Tier register: `$1m-$3m`→bottom, `$3m-$6m`→middle, `$6m-$10m`→top, `$9.5m`→top, `null`→middle. Diagnosis slice exposes the expected keys.
+- Remaining gate (one `AI_MODE=live` Charleston concept run read by the owner: expresses ≥1 current thesis with mechanism, nothing on reject_now) is folded into the Phase 9 owner-judged cycle — it needs human judgment, not an automated assert.
+
+### Phase 3 — Constraint-enforcing room intelligence
+
+**Tasks landed:**
+1. **Typed constraint set.** `lib/ai/context-brain/room-intelligence.ts` now derives a `RoomConstraintSet` (new `deriveRoomConstraints`) exposed as `RoomIntelligence.constraint_set`: door-clearance constraints (with swing-arc note read from the diagnosis text), window-operation constraints (blocking when operable), a high-glare orientation rule, a `camera_backdrop` object for call/video rooms, stated owner spatial constraints promoted to `no_go_zones`, and a tight-circulation rule when area-per-opening < 25. Each `SpatialConstraint` carries `severity` (blocking/advisory) and `derived_from` provenance; positions are read from free-text door/window strings (keyword orientation + swing), so confidence notes state they are heuristics, not a survey. Blocking constraints sort first.
+2. **Threaded as typed data.** Because every compact brain already passes `room_intelligence` whole, the constraint set now flows automatically into diagnosis, concept generation, and the concept critic. `prompts/concepts/generate-room-concept.v1.md` gained a "Spatial constraints (hard)" block (keep no-go zones clear, protect door clearance + circulation, honor camera-backdrop orientation; these sit above taste).
+3. **Blocking layout-violation layer.** Extended `conceptCritiqueSchema` + JSON schema + fixture with per-concept `layout_violations`; `prompts/critic/score-artifact.v1.md` now checks each concept's layout against `constraint_set` and populates it (breach → lower scale_realism/functional_fit, name the constraint id). `buildConceptRegenerationFeedback` treats layout violations as the highest-priority blocking trigger for the one bounded regeneration.
+
+**Gates:**
+- `npm.cmd run typecheck` clean.
+- Runtime check (compiled `room-intelligence.ts`, 11×14 office w/ inward-swing entry door, closet door, operable south window bank, high glare, call purpose, two stated constraints): produced 6 blocking constraints (2 door clearances, 1 window operation, glare orientation, 2 stated no-go zones), the 4 expected no-go zones, a populated `camera_backdrop`, and clear-zone backdrop wall. The critic is now structurally able to fail a concept that places furniture in a diagnosed door/no-go zone.
+- Render-side consumption of `constraint_set` + a render-critic layout check are done in Phase 4 (the render director rebuild), which is where render instruction sets are produced.
+
+### Phase 4 — Render director rebuild + judgment
+
+**Tasks landed:**
+1. **Full context brain into the render director.** `renderPromptDirector` now builds the full `buildContextBrain` (dossier, room intelligence + Phase 3 `constraint_set`, taste graph, Phase 2 trend, style-library lighting/luxury mechanics) via a new `compactContextBrainForRender` compactor (keeps `room_intelligence` whole so no-go zones/door clearances/camera-backdrop pass verbatim). The `generate-render` route now fetches `home` + `design_preferences` and passes them in.
+2. **v2 render prompt (photographer/stylist POV).** `prompts/renders/compose-render-plan.v2.md` — preservation contract, spatial-constraint block, object-budget discipline, and a hard rule that every transformation instruction names the exact surface changed and what light does to the material. Registered in `lib/ai/prompts.ts`; director switched from v1 → v2.
+3. **Furniture-density cap.** New `computeObjectBudget(area × concept restraint × tier register)`: base by floor area (<120→4, <200→6, <350→8, else 10), −2 for a restraint concept (min 3), +1 for a layered one; returns `max_objects` + `posture` + guidance. A restraint concept in an 11×14 (154 sqft) room now budgets 4 objects, not 6 — directly targets the "too full" render. Passed to both the director and the critic.
+4. **Glare/orientation check.** Encoded as a `camera_backdrop` constraint + explicit v2-prompt instruction (seat's back not to the window bank) AND a render-critic blocking check (backlit call user is a blocking violation).
+5. **Real Render Critic (gated).** New `renderCritiqueSchema`/JSON schema/fixture, `critiqueRender` in `critic.ts`, prompt `prompts/critic/score-render.v1.md`. Reviews the plan (prompt + preservation/transformation/negative lists) against the constraint set + preservation contract + object budget; `blocking_violations` cover door/path block, backlit call seat, architectural/camera drift, warping/duplication, object-budget overfill, and reject_now theming. `renderPromptDirector` runs it, does **one bounded plan regeneration** on blocking violations, folds the verdict into the persisted `critique`, and floors `quality_score`/critique score to ≤45 when a blocking violation survives the retry — so a door-blocking or backlit plan cannot present as a high-quality "current" render.
+6. **Preservation language** retained and strengthened (explicit preserve-list; no new/moved/warped openings).
+
+**Gates:**
+- `npm.cmd run typecheck` clean.
+- Object-budget logic reasoned + type-verified (restraint 11×14 → 4 objects; layered → 7; balanced → 6). Critic is now structurally gated (bounded regeneration + score floor) on blocking violations.
+- Live render taste/restraint read + "no door-blocking/backlit render reaches current" against a real photo is folded into the Phase 9 owner-judged cycle; the mock render flow is re-verified in the consolidated Suite 1/2 run at Phase 9.
+
+### Phase 6 — Concept coherence & critic enforcement
+
+**Tasks landed:**
+1. **Deterministic coherence engine.** New `lib/ai/concept-coherence.ts`: `assessConceptCoherence` (no model call — runs in mock and in the route hot path) detects the garbled-finish-token class (a `*wash`/`*plaster` token in the narrative that is neither a recognized finish nor in the concept's own materials list — exactly the shipped `oceanwash` vs `limewash` bug), plus empty materials, empty required fields, degenerate palette (all-identical hexes), and verbatim-duplicated thesis/why_it_works. `repairConceptCoherence` is a bounded single pass that substitutes a garbled token with the concept's own listed finish; `coherenceBlockMessage` renders the owner-facing block.
+2. **Critic-on-edit + approval gate.** Every path to "Approved" funnels through `select-moodboard` (the lock action) — added the coherence assessment there: an incoherent concept returns 400 with the owner-facing message and `coherence_violations`, and is never locked. Edit and reharmonize in `moodboards/[boardId]` now run assess→repair→re-assess before persisting the new version and surface `coherence_repaired` / `coherence_blocked` / `coherence_violations` in the response.
+3. **Bounded repair** (single pass, no loop) at the edit/reharmonize creation point; anything not safely auto-repairable is left flagged so the approval gate still blocks it rather than silently "fixing" it wrong.
+
+**Gates:**
+- `npm.cmd run typecheck` clean.
+- Runtime check (compiled `concept-coherence.ts`, fed the real garbled thesis "…a soft **oceanwash**-plastered backdrop" with materials listing `limewash`): flagged `garbled_finish_token: oceanwash` → suggested `limewash`, produced the block message, repair rewrote it to `limewash-plastered` and the concept became coherent; a clean concept passed; a degenerate all-identical palette was flagged. An edit that introduces a material/thesis contradiction cannot reach Approved.
+
+### Phase 8 — Editorial presentation layer
+
+**Tasks landed:**
+1. **Annotated concept boards.** New `PaletteStrip` (labeled swatches — color chip + name + hex, responsive `grid-cols-3 sm:grid-cols-6`) replaces the anonymous colored dots; new `MaterialSwatches` renders materials as tactile `.atelier-chip` swatches; "Why it works" is now a labeled editorial block. A concept card now reads like a studio review, not a data dump.
+2. **Approved-direction premium state.** New `.atelier-approved` treatment (brass frame + faint paper-gold wash + ring) applied to the locked concept card, with an "Approved direction" brass eyebrow instead of the plain version label — the chosen direction reads final and set apart from working drafts.
+3. **Render page as hero.** The render card is now image-first: the transformed "After" room is a large `aspect-[16/10]` hero with a floating `After · {concept}` eyebrow; the source photo is demoted to a small labeled "Before" thumbnail with an editorial caption. Both `<img>` tags retained so the assets suite still validates before/after.
+4. **Design-language system.** Added reusable component classes to `globals.css` (`.atelier-approved`, `.atelier-swatch`, `.atelier-chip`, `.atelier-eyebrow`) on the existing linen/paper/taupe/brass/moss serif-+-sans atelier system; all additions responsive and non-interactive (no tap-target regressions).
+
+**Gates:**
+- `npm.cmd run typecheck` clean. Every existing `data-testid` preserved (no suite-selector breakage by construction).
+- The visual gate (first-time viewer reads it as polished/calm/editorial; concepts read as a studio board) is scored by Suite 5 (design review) in the consolidated Phase 9 run + owner reaction — a fresh-context reviewer/human judgment, not an automated assert.
+
+### Phase 9 — Owner-judged live cycle & eval harness extensions
+
+**Consolidated verification (the real regression gate for all six phases):**
+- Ran the mock suites against a fresh seed on a clean dev server (`localhost:3117`, `AI_MODE=mock`), reseeding before each per §12.4 discipline.
+- **Suite 1 Integrity: 55/55.** Found and fixed a **pre-existing** suite/gate mismatch: the integrity suite sourced products *before* generating a render, but the Phase 5 gate (prior session) requires a completed render first — reordered the suite to render→then→source-products. (Not caused by this session's changes; the prior session updated e2e but not integrity for the Phase 5 product gate.)
+- **Suite 2 Functional E2E: 25/25** (was 22) — full journey clean, zero console errors, zero failed network requests, confirming Phases 2/3/4/6/8 did not regress diagnosis → concepts → edit/reharmonize/**approve (new coherence gate)** → render (rebuilt director) → products → chat, and the new editorial UI renders.
+- `npm.cmd run typecheck` clean throughout.
+- Teardown + `check:residue`: **zero test residue in production** after all cycles.
+
+**Eval harness extensions (Phase 9 task 3 — the cheap asserts):**
+- Extended the debug room-state endpoint (`concept_data` on mood_boards, `image_url`/`cached_image_path` on products, `preservation_constraints`/`negative_instructions`/`render_prompt` on renders — additive, test-only).
+- Added three governance asserts to the E2E suite: (a) **no concept lands on a `reject_now` cliché** (scans only affirmative design fields — a cliché named in `risk_profile`/`why_user_may_reject_it` is correctly a warning, not a violation; that distinction was a real false-positive caught and fixed during this run); (b) **no dead-image product persists**; (c) **every render instruction set carries a door-preservation/clearance guard**. All green.
+
+**Owner-judged live cycle (the actual gate — needs the owner, not self-assessed):**
+- Wrote `docs/PHASE9_OWNER_CYCLE.md`: the exact pre-flight (apply migration 006 first), the full live loop to run, and the per-artifact reactions to capture (diagnosis currency, concept thesis+mechanism / reject_now / register, the coherence block on a garbled edit, render restraint + no door-block/backlight, product realism, chat, editorial presentation). The gate is the owner describing the app as a design intelligence system, not an AI pipeline.
+
+### Owner-side actions required before the live gate
+1. **Apply migration `006_home_value_band.sql`** via GitHub → Supabase, then `npm run verify:live`. (App is graceful without it — homes default to the middle tier register — but the create-home form will error on the missing column until applied.)
+2. Commit + push this session's changes so CI applies 006.
+3. Run the `docs/PHASE9_OWNER_CYCLE.md` live cycle and record reactions.
+
+### Net result
+PHASE2_BUILD_PLAN phases 2, 3, 4, 6, 8 are implemented, typecheck-clean, and pass the consolidated mock suites; 5 and 7 were already landed. Phase 9's automated backstops are in place and green. The only remaining item is the owner-judged live cycle, which is human-judgment by design.

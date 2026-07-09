@@ -21,17 +21,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
       .order("version", { ascending: true }),
     supabase
       .from("mood_boards")
-      .select("id, version, parent_version, origin, status, concept_name, created_at")
+      .select("id, version, parent_version, origin, status, concept_name, concept_data, created_at")
       .eq("room_id", roomId)
       .order("version", { ascending: true }),
     supabase
       .from("products")
-      .select("id, status, mood_board_version, created_at")
+      .select("id, status, mood_board_version, image_url, cached_image_path, created_at")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true }),
     supabase
       .from("renders")
-      .select("id, status, mood_board_version, source_photo_id, created_at")
+      .select("id, status, mood_board_version, source_photo_id, preservation_constraints, negative_instructions, render_prompt, created_at")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true }),
     supabase

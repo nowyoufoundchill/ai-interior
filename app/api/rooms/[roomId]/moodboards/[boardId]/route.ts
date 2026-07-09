@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { refineConcept } from "@/lib/ai/services";
+import { assessConceptCoherence, repairConceptCoherence } from "@/lib/ai/concept-coherence";
 import { moodBoardSchema, type MoodBoardConcept } from "@/lib/schemas";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -147,6 +148,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     origin = "reharmonized";
   }
 
+  // Phase 6: bounded, single-pass coherence repair before persisting a new
+  // version, so a garbled finish token (the oceanwash class) is reconciled to
+  // the concept's own materials rather than being carried forward to approval.
+  // Anything not safely repairable is left for the approval gate to block.
+  let coherenceRepaired: string[] = [];
+  const preCoherence = assessConceptCoherence(nextConcept);
+  if (!preCoherence.coherent) {
+    const { concept: repaired, repaired: notes } = repairConceptCoherence(nextConcept);
+    if (notes.length) {
+      nextConcept = moodBoardSchema.parse(repaired);
+      coherenceRepaired = notes;
+    }
+  }
+  const postCoherence = assessConceptCoherence(nextConcept);
+
   const { data: latestVersionRows } = await supabase
     .from("mood_boards")
     .select("version")
@@ -186,5 +202,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       .eq("id", roomId);
   }
 
-  return NextResponse.json({ mood_board: inserted });
+  return NextResponse.json({
+    mood_board: inserted,
+    coherence_repaired: coherenceRepaired,
+    // Surfaced so the UI can warn that the new version still needs a fix before
+    // it can be approved (the approval gate will block it otherwise).
+    coherence_blocked: !postCoherence.coherent,
+    coherence_violations: postCoherence.violations
+  });
 }
