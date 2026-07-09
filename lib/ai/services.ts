@@ -29,7 +29,7 @@ import {
   revisionJsonSchema,
   roomAnalysisJsonSchema
 } from "@/lib/schemas/json";
-import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
+import { resolveAiMode, runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
 import { logAiRun } from "@/lib/ai/logging";
 import { styleLibrary, type StyleProfile } from "@/lib/ai/style-library";
 import { resolvePropertyDossier } from "@/lib/ai/context-brain/property-dossier";
@@ -595,6 +595,7 @@ export async function productSourcingAgent(input?: {
   home?: HomeLike | null;
   analysis?: unknown;
   selectedMoodBoard?: MoodBoardLike | null;
+  approvedRender?: unknown;
   provider?: GatewayProvider;
   tools?: unknown[];
   skipCritic?: boolean;
@@ -611,7 +612,7 @@ export async function productSourcingAgent(input?: {
   const contextBrain = buildContextBrain({ room, home: input.home, analysis: input.analysis, designPreferences: input.designPreferences });
   const lockedConcept = input.selectedMoodBoard.concept_data;
 
-  if (isTavilyConfigured()) {
+  if (resolveAiMode() !== "mock" && isTavilyConfigured()) {
     const tavilyProducts = await sourceProductsWithTavily({
       room,
       home: input.home,
@@ -672,6 +673,7 @@ export async function productSourcingAgent(input?: {
         products: sourcedProducts,
         concept: lockedConcept,
         diagnosis: input.analysis,
+        approvedRender: input.approvedRender,
         contextBrain: compactContextBrainForCritic(contextBrain),
         provider
       });
@@ -719,11 +721,24 @@ async function sourceProductsWithTavily(input: {
         maxResults: 5,
         includeRawContent: false,
         includeImages: true
-      });
+      }).catch(() =>
+        searchTavily({
+          query: `${plan.category} home office ${plan.material} buy online`,
+          maxResults: 5,
+          includeRawContent: false,
+          includeImages: true
+        }).catch(() => null)
+      );
 
-      const viableResults = (search.results ?? []).filter((result) => Boolean(result.url && result.title));
+      if (!search) return null;
+
+      const viableResults = (search.results ?? []).filter((result) => isCategoryResult(plan.category, result));
       const primary = viableResults[0] ?? null;
-      const fallbackImage = primary?.images?.find((image) => image.url)?.url ?? search.images?.find((image) => image.url)?.url ?? undefined;
+      if (!primary) return null;
+      const fallbackImage =
+        primary?.images?.map(normalizeTavilyImageUrl).find(Boolean) ??
+        search.images?.map(normalizeTavilyImageUrl).find(Boolean) ??
+        undefined;
       const extract = primary?.url
         ? await extractTavily({
             urls: [primary.url],
@@ -744,7 +759,11 @@ async function sourceProductsWithTavily(input: {
     })
   );
 
-  const products = results.map((result) => productSchema.parse(result));
+  const products = results.filter((result): result is ProductPlanItem => Boolean(result)).map((result) => productSchema.parse(result));
+
+  if (!products.length) {
+    throw new Error("Tavily did not return any usable product candidates.");
+  }
 
   await logAiRun({
     roomId: input.room.id,
@@ -781,47 +800,47 @@ function buildTavilyCategoryPlans(input: {
   const dimensionHint = Object.entries(input.dimensions)
     .map(([key, value]) => `${key} ${String(value)}`)
     .join(", ");
-  const context = [input.roomPurpose, input.conceptName, style, materials, input.strategy].filter(Boolean).join(" ");
+  const context = [style, materials].filter(Boolean).join(" ");
 
   return [
     {
       category: "Desk",
-      query: `${input.roomName} ${context} executive desk natural materials video call backdrop ${input.budget} ${dimensionHint}`.trim(),
+      query: `executive desk home office ${context} buy online site:target.com OR site:ikea.com OR site:wayfair.com OR site:westelm.com ${input.budget} ${dimensionHint}`.trim(),
       targetNote: "Choose a desk sized for dual monitors while preserving chair pull-back clearance.",
       material: pickMaterial(input.conceptMaterials, ["oak", "walnut", "wood", "white oak"]) ?? "wood veneer or solid wood",
       finish: pickFinish(input.conceptMaterials, ["oak", "walnut", "blackened", "plaster"]) ?? "warm natural finish"
     },
     {
       category: "Desk chair",
-      query: `${input.roomName} ${context} ergonomic office chair designer home office ${input.budget}`.trim(),
+      query: `ergonomic desk chair designer home office ${context} buy online site:target.com OR site:ikea.com OR site:wayfair.com OR site:westelm.com ${input.budget}`.trim(),
       targetNote: "Prioritize ergonomic support and a silhouette refined enough for on-camera use.",
       material: pickMaterial(input.conceptMaterials, ["boucle", "linen", "leather", "rattan"]) ?? "upholstery with supportive frame",
       finish: "textured neutral upholstery"
     },
     {
       category: "Rug",
-      query: `${input.roomName} ${context} wool rug home office refined neutral ${input.budget} ${dimensionHint}`.trim(),
+      query: `wool area rug home office refined neutral ${context} buy online site:target.com OR site:ikea.com OR site:wayfair.com OR site:westelm.com ${input.budget} ${dimensionHint}`.trim(),
       targetNote: "Size the rug to ground the desk zone rather than floating as a small accent.",
       material: pickMaterial(input.conceptMaterials, ["wool", "linen", "jute", "boucle"]) ?? "wool or wool blend",
       finish: "soft tonal pattern or low-contrast texture"
     },
     {
       category: "Table lamp",
-      query: `${input.roomName} ${context} table lamp task lighting desk aged brass ceramic ${input.budget}`.trim(),
+      query: `table lamp task lighting desk aged brass ceramic ${context} buy online site:target.com OR site:ikea.com OR site:wayfair.com OR site:westelm.com ${input.budget}`.trim(),
       targetNote: "Add glare-controlled task lighting that also reads well on camera.",
       material: pickMaterial(input.conceptMaterials, ["travertine", "brass", "bronze", "ceramic"]) ?? "mixed stone or metal",
       finish: pickFinish(input.conceptMaterials, ["brass", "bronze", "blackened"]) ?? "aged metal finish"
     },
     {
       category: "Artwork",
-      query: `${input.roomName} ${context} oversized art neutral tonal study backdrop ${input.budget}`.trim(),
+      query: `oversized wall art neutral tonal study office ${context} buy online site:target.com OR site:art.com OR site:chairish.com OR site:minted.com ${input.budget}`.trim(),
       targetNote: "Choose art large enough to support the desk wall rather than many small pieces.",
       material: "framed print, canvas, or mixed media",
       finish: "muted tonal palette"
     },
     {
       category: "Plant",
-      query: `${input.roomName} ${context} sculptural indoor plant planter refined home office ${input.budget}`.trim(),
+      query: `sculptural indoor plant planter refined home office ${context} buy online site:target.com OR site:ikea.com OR site:thesill.com OR site:terrain.com ${input.budget}`.trim(),
       targetNote: "Use one architectural plant moment instead of filling the room with small decor.",
       material: "living greenery with ceramic or stone planter",
       finish: "organic green with matte vessel"
@@ -857,17 +876,20 @@ function buildTavilyProduct(input: {
   roomSummary: string;
   opportunities: string[];
   risks: string[];
-}) {
+}): ProductPlanItem {
   const sourceText = [input.primary?.title, input.primary?.content, input.extract?.results?.[0]?.raw_content]
     .filter(Boolean)
     .join(" ");
   const name = cleanProductTitle(input.primary?.title, input.plan.category);
-  const url = input.primary?.url ?? "https://www.google.com/search?q=" + encodeURIComponent(input.plan.query);
+  const url = input.primary?.url;
+  if (!url) {
+    throw new Error(`No verified source URL for ${input.plan.category}.`);
+  }
   const imageUrl =
-    input.extract?.results?.[0]?.images?.find((image) => image.url)?.url ??
-    input.primary?.images?.find((image) => image.url)?.url ??
+    input.extract?.results?.[0]?.images?.map(normalizeTavilyImageUrl).find(Boolean) ??
+    input.primary?.images?.map(normalizeTavilyImageUrl).find(Boolean) ??
     input.fallbackImage;
-  const retailer = getRetailerName(url);
+  const retailer = getRetailerName(url ?? "");
   const price = extractPrice(sourceText);
 
   return {
@@ -950,6 +972,68 @@ function getRetailerName(url: string) {
   } catch {
     return "Retailer";
   }
+}
+
+function normalizeTavilyImageUrl(image: unknown) {
+  if (typeof image === "string" && /^https?:\/\//i.test(image)) return image;
+  const record = asRecord(image);
+  const url = typeof record.url === "string" ? record.url : "";
+  return /^https?:\/\//i.test(url) ? url : undefined;
+}
+
+function isCategoryResult(category: string, result: { title?: string; url?: string; content?: string }) {
+  if (!result.url || !result.title) return false;
+  if (!isRetailerUrl(result.url)) return false;
+  const text = `${result.title} ${result.url}`.toLowerCase();
+  const terms = categoryTerms(category);
+  return terms.some((term) => new RegExp(`(^|[^a-z0-9])${escapeRegExp(term)}([^a-z0-9]|$)`, "i").test(text));
+}
+
+function isRetailerUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return [
+      "target.com",
+      "ikea.com",
+      "wayfair.com",
+      "westelm.com",
+      "article.com",
+      "rejuvenation.com",
+      "luluandgeorgia.com",
+      "chairish.com",
+      "art.com",
+      "minted.com",
+      "thesill.com",
+      "terrain.com",
+      "potterybarn.com",
+      "crateandbarrel.com"
+    ].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+  } catch {
+    return false;
+  }
+}
+
+function categoryTerms(category: string) {
+  switch (category.toLowerCase()) {
+    case "desk":
+      return ["desk", "writing table", "work table"];
+    case "desk chair":
+      return ["desk chair", "office chair", "task chair", "ergonomic chair"];
+    case "rug":
+      return ["rug", "area rug", "carpet"];
+    case "table lamp":
+      return ["table lamp", "desk lamp", "task lamp"];
+    case "artwork":
+      return ["art", "artwork", "print", "wall decor"];
+    case "plant":
+      return ["plant", "planter", "tree"];
+    default:
+      return [category.toLowerCase()];
+  }
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function extractPrice(text: string) {
@@ -1109,8 +1193,13 @@ export async function revisionAgent(input: {
   selectedMoodBoard?: unknown;
   products?: unknown;
   renders?: unknown;
+  currentRender?: unknown;
+  chatThread?: unknown;
+  lastRequestedChange?: string | null;
   memories?: unknown;
+  provider?: GatewayProvider;
 }): Promise<RevisionResult> {
+  const provider = input.provider ?? "anthropic";
   const lower = input.message.toLowerCase();
   const revision_type = lower.includes("remember") || lower.includes("i prefer") || lower.includes("we prefer") || lower.includes("always") || lower.includes("never")
     ? "memory_update"
@@ -1135,6 +1224,7 @@ export async function revisionAgent(input: {
   return runStructuredTask({
     roomId: input.room.id,
     serviceName: "Revision Agent",
+    provider,
     promptPath: "prompts/chat/design-chat.v1.md",
     schemaName: "revision_result",
     schema: revisionJsonSchema,
@@ -1148,6 +1238,9 @@ export async function revisionAgent(input: {
       selected_mood_board: input.selectedMoodBoard,
       products: input.products,
       renders: input.renders,
+      current_render: input.currentRender,
+      chat_thread: input.chatThread,
+      last_requested_change: input.lastRequestedChange,
       memories: input.memories
     },
     mock: () => mockRevision

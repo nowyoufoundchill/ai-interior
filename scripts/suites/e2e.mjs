@@ -114,14 +114,34 @@ async function main() {
       "locked concept no longer shows a direct Edit control (must unlock first)"
     );
 
-    // --- Products: generate, approve, reject ---------------------------------
+    // --- Renders: generate, regenerate with instructions ---------------------
+    await page.getByTestId("tab-renders").click();
+    await page.getByTestId("render-instructions-input").fill("Keep the leather chair, make the walls darker.");
+    await page.getByTestId("render-generate-button").click();
+    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
+    await page.waitForLoadState("networkidle");
+    const renderCards = page.locator('[data-testid^="render-card-"]');
+    const firstRenderCount = await waitForCount(renderCards, 1);
+    reporter.assert(firstRenderCount === 1, "first render card appears after edit", firstRenderCount);
+
+    await page.getByTestId("render-instructions-input").fill("Regenerate with a larger rug.");
+    await page.getByTestId("render-generate-button").click();
+    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
+    await page.waitForLoadState("networkidle");
+    const secondRenderCount = await waitForCount(renderCards, 2);
+    reporter.assert(secondRenderCount === 2, "regeneration adds a second render card (history kept)", secondRenderCount);
+
+    // --- Products: generate after render, approve, reject ---------------------
     await page.getByTestId("tab-products").click();
     await page.getByTestId("products-generate-button").click();
     await page.waitForResponse((res) => res.url().includes("/source-products") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     const productCards = page.locator('[data-testid^="product-card-"]');
     const productCount = await waitForAtLeast(productCards, 1);
-    reporter.assert(productCount >= 1, "product plan renders at least one product card", productCount);
+    reporter.assert(productCount >= 1, "product plan renders at least one validated product card", productCount);
+
+    const productImages = await productCards.locator("img").count();
+    reporter.assert(productImages === productCount, "every persisted product renders with a cached loading image", { productCount, productImages });
 
     const firstProductId = await extractKey(productCards.nth(0), "product-card-");
     await page.getByTestId(`product-approve-button-${firstProductId}`).click();
@@ -143,23 +163,6 @@ async function main() {
       );
     }
 
-    // --- Renders: generate, regenerate with instructions ---------------------
-    await page.getByTestId("tab-renders").click();
-    await page.getByTestId("render-instructions-input").fill("Keep the leather chair, make the walls darker.");
-    await page.getByTestId("render-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
-    const renderCards = page.locator('[data-testid^="render-card-"]');
-    const firstRenderCount = await waitForCount(renderCards, 1);
-    reporter.assert(firstRenderCount === 1, "first render card appears after edit", firstRenderCount);
-
-    await page.getByTestId("render-instructions-input").fill("Regenerate with a larger rug.");
-    await page.getByTestId("render-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
-    const secondRenderCount = await waitForCount(renderCards, 2);
-    reporter.assert(secondRenderCount === 2, "regeneration adds a second render card (history kept)", secondRenderCount);
-
     // --- Chat: ask why, then request + confirm a revision ---------------------
     await page.getByTestId("tab-chat").click();
     await page.getByTestId("chat-message-input").fill("Why did you choose this palette for this room?");
@@ -167,13 +170,13 @@ async function main() {
     await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     const chatCards = page.locator('[data-testid^="chat-message-card-"]');
-    reporter.assert((await waitForCount(chatCards, 1)) === 1, "first chat turn renders");
+    reporter.assert((await waitForCount(chatCards, 2)) === 2, "first chat turn renders owner and designer messages");
 
     await page.getByTestId("chat-message-input").fill("Make it moodier — darker walls and richer wood tones.");
     await page.getByTestId("chat-send-button").click();
     await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
-    reporter.assert((await waitForCount(chatCards, 2)) === 2, "second chat turn (revision request) renders");
+    reporter.assert((await waitForCount(chatCards, 4)) === 4, "second chat turn renders in the visible thread");
     reporter.assert(
       (await waitForAtLeast(page.getByText("Proposal only"), 1)) >= 1,
       "revision-shaped chat turn is tagged as a proposal, not a silent mutation"

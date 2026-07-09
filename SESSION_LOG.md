@@ -466,3 +466,35 @@
 ### Next Action
 - Recommended first execution slice from the unified plan: **Phase 5 (real Tavily product sourcing + server-side image/link validation) + Phase 7 (working, threaded chat)** — the two remaining HARD trust-killers — then Phase 2 completion + Phase 3 (constraints) + Phase 4 (render director) to make design judgment real, then Phase 8 (editorial presentation) to close the mood-board sophistication gap.
 - Note: a clean dev server was left running on `localhost:3100` for review; the pre-existing server on `:3000` had a corrupted `.next` cache (unrelated to these changes).
+
+## 2026-07-09 — Phase 5 real product gate + Phase 7 threaded design chat
+
+### Built
+- **Phase 5 - Real Product Sourcing v1**
+  - Product sourcing is now gated behind both an approved direction and a completed render record.
+  - Product rows are inserted only after the source URL resolves and the image fetches as a real image, uploads to Supabase Storage `room-photos`, and is saved as `cached_image_path`.
+  - Unfetchable products are dropped before persistence; batches with fewer than four verified products return a surfaced 502 instead of showing thin/incoherent products.
+  - Tavily sourcing now retries simpler category-led queries, normalizes Tavily string/object image payloads, rejects social/media/inspiration domains, removes Google fallback persistence, and requires category alignment from source title/URL.
+  - Product Critic now receives the approved render as the visual contract, not just concept JSON.
+- **Phase 7 - Design Chat as Collaboration v1**
+  - `getRoomWorkspace` loads chronological `chat_messages`; the UI renders that actual thread instead of only `revisions`.
+  - Chat route passes approved direction, current render, prior thread, and last requested change into the turn.
+  - Chat writes owner+designer `chat_messages` with referenced artifact ids; `revisions` remains the audit/proposal artifact.
+  - Chat stays advisory: no state mutation, proposal copy remains visible, and failed sends no longer clear the owner's draft.
+  - Added a long-running chat progress state grounded in the approved direction/latest render.
+
+### Verified
+- `npm.cmd run typecheck` passes.
+- Fresh mock server on `localhost:3112`, fresh seed room `7065eac5-e708-45c2-a66c-88b66620cf47`: `npm.cmd run suite:e2e` passed 22/22.
+- Direct Supabase validation on the same mock seed: 6/6 persisted products had source `200` and cached image `200 image/jpeg`; 4 `chat_messages`; latest designer reply addressed the "moodier" request and required owner confirmation.
+- Screenshots saved:
+  - `test-runs/phase57-screens/products-final.png`
+  - `test-runs/phase57-screens/chat-final.png`
+- One bounded `AI_MODE=live` pass on room `f88986dc-0d16-4da8-9018-a22cdc6e257d` completed diagnosis, concepts, approval, render, and chat. The live chat answer was contextual and strong (11x14 room, seven openings, current render, non-crowding advice, confirm in Renders/Preferences).
+
+### Findings / Deferrals
+- Live Tavily sourcing initially returned technically valid but semantically poor sources (Pinterest/YouTube/blog/social and mismatched categories). Tightened code now rejects those paths, including Google fallback and thin batches. A full owner-judged live product-quality pass remains for Phase 9 because the live supplier/search quality needs human review, not just route correctness.
+- The in-app browser plugin was unavailable in this session (`agent.browsers.list()` returned `[]`), so ad hoc visual verification used Playwright screenshots plus direct browser-level image `naturalWidth` checks.
+
+### Next Action
+- Recommended next phase: Phase 3 + Phase 4 together (constraint engine + render director), because the live chat already reasons about density/openings, but render/product quality still needs hard spatial constraints and render-aware judgment to become systemic.

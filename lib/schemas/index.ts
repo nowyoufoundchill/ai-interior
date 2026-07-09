@@ -121,8 +121,8 @@ export const revisionSchema = z.object({
     "memory_update"
   ]),
   assistant_response: z.string(),
-  state_before: z.record(z.unknown()),
-  state_after: z.record(z.unknown())
+  state_before: z.object({ summary: z.string() }),
+  state_after: z.object({ summary: z.string() })
 });
 
 export const designMemorySchema = z.object({

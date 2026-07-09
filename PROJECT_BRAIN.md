@@ -76,6 +76,7 @@ The flagship moment is transforming the owner's real room photos into concept-al
 ## UI Shape
 - Room Detail is the primary workspace.
 - Current room tabs (reordered 2026-07-08 to concept-→render-first): `Photos & Brief`, `Concepts`, `Renders`, `Chat`, `Products`, `Diagnosis` (diagnosis demoted to a supporting artifact). The workspace now **opens on the render** when one exists, not the upload tab. Approval language is "Approve/Change direction" (not "Lock/Unlock concept"); global nav is trimmed to Studio + Homes (no pipeline stages). See [docs/PHASE2_BUILD_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_BUILD_PLAN_2026-07-08.md) Phase 1.
+- Phase 5/7 trust slice landed 2026-07-09: Products are gated after approved direction + render, persist only after source URL validation and server-side image re-host to `room-photos` via `cached_image_path`, and Product Critic receives the approved render as visual context. Chat now renders `chat_messages` as the visible thread, passes approved direction/current render/prior thread/last requested change into the turn, writes owner+designer messages with artifact references, and stays advisory only.
 - Hidden debug route: `/debug`.
 - Hidden spike route: `/spike`.
 - Home-level preferences UI does not exist yet even though the migration path is defined.

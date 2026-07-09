@@ -28,15 +28,15 @@ export async function buildFullJourney(page, roomId) {
   await page.waitForResponse((res) => res.url().includes("/select-moodboard") && res.request().method() === "POST");
   await page.waitForLoadState("networkidle");
 
-  await page.getByTestId("tab-products").click();
-  await page.getByTestId("products-generate-button").click();
-  await page.waitForResponse((res) => res.url().includes("/source-products") && res.request().method() === "POST");
-  await page.waitForLoadState("networkidle");
-
   await page.getByTestId("tab-renders").click();
   await page.getByTestId("render-instructions-input").fill("Warm the space, add texture.");
   await page.getByTestId("render-generate-button").click();
   await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
+  await page.waitForLoadState("networkidle");
+
+  await page.getByTestId("tab-products").click();
+  await page.getByTestId("products-generate-button").click();
+  await page.waitForResponse((res) => res.url().includes("/source-products") && res.request().method() === "POST");
   await page.waitForLoadState("networkidle");
 
   await page.getByTestId("tab-chat").click();

@@ -96,6 +96,7 @@ export async function critiqueProducts(input: {
   products: ProductPlanItem[];
   concept: unknown;
   diagnosis?: unknown;
+  approvedRender?: unknown;
   contextBrain: unknown;
   provider?: GatewayProvider;
 }): Promise<ProductCritique> {
@@ -113,6 +114,7 @@ export async function critiqueProducts(input: {
       products: input.products,
       locked_concept: input.concept,
       diagnosis: input.diagnosis,
+      approved_render: input.approvedRender,
       context_brain: input.contextBrain,
       scale_anchors: SCALE_ANCHORS
     },

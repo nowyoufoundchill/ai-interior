@@ -30,6 +30,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .maybeSingle();
   const { data: products } = await supabase.from("products").select("*").eq("room_id", roomId).order("created_at", { ascending: true });
   const { data: renders } = await supabase.from("renders").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(5);
+  const currentRender = renders?.find((render) => render.status !== "stale") ?? renders?.[0] ?? null;
+  const { data: chatThread } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: true })
+    .limit(20);
+  const lastRequestedChange = [...(chatThread ?? [])].reverse().find((entry) => entry.role === "user")?.content ?? null;
   const { data: memories } = await supabase.from("design_memories").select("*").eq("scope_id", roomId).order("created_at", { ascending: false });
 
   let revision;
@@ -42,6 +50,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       selectedMoodBoard,
       products,
       renders,
+      currentRender,
+      chatThread,
+      lastRequestedChange,
       memories
     });
   } catch (error) {
@@ -49,6 +60,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 
+  const assistantResponse = revision.assistant_response?.trim()
+    ? revision.assistant_response
+    : "I have the request, but I could not form a reliable design recommendation from the saved room context. Nothing has been changed; try asking for one specific render, product, or concept adjustment.";
   const stateBefore = revision.state_before as Json;
   const stateAfter = revision.state_after as Json;
   const { data, error } = await supabase
@@ -56,7 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .insert({
       room_id: roomId,
       user_message: revision.user_message,
-      assistant_response: revision.assistant_response,
+      assistant_response: assistantResponse,
       revision_type: revision.revision_type,
       state_before: stateBefore,
       state_after: stateAfter,
@@ -67,24 +81,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await supabase.from("chat_messages").insert([
+  const referencedArtifactIds = [
+    selectedMoodBoard?.id,
+    currentRender?.id
+  ].filter((id): id is string => Boolean(id));
+
+  const { data: messages, error: messageError } = await supabase.from("chat_messages").insert([
     {
       room_id: roomId,
       role: "user",
       content: revision.user_message,
       classified_intent: revision.revision_type,
-      referenced_artifact_ids: [],
+      referenced_artifact_ids: referencedArtifactIds,
       test_run_id: room?.test_run_id ?? null
     },
     {
       room_id: roomId,
       role: "assistant",
-      content: revision.assistant_response,
+      content: assistantResponse,
       classified_intent: revision.revision_type,
-      referenced_artifact_ids: [],
+      referenced_artifact_ids: referencedArtifactIds,
       test_run_id: room?.test_run_id ?? null
     }
-  ]);
+  ]).select("*");
+
+  if (messageError) return NextResponse.json({ error: messageError.message }, { status: 500 });
 
   // Chat no longer silently mutates taste state. A preference the owner states
   // in chat is surfaced as a proposal (revision_type "memory_update"); the owner
@@ -92,5 +113,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   // single source of truth for the taste graph. design_memories is no longer
   // written from chat.
 
-  return NextResponse.json({ revision: data });
+  return NextResponse.json({ revision: data, messages });
 }

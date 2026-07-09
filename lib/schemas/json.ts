@@ -356,11 +356,19 @@ export const revisionJsonSchema = {
     assistant_response: { type: "string" },
     state_before: {
       type: "object",
-      additionalProperties: true
+      additionalProperties: false,
+      properties: {
+        summary: { type: "string" }
+      },
+      required: ["summary"]
     },
     state_after: {
       type: "object",
-      additionalProperties: true
+      additionalProperties: false,
+      properties: {
+        summary: { type: "string" }
+      },
+      required: ["summary"]
     }
   },
   required: ["user_message", "revision_type", "assistant_response", "state_before", "state_after"]

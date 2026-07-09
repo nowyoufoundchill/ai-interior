@@ -14,6 +14,7 @@ type MoodBoard = Database["public"]["Tables"]["mood_boards"]["Row"];
 type Product = Database["public"]["Tables"]["products"]["Row"];
 type Render = Database["public"]["Tables"]["renders"]["Row"];
 type Revision = Database["public"]["Tables"]["revisions"]["Row"];
+type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type TabName = (typeof ROOM_TABS)[number];
 
@@ -35,6 +36,7 @@ export function RoomWorkspace(props: {
   products: Product[];
   renders: Render[];
   revisions: Revision[];
+  chatMessages: ChatMessage[];
   memories: Memory[];
 }) {
   const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
@@ -75,12 +77,14 @@ export function RoomWorkspace(props: {
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         alert(payload.error ?? "The request failed.");
-        return;
+        return false;
       }
 
       router.refresh();
+      return true;
     } catch (error) {
       alert(error instanceof Error ? error.message : "The request failed.");
+      return false;
     } finally {
       setLoadingAction(null);
     }
@@ -88,8 +92,8 @@ export function RoomWorkspace(props: {
 
   async function sendChat() {
     if (!chatMessage.trim()) return;
-    await runAction("chat", `/api/rooms/${props.room.id}/chat`, { message: chatMessage });
-    setChatMessage("");
+    const sent = await runAction("chat", `/api/rooms/${props.room.id}/chat`, { message: chatMessage });
+    if (sent) setChatMessage("");
   }
 
   return (
@@ -177,6 +181,7 @@ export function RoomWorkspace(props: {
         <ProductsPanel
           products={props.products}
           hasLockedConcept={Boolean(lockedMoodBoard)}
+          hasRender={Boolean(currentRender)}
           isStale={productsStale}
           isLoading={loadingAction === "products"}
           loadingAction={loadingAction}
@@ -201,9 +206,11 @@ export function RoomWorkspace(props: {
 
       {activeTab === "Chat" && (
         <ChatPanel
+          messages={props.chatMessages}
           revisions={props.revisions}
           conceptName={lockedMoodBoard?.concept_name ?? undefined}
           hasRender={Boolean(currentRender)}
+          latestRenderInstructions={currentRender?.user_regeneration_instructions ?? undefined}
           message={chatMessage}
           isLoading={loadingAction === "chat"}
           onMessageChange={setChatMessage}
@@ -530,6 +537,7 @@ function originLabel(origin: string) {
 function ProductsPanel(props: {
   products: Product[];
   hasLockedConcept: boolean;
+  hasRender: boolean;
   isStale: boolean;
   isLoading: boolean;
   loadingAction: string | null;
@@ -560,7 +568,7 @@ function ProductsPanel(props: {
         title="Shoppable direction with rationale"
         actionLabel={props.isLoading ? "Sourcing" : "Generate products"}
         actionTestId="products-generate-button"
-        disabled={!props.hasLockedConcept || props.isLoading}
+        disabled={!props.hasLockedConcept || !props.hasRender || props.isLoading}
         icon={Package}
         onAction={props.onGenerate}
       />
@@ -569,6 +577,8 @@ function ProductsPanel(props: {
       )}
       {!props.hasLockedConcept ? (
         <EmptyState text="Lock a concept before sourcing products." />
+      ) : !props.hasRender ? (
+        <EmptyState text="Edit a room photo first. Products come after the approved direction has been proven against your real room." />
       ) : props.products.length === 0 ? (
         <EmptyState text="Generate a curated product plan for the locked direction." />
       ) : (
@@ -866,9 +876,11 @@ function RendersPanel(props: {
 }
 
 function ChatPanel(props: {
+  messages: ChatMessage[];
   revisions: Revision[];
   conceptName?: string;
   hasRender: boolean;
+  latestRenderInstructions?: string;
   message: string;
   isLoading: boolean;
   onMessageChange: (message: string) => void;
@@ -886,7 +898,17 @@ function ChatPanel(props: {
         <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
           {props.hasRender ? "Working from your latest render" : "No render yet"}
         </span>
+        {props.latestRenderInstructions && (
+          <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
+            Last change: {props.latestRenderInstructions}
+          </span>
+        )}
       </div>
+      {props.isLoading && (
+        <div data-testid="chat-progress-state" className="rounded-md border border-atelier-taupe/20 bg-white/60 p-4 text-sm text-atelier-charcoal">
+          Reviewing the approved direction, latest render, and your requested change before replying.
+        </div>
+      )}
       <div className="atelier-card grid gap-3 p-5">
         <textarea
           data-testid="chat-message-input"
@@ -907,17 +929,21 @@ function ChatPanel(props: {
           {props.isLoading ? "Thinking…" : "Send"}
         </button>
       </div>
-      {props.revisions.length === 0 ? (
+      {props.messages.length === 0 ? (
         <EmptyState text="Ask your designer anything about this room — why a choice was made, or what to change. They'll talk it through and point you to the next step, but never alter your design without you." />
       ) : (
         <div className="grid gap-4">
-          {props.revisions.map((revision) => {
-            const proposal = proposalHint(revision.revision_type);
+          {props.messages.map((message) => {
+            const proposal = message.role === "assistant" ? proposalHint(message.classified_intent ?? "") : null;
             return (
-              <article key={revision.id} data-testid={`chat-message-card-${revision.id}`} className="atelier-card grid gap-3 p-5">
-                <p className="atelier-label">{revision.revision_type.replaceAll("_", " ")}</p>
-                <p className="font-semibold text-atelier-ink">{revision.user_message}</p>
-                <p className="text-sm leading-6 text-atelier-charcoal">{revision.assistant_response}</p>
+              <article key={message.id} data-testid={`chat-message-card-${message.id}`} className={`atelier-card grid gap-3 p-5 ${message.role === "user" ? "bg-white/70" : ""}`}>
+                <p className="atelier-label">
+                  {message.role === "assistant" ? "Designer" : "You"}
+                  {message.classified_intent ? ` - ${message.classified_intent.replaceAll("_", " ")}` : ""}
+                </p>
+                <p className={message.role === "assistant" ? "text-sm leading-6 text-atelier-charcoal" : "font-semibold text-atelier-ink"}>
+                  {message.content}
+                </p>
                 {proposal && (
                   <p className="rounded-md border border-atelier-taupe/30 bg-atelier-linen/60 px-3 py-2 text-xs text-atelier-charcoal">
                     Proposal only — {proposal}

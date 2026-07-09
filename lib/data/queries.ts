@@ -10,6 +10,7 @@ type MoodBoard = Database["public"]["Tables"]["mood_boards"]["Row"];
 type Product = Database["public"]["Tables"]["products"]["Row"];
 type Render = Database["public"]["Tables"]["renders"]["Row"];
 type Revision = Database["public"]["Tables"]["revisions"]["Row"];
+type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type AiRun = Database["public"]["Tables"]["ai_runs"]["Row"];
 
@@ -30,6 +31,7 @@ export type RoomWorkspaceData = {
   products: Product[];
   renders: Render[];
   revisions: Revision[];
+  chatMessages: ChatMessage[];
   memories: Memory[];
   aiRuns: AiRun[];
 };
@@ -94,6 +96,7 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     products,
     renders,
     revisions,
+    chatMessages,
     memories,
     aiRuns
   ] = await Promise.all([
@@ -103,11 +106,12 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     supabase.from("products").select("*").eq("room_id", roomId).order("created_at", { ascending: true }),
     supabase.from("renders").select("*").eq("room_id", roomId).order("created_at", { ascending: false }),
     supabase.from("revisions").select("*").eq("room_id", roomId).order("created_at", { ascending: false }),
+    supabase.from("chat_messages").select("*").eq("room_id", roomId).order("created_at", { ascending: true }),
     supabase.from("design_memories").select("*").eq("scope_id", roomId).order("created_at", { ascending: false }),
     supabase.from("ai_runs").select("*").eq("room_id", roomId).order("created_at", { ascending: false }).limit(12)
   ]);
 
-  const errors = [photos, analyses, moodBoards, products, renders, revisions, memories, aiRuns]
+  const errors = [photos, analyses, moodBoards, products, renders, revisions, chatMessages, memories, aiRuns]
     .map((result) => result.error)
     .filter(Boolean);
 
@@ -122,6 +126,7 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     products: (products.data ?? []) as Product[],
     renders: (renders.data ?? []) as Render[],
     revisions: (revisions.data ?? []) as Revision[],
+    chatMessages: (chatMessages.data ?? []) as ChatMessage[],
     memories: (memories.data ?? []) as Memory[],
     aiRuns: (aiRuns.data ?? []) as AiRun[]
   };
