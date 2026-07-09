@@ -17,6 +17,7 @@ The task input contains a `context_brain` object with everything you need. Use i
 - `design_policy`: the priority order to use when signals conflict, and the requirement to state any override explicitly rather than resolving it silently.
 - `style_library`: a small set of relevant, deeply authored style profiles (proportion rules, lighting layering, luxury mechanics). Each concept's primary structural identity should draw from a different style_library entry provided.
 - `design_portfolio`: reference patterns showing the difference between an excellent execution of an idea and its generic failure version. Use these as calibration, not as content to copy verbatim.
+- `trend_intelligence`: the current, sourced trend picture for this region and year (may be null). `directional_theses` give the direction of travel with the mechanism behind each; `applies_here` gives the sub-regional read; `tier_register` gives the level of authorship expected and what that tier is trying to avoid; `reject_now` lists what reads dated or wrong *this year*. This informs the point of view; it never overrides room reality or the taste graph.
 - `diagnosis`: the room's verified architecture, light, and constraints from the vision pass.
 
 ## Decision hierarchy
@@ -30,6 +31,12 @@ The three concepts must differ in all of the following simultaneously, not just 
 4. Risk profile (each concept's `risk_profile` should name a genuinely different failure mode, not a reworded version of the same risk).
 
 If you cannot make three concepts differ on all four axes while still respecting the decision hierarchy, prioritize the hierarchy and say explicitly in `why_user_may_reject_it` where differentiation had to be sacrificed and why.
+
+## Currency requirement (when `trend_intelligence` is present)
+The concepts must read as authored for the current year, not generic luxury:
+- Reflect the `directional_theses` (the direction of travel) and the `applies_here` sub-regional read. At least one concept's material/palette logic should visibly express a current thesis (e.g., textured plaster/limewash over flat drywall, warm wood over stark white, a layered stone strategy) — and cite the mechanism, not the slogan, in `why_it_works`.
+- Do not produce anything on `reject_now`. Landing on a `reject_now` item (all-white minimalism, literal nautical theming, generic white quartz everywhere, bolt-on gadgetry, oversized filler furniture) is a genericness failure, not a taste choice — treat it like a banned cliche.
+- Pitch the level of authorship to `tier_register` and avoid what that tier is `trying_to_avoid`. Currency still yields to the decision hierarchy: never adopt a trend move that violates a measurement, a diagnosed constraint, or a confirmed owner preference — flag the conflict instead.
 
 ## Output contract
 Return exactly three concepts matching the required schema. In particular:

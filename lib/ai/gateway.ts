@@ -6,6 +6,7 @@ import { loadPrompt } from "@/lib/ai/prompts";
 import type { Json } from "@/types/database";
 
 export type GatewayProvider = "openai" | "anthropic" | "mock";
+const ANTHROPIC_RETRY_MAX_TOKENS_CAP = 16384;
 
 /**
  * `AI_MODE=mock` forces every gateway call onto its `mock` fixture regardless
@@ -42,6 +43,8 @@ export async function runStructuredTask<T>(input: {
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const startedAt = Date.now();
+      const attemptMaxTokens =
+        attempt === 1 ? input.maxTokens : getExpandedAnthropicMaxTokens(input.maxTokens, lastError);
 
       try {
         const result = await runAnthropicStructuredResponse({
@@ -49,7 +52,7 @@ export async function runStructuredTask<T>(input: {
           instructions: prompt.body,
           text: JSON.stringify(input.taskInput),
           model: resolveProviderModel("anthropic", prompt.model),
-          maxTokens: input.maxTokens,
+          maxTokens: attemptMaxTokens,
           images: input.images,
           tools: input.tools
         });
@@ -172,6 +175,15 @@ export async function runStructuredTask<T>(input: {
     outputPayload: mocked as Json
   });
   return mocked;
+}
+
+function getExpandedAnthropicMaxTokens(maxTokens: number | undefined, previousError: Error | null) {
+  if (!previousError || !previousError.message.includes("max_tokens")) {
+    return maxTokens;
+  }
+
+  const base = maxTokens ?? Number(process.env.ANTHROPIC_MAX_TOKENS ?? 4096);
+  return Math.min(base * 2, ANTHROPIC_RETRY_MAX_TOKENS_CAP);
 }
 
 export async function generateImageEdit(input: {

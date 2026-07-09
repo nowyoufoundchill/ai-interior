@@ -438,3 +438,31 @@
 
 ### Next Action
 - Awaiting owner direction on which design-brain area to prioritize first, or run the suggested real-cycle-plus-owner-reaction pass to get concrete, current feedback to work from.
+
+## 2026-07-08 (continued 3) — Owner E2E evaluation, trust fixes landed, taste/trend brain v1, unified build plan
+
+### Reviewed (phased E2E product evaluation)
+- Ran a real, browser-driven owner evaluation of the app against `docs/PHASE2_PLAN_2026-07-08.md`, using an actual live-generated room ("Darren's Office", room `48522218`, home "Forest Trl" / Isle of Palms) — real diagnosis, 4 concepts, 6 products, the flagship render, and a live chat attempt — not mock fixtures.
+- Confirmed the current app is still the pre-Phase-2 flow (tabs `Photos & Brief · Diagnosis · Concepts · Products · Renders · Chat`, "Lock concept" language, diagnosis-first, products-before-renders); none of Phase 2A/B/C was implemented yet.
+- Verdict: **Promising but uneven.** Reasoning layer genuinely strong (diagnosis is expert and room-specific; concepts distinct; render preservation excellent — camera/fan/windows/doors/floor and even sun-patches preserved). Failures are on execution surfaces + taste currency.
+
+### Found (top findings)
+1. **Products fabricated/broken (HARD):** all 6 product image URLs 404 (confirmed via curl); "Open product source" links point to invented paths. Rationale text is expert, which made the broken imagery worse.
+2. **Chat dead / form-not-conversation (HARD):** a realistic revision produced no reply, no persisted row (0 in `revisions`, `chat_messages`, `ai_runs`) on the running instance; UI was a single "Save chat turn" form with no thread/context.
+3. **Garbled approved concept (HARD):** locked v4 thesis read "not as a **ocean esque** focal plane but as a soft **oceanwash**-plastered backdrop" (broken word-substitution of dark/limewash), contradicting its own materials list.
+4. **Backwards workflow (SOFT):** diagnosis-first tabs, products before renders, finished room defaulted to the upload tab, global nav promoted Mood Boards/Products, terminology drift.
+5. **Render judgment soft (SOFT):** preservation excellent but a restraint concept was styled full (desk+lounge+credenza+plant+lamp+art in 11×14); glare/orientation goal not verifiably solved; door clearance is prose-only, not enforced.
+6. **Pipeline UI leaks (SOFT):** render page dumped the full 200-word generation prompt; products led with a 5-field admin filter row over 6 items.
+
+### Fixed / Built (landed, `tsc --noEmit` clean, verified in a live browser on a clean dev server)
+- **Phase 1 owner-trust baseline** — `lib/constants.ts` (tab reorder → `Photos & Brief · Concepts · Renders · Chat · Products · Diagnosis`; status copy), `components/rooms/room-workspace.tsx` (opens on render via `initialTab`; "Approve/Change direction" language; `StatusBadge` "Approved"; render-first `nextHint`; `ProductImage` fallback so a broken-image glyph can never render; source link gated to real `http`; admin filter row hidden < 8 products; render page shows a one-line caption with the full prompt moved behind the details disclosure; Chat reframed to "Talk it through with your designer" + context chips + "Send" + designer-voice empty state), `components/layout/app-shell.tsx` (nav trimmed to Studio + Homes), `app/dashboard/page.tsx` (concept-→render-first copy).
+- **Data repair (Finding 3):** corrected the corrupted locked v4 concept thesis in production (`ocean esque`→`dark`, `oceanwash`→`limewash`) so it is coherent with its materials again.
+- **Phase 2 v1 — Taste & Trend Intelligence:** new `lib/ai/context-brain/trend-intelligence.ts` — `RegionalTrendBrief` (`sc-luxury-2026`, distilled from an owner-provided SC 2026 luxury-interiors deep-research report) with directional theses + mechanism, material/palette vocabulary, coastal↔inland sub-regions, price-tier register, `reject_now`, provenance (`sources`, `authored`, `valid_through`, `confidence`), and a resolver + tier mapping (runtime-verified: Charleston→Coastal, Lake Keowee→Inland, Austin→null; tier parsing fixed for `$5m`/`$9.5m`/ranges). Wired into `buildContextBrain`, `compactContextBrainForGeneration`, `compactContextBrainForCritic` in `lib/ai/services.ts`; concept prompt `prompts/concepts/generate-room-concepts.v2.md` gained a **Currency requirement** (reflect the direction of travel, reject `reject_now` as genericness, pitch to tier register, currency yields to the decision hierarchy).
+
+### Decision
+- Wrote a single unified program rather than splitting fixes from strategy: **`docs/PHASE2_BUILD_PLAN_2026-07-08.md`** — a 9-phase build plan covering all six E2E findings and the taste/trend brain, with findings→phases traceability, a dependency diagram, cross-cutting concerns, and a program definition-of-done. `BUILD_PLAN.md` now points to it as the executable plan. Phase 1 and Phase 2 v1 marked landed.
+- Core design principle established for the taste brain: **taste is structured, sourced, dated data (mechanism not slogans; provenance + expiry), and trend is lower priority than room reality and the owner's taste graph** — it informs the point of view, never overrides a measurement or a diagnosed constraint.
+
+### Next Action
+- Recommended first execution slice from the unified plan: **Phase 5 (real Tavily product sourcing + server-side image/link validation) + Phase 7 (working, threaded chat)** — the two remaining HARD trust-killers — then Phase 2 completion + Phase 3 (constraints) + Phase 4 (render director) to make design judgment real, then Phase 8 (editorial presentation) to close the mood-board sophistication gap.
+- Note: a clean dev server was left running on `localhost:3100` for review; the pre-existing server on `:3000` had a corrupted `.next` cache (unrelated to these changes).

@@ -29,8 +29,8 @@ export default async function DashboardPage() {
               A calm workspace for designing the whole home, room by room.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-atelier-charcoal">
-              Create homes, add rooms, upload photos, capture the brief, and build toward diagnosis,
-              mood boards, product plans, mockups, and room-aware chat.
+              Add a room, choose a concept direction, and see it rendered on your real room photos.
+              Refine in chat, then source the products to make it real.
             </p>
           </div>
           <div className="atelier-card flex flex-col justify-between gap-6 p-6">

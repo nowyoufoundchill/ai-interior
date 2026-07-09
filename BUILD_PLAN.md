@@ -40,6 +40,13 @@ See "## PRD v3 Delta Plan" further down for the active phase-by-phase tracking. 
 
 ## Next Priority: Design Brain Quality (flagged 2026-07-08 — not yet scoped)
 
+Strategy: [docs/PHASE2_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_PLAN_2026-07-08.md). **Executable build plan (the sequenced program to work from): [docs/PHASE2_BUILD_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_BUILD_PLAN_2026-07-08.md)** — one unified 9-phase program covering all six E2E findings and the taste/trend brain. The notes below remain supporting context.
+
+**Landed 2026-07-08 (owner E2E evaluation + first slice; `tsc` clean, verified in a live browser):**
+- [x] **Phase 1 — Owner-trust baseline.** Tabs reordered to concept-→render-first and the workspace opens on the render; "Approve/Change direction" language; global nav trimmed to Studio + Homes; product cards can no longer render a broken-image glyph (`ProductImage` fallback + real-URL-gated source links + filter row hidden < 8 items); render page shows a caption with the raw prompt behind a disclosure; chat reframed to a designer collaboration (context chips, "Send", designer voice). Corrupted locked concept data repaired (Finding 3, data).
+- [x] **Phase 2 v1 — Taste & trend intelligence.** `lib/ai/context-brain/trend-intelligence.ts` (`RegionalTrendBrief` `sc-luxury-2026`, distilled from the owner's SC-2026 deep-research report) wired into concept generation + critic; concept prompt v2 gained a Currency requirement. Trend is dated/sourced data, lower priority than room reality and the taste graph.
+- Remaining findings and the deep work (real Tavily products, working threaded chat, constraint engine, render director, coherence gate, editorial presentation, owner-judged cycle) are sequenced as Phases 3–9 in the build plan above.
+
 The owner's read after using the deployed app: it "doesn't feel like a design intelligence brain," feels like "AI slop... with a lot going on." This is a judgment about actual output quality and product feel, not about anything the verification suites above check (they check state-machine correctness and UI mechanics, not whether a diagnosis is insightful or a concept is genuinely distinctive and high-taste). Nothing below is scoped or committed yet — this is a punch list of the areas in the existing architecture that own this problem, for the owner to prioritize:
 
 - **Prompts** (`/prompts/{diagnosis,concepts,products,renders,chat,critic}/*.md`) — the actual instructions driving every AI call. Last touched for real content during the Phase 0 spike (2026-07-06/07); may need another real-photo iteration pass now that the full context-brain + critic pattern exists.

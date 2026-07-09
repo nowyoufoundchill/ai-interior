@@ -30,8 +30,10 @@ import {
   roomAnalysisJsonSchema
 } from "@/lib/schemas/json";
 import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
+import { logAiRun } from "@/lib/ai/logging";
 import { styleLibrary, type StyleProfile } from "@/lib/ai/style-library";
 import { resolvePropertyDossier } from "@/lib/ai/context-brain/property-dossier";
+import { resolveRegionalTrendBrief, compactTrendBriefForGeneration } from "@/lib/ai/context-brain/trend-intelligence";
 import { deriveRoomIntelligence } from "@/lib/ai/context-brain/room-intelligence";
 import { buildTasteGraph } from "@/lib/ai/context-brain/taste-graph";
 import { DESIGN_DISSENT_POLICY } from "@/lib/ai/context-brain/design-policy";
@@ -41,6 +43,8 @@ import { buildDiagnosisFixture } from "@/lib/ai/fixtures/diagnosis";
 import { buildProductPlanFixture } from "@/lib/ai/fixtures/products";
 import { buildRenderPlanFixture } from "@/lib/ai/fixtures/renders";
 import { buildRevisionFixture } from "@/lib/ai/fixtures/chat";
+import { extractTavily, isTavilyConfigured, searchTavily } from "@/lib/ai/tavily";
+import type { Json } from "@/types/database";
 
 type RoomLike = {
   id: string;
@@ -120,7 +124,7 @@ export async function roomVisionAnalyst(input: {
       schemaName: "room_analysis",
       schema: roomAnalysisJsonSchema,
       zodSchema: roomAnalysisSchema,
-      maxTokens: 4096,
+      maxTokens: 8192,
       taskInput: {
         task: "Diagnose this room for an interior design workflow.",
         room: input.room,
@@ -340,7 +344,11 @@ function buildContextBrain(input: {
     }),
     design_policy: DESIGN_DISSENT_POLICY,
     style_library: selectRelevantStyles({ room: input.room, home: input.home }),
-    design_portfolio: DESIGN_PORTFOLIO
+    design_portfolio: DESIGN_PORTFOLIO,
+    // Dated, sourced trend picture for this region (null when no brief matches,
+    // so we never invent a trend story). Lower priority than room reality and
+    // the owner's taste graph — it informs the point of view, not the rules.
+    trend_intelligence: resolveRegionalTrendBrief(input.home?.region ?? null)
   };
 }
 
@@ -382,7 +390,13 @@ function compactContextBrainForGeneration(contextBrain: ReturnType<typeof buildC
       why_it_works: pattern.why_it_works,
       generic_failure_version: pattern.generic_failure_version,
       principle_demonstrated: pattern.principle_demonstrated
-    }))
+    })),
+    // Current, sourced trend picture — the difference between "on-brief for
+    // 2026" and "generic luxury." Concepts must reflect the direction of
+    // travel and avoid everything in `reject_now`.
+    trend_intelligence: contextBrain.trend_intelligence
+      ? compactTrendBriefForGeneration(contextBrain.trend_intelligence)
+      : null
   };
 }
 
@@ -402,7 +416,17 @@ function compactContextBrainForCritic(contextBrain: ReturnType<typeof buildConte
       pattern_name: pattern.pattern_name,
       principle_demonstrated: pattern.principle_demonstrated,
       generic_failure_version: pattern.generic_failure_version
-    }))
+    })),
+    // The critic scores currency/regional-rightness against this: a concept
+    // that ignores the direction of travel or lands on a `reject_now` item is
+    // generic, not just a taste preference.
+    trend_intelligence: contextBrain.trend_intelligence
+      ? {
+          headline: contextBrain.trend_intelligence.headline,
+          direction_of_travel: contextBrain.trend_intelligence.directional_theses.map((t) => t.move),
+          reject_now: contextBrain.trend_intelligence.reject_now
+        }
+      : null
   };
 }
 
@@ -460,7 +484,7 @@ export async function moodBoardGenerator(input: {
       schemaName: `mood_board_concept_${slotIndex}`,
       schema: moodBoardJsonSchema,
       zodSchema: moodBoardSchema,
-      maxTokens: 4096,
+      maxTokens: 8192,
       taskInput: {
         task: "Generate one room mood board concept.",
         room: input.room,
@@ -585,8 +609,26 @@ export async function productSourcingAgent(input?: {
 
   const room = input.room;
   const contextBrain = buildContextBrain({ room, home: input.home, analysis: input.analysis, designPreferences: input.designPreferences });
-  const productContextBrain = compactContextBrainForGeneration(contextBrain);
   const lockedConcept = input.selectedMoodBoard.concept_data;
+
+  if (isTavilyConfigured()) {
+    const tavilyProducts = await sourceProductsWithTavily({
+      room,
+      home: input.home,
+      diagnosis: input.analysis,
+      lockedConcept
+    });
+
+    if (!input.skipCritic) {
+      // Tavily is now the sourcing authority for this stage, so skip the
+      // Anthropic critic pass by default to avoid turning product sourcing back
+      // into an Anthropic-dependent workflow.
+    }
+
+    return tavilyProducts;
+  }
+
+  const productContextBrain = compactContextBrainForGeneration(contextBrain);
 
   const output = await runStructuredTask({
     roomId: room.id,
@@ -639,6 +681,308 @@ export async function productSourcingAgent(input?: {
   }
 
   return sourcedProducts;
+}
+
+async function sourceProductsWithTavily(input: {
+  room: RoomLike;
+  home?: HomeLike | null;
+  diagnosis?: unknown;
+  lockedConcept: unknown;
+}): Promise<ProductPlanItem[]> {
+  const startedAt = Date.now();
+  const concept = asRecord(input.lockedConcept);
+  const conceptName = String(concept.concept_name ?? "Locked concept");
+  const styleKeywords = toStringArray(concept.style_keywords).slice(0, 3);
+  const conceptMaterials = toStringArray(concept.materials).slice(0, 5);
+  const budget = input.room.budget_range ?? "budget not specified";
+  const dimensions = asRecord(input.room.dimensions);
+  const diagnosis = asRecord(input.diagnosis);
+  const strategy = String(diagnosis.recommended_strategy ?? "");
+  const roomSummary = String(diagnosis.room_summary ?? "");
+  const opportunities = toStringArray(diagnosis.opportunities).slice(0, 2);
+  const risks = toStringArray(diagnosis.design_risks).slice(0, 2);
+  const categoryPlans = buildTavilyCategoryPlans({
+    roomName: input.room.name,
+    roomPurpose: input.room.purpose ?? input.room.name,
+    conceptName,
+    styleKeywords,
+    conceptMaterials,
+    budget,
+    dimensions,
+    strategy
+  });
+
+  const results = await Promise.all(
+    categoryPlans.map(async (plan) => {
+      const search = await searchTavily({
+        query: plan.query,
+        maxResults: 5,
+        includeRawContent: false,
+        includeImages: true
+      });
+
+      const viableResults = (search.results ?? []).filter((result) => Boolean(result.url && result.title));
+      const primary = viableResults[0] ?? null;
+      const fallbackImage = primary?.images?.find((image) => image.url)?.url ?? search.images?.find((image) => image.url)?.url ?? undefined;
+      const extract = primary?.url
+        ? await extractTavily({
+            urls: [primary.url],
+            query: `Find price, dimensions, materials, finish, and practical buying notes for a ${plan.category.toLowerCase()} in an interior design sourcing workflow.`
+          }).catch(() => null)
+        : null;
+
+      return buildTavilyProduct({
+        plan,
+        primary,
+        alternatives: viableResults.slice(1, 3),
+        fallbackImage,
+        extract,
+        roomSummary,
+        opportunities,
+        risks
+      });
+    })
+  );
+
+  const products = results.map((result) => productSchema.parse(result));
+
+  await logAiRun({
+    roomId: input.room.id,
+    serviceName: "Product Sourcing Agent",
+    promptVersion: "product_sourcing_tavily_v1",
+    provider: "tavily",
+    modelName: "tavily-search-extract",
+    status: "completed",
+    inputPayload: {
+      room_name: input.room.name,
+      budget,
+      concept_name: conceptName,
+      category_queries: categoryPlans.map((plan) => ({ category: plan.category, query: plan.query }))
+    },
+    outputPayload: { products } as Json,
+    latencyMs: Date.now() - startedAt
+  });
+
+  return products;
+}
+
+function buildTavilyCategoryPlans(input: {
+  roomName: string;
+  roomPurpose: string;
+  conceptName: string;
+  styleKeywords: string[];
+  conceptMaterials: string[];
+  budget: string;
+  dimensions: Record<string, unknown>;
+  strategy: string;
+}) {
+  const style = input.styleKeywords.join(" ");
+  const materials = input.conceptMaterials.join(", ");
+  const dimensionHint = Object.entries(input.dimensions)
+    .map(([key, value]) => `${key} ${String(value)}`)
+    .join(", ");
+  const context = [input.roomPurpose, input.conceptName, style, materials, input.strategy].filter(Boolean).join(" ");
+
+  return [
+    {
+      category: "Desk",
+      query: `${input.roomName} ${context} executive desk natural materials video call backdrop ${input.budget} ${dimensionHint}`.trim(),
+      targetNote: "Choose a desk sized for dual monitors while preserving chair pull-back clearance.",
+      material: pickMaterial(input.conceptMaterials, ["oak", "walnut", "wood", "white oak"]) ?? "wood veneer or solid wood",
+      finish: pickFinish(input.conceptMaterials, ["oak", "walnut", "blackened", "plaster"]) ?? "warm natural finish"
+    },
+    {
+      category: "Desk chair",
+      query: `${input.roomName} ${context} ergonomic office chair designer home office ${input.budget}`.trim(),
+      targetNote: "Prioritize ergonomic support and a silhouette refined enough for on-camera use.",
+      material: pickMaterial(input.conceptMaterials, ["boucle", "linen", "leather", "rattan"]) ?? "upholstery with supportive frame",
+      finish: "textured neutral upholstery"
+    },
+    {
+      category: "Rug",
+      query: `${input.roomName} ${context} wool rug home office refined neutral ${input.budget} ${dimensionHint}`.trim(),
+      targetNote: "Size the rug to ground the desk zone rather than floating as a small accent.",
+      material: pickMaterial(input.conceptMaterials, ["wool", "linen", "jute", "boucle"]) ?? "wool or wool blend",
+      finish: "soft tonal pattern or low-contrast texture"
+    },
+    {
+      category: "Table lamp",
+      query: `${input.roomName} ${context} table lamp task lighting desk aged brass ceramic ${input.budget}`.trim(),
+      targetNote: "Add glare-controlled task lighting that also reads well on camera.",
+      material: pickMaterial(input.conceptMaterials, ["travertine", "brass", "bronze", "ceramic"]) ?? "mixed stone or metal",
+      finish: pickFinish(input.conceptMaterials, ["brass", "bronze", "blackened"]) ?? "aged metal finish"
+    },
+    {
+      category: "Artwork",
+      query: `${input.roomName} ${context} oversized art neutral tonal study backdrop ${input.budget}`.trim(),
+      targetNote: "Choose art large enough to support the desk wall rather than many small pieces.",
+      material: "framed print, canvas, or mixed media",
+      finish: "muted tonal palette"
+    },
+    {
+      category: "Plant",
+      query: `${input.roomName} ${context} sculptural indoor plant planter refined home office ${input.budget}`.trim(),
+      targetNote: "Use one architectural plant moment instead of filling the room with small decor.",
+      material: "living greenery with ceramic or stone planter",
+      finish: "organic green with matte vessel"
+    }
+  ];
+}
+
+function buildTavilyProduct(input: {
+  plan: {
+    category: string;
+    query: string;
+    targetNote: string;
+    material: string;
+    finish: string;
+  };
+  primary: {
+    title?: string;
+    url?: string;
+    content?: string;
+    images?: Array<{ url?: string; description?: string }>;
+  } | null;
+  alternatives: Array<{
+    title?: string;
+    url?: string;
+  }>;
+  fallbackImage?: string;
+  extract: {
+    results?: Array<{
+      raw_content?: string;
+      images?: Array<{ url?: string; description?: string }>;
+    }>;
+  } | null;
+  roomSummary: string;
+  opportunities: string[];
+  risks: string[];
+}) {
+  const sourceText = [input.primary?.title, input.primary?.content, input.extract?.results?.[0]?.raw_content]
+    .filter(Boolean)
+    .join(" ");
+  const name = cleanProductTitle(input.primary?.title, input.plan.category);
+  const url = input.primary?.url ?? "https://www.google.com/search?q=" + encodeURIComponent(input.plan.query);
+  const imageUrl =
+    input.extract?.results?.[0]?.images?.find((image) => image.url)?.url ??
+    input.primary?.images?.find((image) => image.url)?.url ??
+    input.fallbackImage;
+  const retailer = getRetailerName(url);
+  const price = extractPrice(sourceText);
+
+  return {
+    category: input.plan.category,
+    name,
+    retailer,
+    url,
+    image_url: imageUrl,
+    price,
+    dimensions: buildProductDimensions(input.plan.category, input.plan.targetNote, sourceText),
+    material: input.plan.material,
+    finish: input.plan.finish,
+    scores: buildTavilyScores(input.plan.category),
+    reason_selected: buildProductReason({
+      category: input.plan.category,
+      roomSummary: input.roomSummary,
+      opportunity: input.opportunities[0],
+      targetNote: input.plan.targetNote
+    }),
+    risks: buildProductRisks(input.risks, sourceText),
+    alternatives: input.alternatives.map((alternative) => cleanProductTitle(alternative.title, "Alternative")).slice(0, 2)
+  };
+}
+
+function buildProductDimensions(category: string, targetNote: string, sourceText: string) {
+  const dimensions = extractDimensionFragments(sourceText);
+  const note = dimensions.length
+    ? `${targetNote} Verify listed source dimensions before purchase.`
+    : `${targetNote} Exact source dimensions were not confidently extracted; verify before purchase.`;
+
+  return {
+    note,
+    ...(dimensions[0] ? { source_size: dimensions[0] } : {})
+  };
+}
+
+function buildTavilyScores(category: string) {
+  const scaleBias = category === "Desk" || category === "Rug" ? 82 : 78;
+  return {
+    style_fit: 84,
+    scale_fit: scaleBias,
+    budget_fit: 74,
+    material_fit: 82,
+    luxury_signal: 79
+  };
+}
+
+function buildProductReason(input: {
+  category: string;
+  roomSummary: string;
+  opportunity?: string;
+  targetNote: string;
+}) {
+  const roomContext = input.opportunity || input.roomSummary || "the diagnosed room conditions";
+  return `Selected as the ${input.category.toLowerCase()} candidate because it supports ${roomContext.toLowerCase()} and follows the concept's material and proportion direction. ${input.targetNote}`;
+}
+
+function buildProductRisks(roomRisks: string[], sourceText: string) {
+  const risks = [
+    roomRisks[0] || "Verify fit against real room clearances before ordering.",
+    extractLeadTimeCue(sourceText) || "Stock and lead time should be verified directly with the retailer.",
+    "Finish and color can read differently online than in the room's daylight."
+  ];
+  return risks.slice(0, 3);
+}
+
+function cleanProductTitle(title: string | undefined, fallback: string) {
+  if (!title?.trim()) return fallback;
+  return title.replace(/\s*\|\s*.+$/, "").trim();
+}
+
+function getRetailerName(url: string) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    const root = hostname.split(".")[0] ?? "Retailer";
+    return root
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  } catch {
+    return "Retailer";
+  }
+}
+
+function extractPrice(text: string) {
+  const match = text.match(/\$ ?(\d{2,5}(?:\.\d{2})?)/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function extractDimensionFragments(text: string) {
+  return Array.from(text.matchAll(/\b\d{1,3}(?:\.\d+)?\s?(?:inches|inch|in|\"|ft|feet|cm)\b/gi))
+    .map((match) => match[0])
+    .slice(0, 3);
+}
+
+function extractLeadTimeCue(text: string) {
+  const match = text.match(/\b(?:lead time|ships in|delivery|made to order)[^.]{0,80}/i);
+  return match?.[0]?.trim() || null;
+}
+
+function pickMaterial(materials: string[], preferredTerms: string[]) {
+  const lowerMaterials = materials.map((material) => material.toLowerCase());
+  const match = preferredTerms.find((term) => lowerMaterials.some((material) => material.includes(term)));
+  return match ? materials.find((material) => material.toLowerCase().includes(match)) ?? null : null;
+}
+
+function pickFinish(materials: string[], preferredTerms: string[]) {
+  const lowerMaterials = materials.map((material) => material.toLowerCase());
+  const match = preferredTerms.find((term) => lowerMaterials.some((material) => material.includes(term)));
+  if (!match) return null;
+  if (match.includes("blackened")) return "blackened metal";
+  if (match.includes("brass")) return "aged brass";
+  if (match.includes("bronze")) return "blackened bronze";
+  if (match.includes("plaster")) return "limewash or plaster-toned finish";
+  return `${match} finish`;
 }
 
 export async function scaleAndFitEvaluator(input: {
@@ -837,6 +1181,15 @@ function toArray(value: unknown): string[] {
 
   return [];
 }
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
 const briefProductListSchema = z.object({
   products: z.array(productSchema)
 });

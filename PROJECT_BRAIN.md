@@ -5,6 +5,8 @@ AI Interior Atelier is a private, premium virtual interior design studio for one
 
 `Home -> Room -> Diagnosis -> 3 Concepts -> Lock one concept -> Products and Renders -> Design Chat`
 
+Near-term Phase 2 direction: this visible owner flow is moving to a concept-first, render-first journey centered on approved direction and photo transformation, with products demoted to a supporting role after visual approval. The **Phase 1 flow reorder landed 2026-07-08** (tabs reordered, room opens on the render, "Approve direction" language). Strategy in [docs/PHASE2_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_PLAN_2026-07-08.md); the sequenced 9-phase execution program (all six E2E findings + the taste/trend brain) is [docs/PHASE2_BUILD_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_BUILD_PLAN_2026-07-08.md).
+
 The flagship moment is transforming the owner's real room photos into concept-aligned renders. The locked concept is the contract that downstream products and renders must follow.
 
 ## Current Reality
@@ -49,7 +51,8 @@ The flagship moment is transforming the owner's real room photos into concept-al
 
 ## Context Brain Layer (added 2026-07-06/07)
 - Prompts are treated as a compact operating system (role, decision hierarchy, output contract), not the place design intelligence lives. This follows evidence from a 10-variant real-photo batch showing prompt wording alone moved tone but not judgment.
-- Design intelligence lives as structured data under `/lib/ai/context-brain/` (property dossier, room intelligence, taste graph, design policy) plus `/lib/ai/design-portfolio.ts` (annotated reference patterns) and a deepened `/lib/ai/style-library.ts`.
+- Design intelligence lives as structured data under `/lib/ai/context-brain/` (property dossier, room intelligence, taste graph, design policy, and — added 2026-07-08 — `trend-intelligence.ts`) plus `/lib/ai/design-portfolio.ts` (annotated reference patterns) and a deepened `/lib/ai/style-library.ts`.
+- **Trend intelligence** (`trend-intelligence.ts`) is the layer that makes the brain execute like a designer who reads the market: a `RegionalTrendBrief` is dated, sourced taste data (directional theses with their *mechanism*, material/palette vocabulary, sub-regional split, price-tier register, a `reject_now` genericness list) stamped with `sources` + `valid_through` so it can be trusted and refreshed rather than silently rotting. The first brief (`sc-luxury-2026`) is distilled from an owner-provided South Carolina 2026 luxury-interiors deep-research report. It is wired into concept generation + critic and is **lower priority than room reality and the owner's taste graph** (per `design-policy.ts`) — it informs the point of view, never overrides a measurement or a diagnosed constraint. Refresh workflow: append a new brief (never overwrite); the resolver auto-selects the newest match.
 - `/lib/ai/critic.ts` is a real, gateway-logged Critic (previously a hardcoded mock) scored against `/lib/ai/critic-rubric.ts`, including a concept-differentiation check with one bounded regeneration retry.
 - This pattern is proven in production-like validation for Concept Director and is now also applied to Diagnosis with a dedicated diagnosis critic and bounded regeneration pass. Products, renders, and chat are only partially migrated.
 - Real validation artifacts now closing the loop:
@@ -72,10 +75,11 @@ The flagship moment is transforming the owner's real room photos into concept-al
 
 ## UI Shape
 - Room Detail is the primary workspace.
-- Current room tabs: `Photos & Brief`, `Diagnosis`, `Concepts`, `Products`, `Renders`, `Chat`.
+- Current room tabs (reordered 2026-07-08 to concept-→render-first): `Photos & Brief`, `Concepts`, `Renders`, `Chat`, `Products`, `Diagnosis` (diagnosis demoted to a supporting artifact). The workspace now **opens on the render** when one exists, not the upload tab. Approval language is "Approve/Change direction" (not "Lock/Unlock concept"); global nav is trimmed to Studio + Homes (no pipeline stages). See [docs/PHASE2_BUILD_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_BUILD_PLAN_2026-07-08.md) Phase 1.
 - Hidden debug route: `/debug`.
 - Hidden spike route: `/spike`.
 - Home-level preferences UI does not exist yet even though the migration path is defined.
+- The current UI is functional but not yet at the owner's desired level of visual maturity; Phase 2 now explicitly includes a full interface redesign covering typography, palette, spacing, hierarchy, concept presentation, and render-page composition.
 
 ## Agent Rules
 - Treat [docs/AI_Interior_Atelier_PRD_v3.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/AI_Interior_Atelier_PRD_v3.md) as the single product spec. v2 is historical context only.

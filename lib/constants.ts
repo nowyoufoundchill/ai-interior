@@ -13,13 +13,16 @@ export const PHOTO_LABELS = [
   "Inspiration"
 ] as const;
 
+// Order reflects the homeowner's mental model, not the pipeline: pick a
+// direction, see it on your real room, refine it — then source products.
+// Diagnosis is a supporting artifact, demoted to the end.
 export const ROOM_TABS = [
   "Photos & Brief",
-  "Diagnosis",
   "Concepts",
-  "Products",
   "Renders",
-  "Chat"
+  "Chat",
+  "Products",
+  "Diagnosis"
 ] as const;
 
 export const ROOM_STATUSES = {
@@ -27,11 +30,11 @@ export const ROOM_STATUSES = {
   photos: "Photos and dimensions added",
   diagnosed: "Diagnosis ready",
   concepts: "Concepts generated",
-  concept_locked: "Concept locked",
-  executing: "Execution in progress",
+  concept_locked: "Direction approved",
+  executing: "In progress",
   intake: "Intake",
   analyzed: "Diagnosis ready",
-  selected: "Concept selected",
-  products: "Products planned",
-  renders: "Mockups ready"
+  selected: "Direction approved",
+  products: "Products sourced",
+  renders: "Render ready"
 } as const;

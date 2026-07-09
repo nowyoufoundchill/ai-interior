@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Home, LayoutDashboard, MessageSquare, Package, Sparkles } from "lucide-react";
+import { Home, LayoutDashboard } from "lucide-react";
 
+// Top-level nav stays at the studio/home level. Pipeline stages (concepts,
+// renders, products, chat) live inside a room, not in the global nav, so the
+// app doesn't read as a stack of tool tabs.
 const navItems = [
   { href: "/dashboard", label: "Studio", icon: LayoutDashboard, testId: "nav-link-dashboard" },
-  { href: "/dashboard", label: "Homes", icon: Home, testId: "nav-link-homes" },
-  { href: "/dashboard", label: "Mood Boards", icon: Sparkles, testId: "nav-link-mood-boards" },
-  { href: "/dashboard", label: "Products", icon: Package, testId: "nav-link-products" },
-  { href: "/dashboard", label: "Design Chat", icon: MessageSquare, testId: "nav-link-design-chat" }
+  { href: "/dashboard", label: "Homes", icon: Home, testId: "nav-link-homes" }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

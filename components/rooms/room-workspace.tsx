@@ -37,13 +37,25 @@ export function RoomWorkspace(props: {
   revisions: Revision[];
   memories: Memory[];
 }) {
-  const [activeTab, setActiveTab] = useState<TabName>("Photos & Brief");
+  const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
+  const latestDiagnosis = props.diagnoses[0];
+  const currentRender = props.renders.find((render) => render.status !== "stale") ?? props.renders[0];
+
+  // Land on the owner's most valuable artifact, not the intake screen: a
+  // finished room opens on its render, not on photo upload.
+  const initialTab: TabName = props.renders.length
+    ? "Renders"
+    : lockedMoodBoard
+      ? "Renders"
+      : props.moodBoards.length
+        ? "Concepts"
+        : "Photos & Brief";
+
+  const [activeTab, setActiveTab] = useState<TabName>(initialTab);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [chatMessage, setChatMessage] = useState("");
   const router = useRouter();
 
-  const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
-  const latestDiagnosis = props.diagnoses[0];
   const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
   // A diagnosis rerun marks every prior concept stale. If concepts exist but
   // none are active, the concept set is stale relative to the current diagnosis.
@@ -99,10 +111,10 @@ export function RoomWorkspace(props: {
           </div>
           <div className="text-sm text-atelier-charcoal">
             <p>
-              Locked concept:{" "}
-              <span className="font-semibold text-atelier-ink">{lockedMoodBoard?.concept_name ?? "None yet"}</span>
+              Approved direction:{" "}
+              <span className="font-semibold text-atelier-ink">{lockedMoodBoard?.concept_name ?? "Not chosen yet"}</span>
             </p>
-            <p className="mt-2">What&apos;s next: {nextHint(props.room.current_stage || props.room.status, props.photos.length, Boolean(latestDiagnosis), Boolean(lockedMoodBoard))}</p>
+            <p className="mt-2">What&apos;s next: {nextHint(props.photos.length, props.moodBoards.length > 0, Boolean(lockedMoodBoard), props.renders.length > 0)}</p>
             <p className="mt-2">Saved photos: {props.photos.length}</p>
           </div>
         </div>
@@ -179,6 +191,7 @@ export function RoomWorkspace(props: {
         <RendersPanel
           renders={props.renders}
           photos={props.photos}
+          conceptName={lockedMoodBoard?.concept_name ?? undefined}
           hasLockedConcept={Boolean(lockedMoodBoard)}
           isStale={rendersStale}
           isLoading={loadingAction === "render"}
@@ -189,6 +202,8 @@ export function RoomWorkspace(props: {
       {activeTab === "Chat" && (
         <ChatPanel
           revisions={props.revisions}
+          conceptName={lockedMoodBoard?.concept_name ?? undefined}
+          hasRender={Boolean(currentRender)}
           message={chatMessage}
           isLoading={loadingAction === "chat"}
           onMessageChange={setChatMessage}
@@ -461,7 +476,7 @@ function ConceptCard(props: {
               disabled={props.busy}
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
             >
-              {props.busy ? "Working" : "Unlock concept"}
+              {props.busy ? "Working" : "Change direction"}
             </button>
           ) : (
             <button
@@ -471,7 +486,7 @@ function ConceptCard(props: {
               disabled={props.busy}
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
             >
-              {props.busy ? "Working" : isStale ? "Re-lock this concept" : "Lock this concept"}
+              {props.busy ? "Working" : isStale ? "Re-approve this direction" : "Approve this direction"}
             </button>
           )}
           <button
@@ -558,7 +573,7 @@ function ProductsPanel(props: {
         <EmptyState text="Generate a curated product plan for the locked direction." />
       ) : (
         <div className="grid gap-4">
-          <div className="flex flex-col gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-3 md:flex-row md:items-end">
+          <div className={`flex-col gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-3 md:flex-row md:items-end ${props.products.length > 8 ? "flex" : "hidden"}`}>
             <label className="grid gap-2">
               <span className="atelier-label">Category</span>
               <select
@@ -627,9 +642,7 @@ function ProductsPanel(props: {
                   data-testid={`product-card-${product.id}`}
                   className={`atelier-card overflow-hidden ${product.status === "rejected" ? "opacity-60" : ""}`}
                 >
-                  {(product.cached_image_path ?? product.image_url) && (
-                    <img src={product.cached_image_path ?? product.image_url ?? ""} alt="" className="aspect-[4/3] w-full object-cover" />
-                  )}
+                  <ProductImage product={product} />
                   <div className="grid gap-3 p-5">
                     <div className="flex items-center justify-between gap-3">
                       <p className="atelier-label">{product.category}</p>
@@ -660,7 +673,7 @@ function ProductsPanel(props: {
                       <span>Budget {String(scores.budget_fit ?? "N/A")}</span>
                       <span>Luxury {String(scores.luxury_signal ?? "N/A")}</span>
                     </div>
-                    {product.url && (
+                    {product.url?.startsWith("http") && (
                       <a
                         data-testid={`product-source-link-${product.id}`}
                         href={product.url}
@@ -668,7 +681,7 @@ function ProductsPanel(props: {
                         rel="noreferrer"
                         className="text-sm font-semibold text-atelier-ink underline underline-offset-4"
                       >
-                        Open product source
+                        View at {product.retailer ?? "retailer"}
                       </a>
                     )}
                     {(() => {
@@ -725,6 +738,7 @@ function ProductsPanel(props: {
 function RendersPanel(props: {
   renders: Render[];
   photos: Photo[];
+  conceptName?: string;
   hasLockedConcept: boolean;
   isStale: boolean;
   isLoading: boolean;
@@ -813,10 +827,12 @@ function RendersPanel(props: {
                     </div>
                     <div className="grid gap-3 p-5">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="atelier-label">Concept v{render.mood_board_version ?? "n/a"}</p>
+                        <p className="atelier-label">{props.conceptName ?? "Approved direction"}</p>
                         <StatusBadge status={render.status} />
                       </div>
-                      <p className="text-sm leading-6 text-atelier-charcoal">{render.render_prompt ?? render.prompt}</p>
+                      <p className="text-sm leading-6 text-atelier-charcoal">
+                        {props.conceptName ?? "Your approved direction"} applied to your {sourcePhoto?.label ?? "room"} photo, preserving the real architecture, camera angle, windows, and doors.
+                      </p>
                       {render.user_regeneration_instructions && (
                         <p className="text-sm text-atelier-charcoal">
                           <span className="font-semibold text-atelier-ink">Your instructions:</span> {render.user_regeneration_instructions}
@@ -829,6 +845,12 @@ function RendersPanel(props: {
                           <ListBlock title="Applied changes" items={toStringArray(render.transformation_instructions)} compact />
                           <ListBlock title="Avoided" items={toStringArray(render.negative_instructions)} compact />
                           <ListBlock title="Critic notes" items={toStringArray(critique.notes)} compact />
+                          {(render.render_prompt || render.prompt) && (
+                            <div>
+                              <p className="atelier-label">Full edit brief</p>
+                              <p className="mt-2 text-xs leading-6 text-atelier-charcoal/80">{render.render_prompt ?? render.prompt}</p>
+                            </div>
+                          )}
                         </div>
                       </details>
                     </div>
@@ -845,6 +867,8 @@ function RendersPanel(props: {
 
 function ChatPanel(props: {
   revisions: Revision[];
+  conceptName?: string;
+  hasRender: boolean;
   message: string;
   isLoading: boolean;
   onMessageChange: (message: string) => void;
@@ -852,7 +876,17 @@ function ChatPanel(props: {
 }) {
   return (
     <section className="grid gap-5">
-      <PanelHeader eyebrow="Design chat" title="Explain decisions and propose reruns" icon={MessageSquare} />
+      <PanelHeader eyebrow="Design chat" title="Talk it through with your designer" icon={MessageSquare} />
+      {/* Context chips make the conversation feel grounded in the current work,
+          not a blind text box. */}
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
+          Direction: {props.conceptName ?? "not chosen yet"}
+        </span>
+        <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
+          {props.hasRender ? "Working from your latest render" : "No render yet"}
+        </span>
+      </div>
       <div className="atelier-card grid gap-3 p-5">
         <textarea
           data-testid="chat-message-input"
@@ -860,7 +894,7 @@ function ChatPanel(props: {
           rows={4}
           value={props.message}
           onChange={(event) => props.onMessageChange(event.target.value)}
-          placeholder="Make it moodier, find a cheaper rug, keep my leather chair, or regenerate with darker walls."
+          placeholder="Tell your designer what to change — 'the room feels too full, what would you pull out?' or 'keep my leather chair but warm up the walls.'"
         />
         <button
           type="button"
@@ -870,11 +904,11 @@ function ChatPanel(props: {
           className="flex min-h-11 w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
         >
           {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-          Save chat turn
+          {props.isLoading ? "Thinking…" : "Send"}
         </button>
       </div>
       {props.revisions.length === 0 ? (
-        <EmptyState text="The room chat explains stored rationale and proposes next steps. It never changes your design on its own — you confirm reruns and preferences yourself." />
+        <EmptyState text="Ask your designer anything about this room — why a choice was made, or what to change. They'll talk it through and point you to the next step, but never alter your design without you." />
       ) : (
         <div className="grid gap-4">
           {props.revisions.map((revision) => {
@@ -970,6 +1004,31 @@ function ListBlock({ title, items, compact = false }: { title: string; items: st
   );
 }
 
+function ProductImage({ product }: { product: Product }) {
+  const src = product.cached_image_path ?? product.image_url ?? "";
+  const [failed, setFailed] = useState(!src);
+
+  // Never render a broken-image icon. A product whose image can't load (dead
+  // or fabricated URL) falls back to a calm labeled tile rather than the
+  // browser's broken-image glyph, which reads as "AI slop."
+  if (failed || !src) {
+    return (
+      <div className="flex aspect-[4/3] w-full items-center justify-center bg-atelier-linen">
+        <span className="atelier-label text-atelier-taupe">{product.category}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="aspect-[4/3] w-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const tone =
     status === "locked"
@@ -981,7 +1040,10 @@ function StatusBadge({ status }: { status: string }) {
           : status === "approved"
             ? "bg-atelier-moss/15 text-atelier-moss"
             : "bg-atelier-linen text-atelier-charcoal";
-  return <span className={`rounded-md px-3 py-1 text-xs font-semibold capitalize ${tone}`}>{status}</span>;
+  // Owner-facing language: a "locked" concept reads as the approved direction;
+  // a "stale" artifact reads as needing a refresh, not a database state.
+  const label = status === "locked" ? "Approved" : status === "stale" ? "Needs refresh" : status;
+  return <span className={`rounded-md px-3 py-1 text-xs font-semibold capitalize ${tone}`}>{label}</span>;
 }
 
 function StaleNotice({ text }: { text: string }) {
@@ -1002,11 +1064,12 @@ function statusLabel(status: string) {
   return ROOM_STATUSES[status as keyof typeof ROOM_STATUSES] ?? status.replaceAll("_", " ");
 }
 
-function nextHint(stage: string, photoCount: number, hasDiagnosis: boolean, hasLockedConcept: boolean) {
+function nextHint(photoCount: number, hasConcepts: boolean, hasApproved: boolean, hasRenders: boolean) {
   if (!photoCount) return "Add photos, dimensions, and a design brief.";
-  if (!hasDiagnosis || stage === "empty" || stage === "photos") return "Run the room diagnosis.";
-  if (!hasLockedConcept || stage === "diagnosed" || stage === "concepts") return "Generate and lock a concept.";
-  return "Generate products, renders, or use chat to request a revision.";
+  if (!hasConcepts) return "Generate three concept directions.";
+  if (!hasApproved) return "Approve the direction that feels right.";
+  if (!hasRenders) return "See the approved direction on your real room photo.";
+  return "Refine it in chat, or source products to make the look real.";
 }
 
 function formatDimensions(value: Json | unknown) {
