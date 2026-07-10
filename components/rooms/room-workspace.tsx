@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ROOM_STATUSES, ROOM_TABS } from "@/lib/constants";
 import type { Database, Json, Photo } from "@/types/database";
@@ -16,10 +16,26 @@ type Revision = Database["public"]["Tables"]["revisions"]["Row"];
 type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type TabName = (typeof ROOM_TABS)[number];
+type OutputAction = "analyze" | "moodboards" | "products" | "render" | "chat";
+type FlowStepId = "intake" | "concept" | "render" | "refine";
+
+type PendingOutput = {
+  action: OutputAction;
+  phase: "request" | "refresh";
+  targetTab: TabName;
+  startedAt: number;
+  baseline: {
+    diagnosisId?: string;
+    moodBoardCount: number;
+    productCount: number;
+    renderId?: string;
+    renderCount: number;
+    chatCount: number;
+  };
+};
 
 const TAB_TESTID: Record<TabName, string> = {
   "Photos & Brief": "photos-brief",
-  Diagnosis: "diagnosis",
   Concepts: "concepts",
   Products: "products",
   Renders: "renders",
@@ -40,6 +56,7 @@ export function RoomWorkspace(props: {
 }) {
   const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
   const latestDiagnosis = props.diagnoses[0];
+  const hasCurrentDiagnosis = latestDiagnosis?.status === "current";
   const currentRender = props.renders.find((render) => render.status !== "stale") ?? props.renders[0];
 
   // Land on the owner's most valuable artifact, not the intake screen: a
@@ -54,6 +71,8 @@ export function RoomWorkspace(props: {
 
   const [activeTab, setActiveTab] = useState<TabName>(initialTab);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [pendingOutput, setPendingOutput] = useState<PendingOutput | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [chatMessage, setChatMessage] = useState("");
   const router = useRouter();
 
@@ -64,8 +83,61 @@ export function RoomWorkspace(props: {
   const productsStale = props.products.length > 0 && props.products.every((product) => product.status === "stale");
   const rendersStale = props.renders.length > 0 && props.renders.every((render) => render.status === "stale");
 
+  useEffect(() => {
+    if (!pendingOutput) return;
+
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - pendingOutput.startedAt) / 1000)));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [pendingOutput]);
+
+  useEffect(() => {
+    if (!pendingOutput) return;
+
+    const outputArrived =
+      pendingOutput.action === "analyze"
+        ? Boolean(latestDiagnosis?.id && latestDiagnosis.id !== pendingOutput.baseline.diagnosisId)
+        : pendingOutput.action === "moodboards"
+          ? props.moodBoards.length > pendingOutput.baseline.moodBoardCount
+          : pendingOutput.action === "products"
+            ? props.products.length > pendingOutput.baseline.productCount
+            : pendingOutput.action === "render"
+              ? Boolean(currentRender?.id && (currentRender.id !== pendingOutput.baseline.renderId || props.renders.length > pendingOutput.baseline.renderCount))
+              : props.chatMessages.length >= pendingOutput.baseline.chatCount + 2;
+
+    if (outputArrived) {
+      setLoadingAction(null);
+      setPendingOutput(null);
+      setElapsedSeconds(0);
+    }
+  }, [currentRender?.id, latestDiagnosis?.id, pendingOutput, props.chatMessages.length, props.moodBoards.length, props.products.length, props.renders.length]);
+
   async function runAction(label: string, url: string, body?: Record<string, unknown>) {
+    const outputAction = getOutputAction(label);
+    const targetTab = outputAction ? outputTargetTab(outputAction) : null;
+    if (targetTab) setActiveTab(targetTab);
     setLoadingAction(label);
+    if (outputAction && targetTab) {
+      setElapsedSeconds(0);
+      setPendingOutput({
+        action: outputAction,
+        phase: "request",
+        targetTab,
+        startedAt: Date.now(),
+        baseline: {
+          diagnosisId: latestDiagnosis?.id,
+          moodBoardCount: props.moodBoards.length,
+          productCount: props.products.length,
+          renderId: currentRender?.id,
+          renderCount: props.renders.length,
+          chatCount: props.chatMessages.length
+        }
+      });
+    }
+
+    let keepWaitingForOutput = false;
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -79,13 +151,83 @@ export function RoomWorkspace(props: {
         return false;
       }
 
+      keepWaitingForOutput = Boolean(outputAction);
+      if (outputAction && targetTab) {
+        setActiveTab(targetTab);
+        setPendingOutput((current) => current && current.action === outputAction ? { ...current, phase: "refresh" } : current);
+      }
       router.refresh();
       return true;
     } catch (error) {
       alert(error instanceof Error ? error.message : "The request failed.");
       return false;
     } finally {
+      if (!keepWaitingForOutput) {
+        setLoadingAction(null);
+        setPendingOutput(null);
+        setElapsedSeconds(0);
+      }
+    }
+  }
+
+  async function generateConceptPackage() {
+    if (hasCurrentDiagnosis) {
+      await runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`);
+      return;
+    }
+
+    setActiveTab("Concepts");
+    setLoadingAction("concept-package");
+    setElapsedSeconds(0);
+    setPendingOutput({
+      action: "moodboards",
+      phase: "request",
+      targetTab: "Concepts",
+      startedAt: Date.now(),
+      baseline: {
+        diagnosisId: latestDiagnosis?.id,
+        moodBoardCount: props.moodBoards.length,
+        productCount: props.products.length,
+        renderId: currentRender?.id,
+        renderCount: props.renders.length,
+        chatCount: props.chatMessages.length
+      }
+    });
+
+    try {
+      const diagnosisResponse = await fetch(`/api/rooms/${props.room.id}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!diagnosisResponse.ok) {
+        const payload = await diagnosisResponse.json().catch(() => ({}));
+        alert(payload.error ?? "The diagnosis request failed.");
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return;
+      }
+
+      setPendingOutput((current) => current ? { ...current, phase: "refresh" } : current);
+
+      const conceptsResponse = await fetch(`/api/rooms/${props.room.id}/generate-moodboards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!conceptsResponse.ok) {
+        const payload = await conceptsResponse.json().catch(() => ({}));
+        alert(payload.error ?? "The concept request failed.");
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return;
+      }
+
+      router.refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "The request failed.");
       setLoadingAction(null);
+      setPendingOutput(null);
     }
   }
 
@@ -124,6 +266,15 @@ export function RoomWorkspace(props: {
         </div>
       </section>
 
+      <PathGuide
+        activeStep={currentFlowStep(props.photos.length, activeConcepts.length, Boolean(lockedMoodBoard), props.renders.length)}
+        photoCount={props.photos.length}
+        hasDiagnosis={hasCurrentDiagnosis}
+        hasConcepts={activeConcepts.length > 0}
+        hasApproved={Boolean(lockedMoodBoard)}
+        hasRenders={props.renders.length > 0}
+      />
+
       <div className="grid grid-cols-2 gap-x-6 border-b border-hairline sm:flex sm:gap-8 sm:overflow-x-auto">
         {ROOM_TABS.map((tab) => (
           <button
@@ -142,6 +293,10 @@ export function RoomWorkspace(props: {
         ))}
       </div>
 
+      {pendingOutput && (
+        <WorkInProgressNotice pending={pendingOutput} elapsedSeconds={elapsedSeconds} />
+      )}
+
       {activeTab === "Photos & Brief" && (
         <section className="grid gap-8">
           <div className="grid gap-8 lg:grid-cols-2">
@@ -149,25 +304,23 @@ export function RoomWorkspace(props: {
             <InfoBlock testId="room-brief-info" title="Brief" value={props.room.design_brief || "No design brief saved yet."} />
           </div>
           <PhotoUploader roomId={props.room.id} photos={props.photos} />
+          <DiagnosisPanel
+            diagnosis={latestDiagnosis}
+            isLoading={loadingAction === "analyze"}
+            canGenerate={props.photos.length > 0}
+            onGenerate={() => runAction("analyze", `/api/rooms/${props.room.id}/analyze`)}
+          />
         </section>
-      )}
-
-      {activeTab === "Diagnosis" && (
-        <DiagnosisPanel
-          diagnosis={latestDiagnosis}
-          isLoading={loadingAction === "analyze"}
-          canGenerate={props.photos.length > 0}
-          onGenerate={() => runAction("analyze", `/api/rooms/${props.room.id}/analyze`)}
-        />
       )}
 
       {activeTab === "Concepts" && (
         <ConceptPanel
           moodBoards={props.moodBoards}
-          hasDiagnosis={Boolean(latestDiagnosis)}
+          hasDiagnosis={hasCurrentDiagnosis}
+          canGenerate={props.photos.length > 0}
           conceptsStale={conceptsStale}
           loadingAction={loadingAction}
-          onGenerate={() => runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`)}
+          onGenerate={generateConceptPackage}
           onLock={(id) => runAction("select", `/api/rooms/${props.room.id}/select-moodboard`, { mood_board_id: id })}
           onUnlock={(id) => runAction(`concept-${id}`, `/api/rooms/${props.room.id}/moodboards/${id}`, { action: "unlock" })}
           onReharmonize={(id, instructions) =>
@@ -272,9 +425,108 @@ function DiagnosisPanel(props: {
   );
 }
 
+function PathGuide(props: {
+  activeStep: FlowStepId;
+  photoCount: number;
+  hasDiagnosis: boolean;
+  hasConcepts: boolean;
+  hasApproved: boolean;
+  hasRenders: boolean;
+}) {
+  const steps: { id: FlowStepId; label: string; detail: string; done: boolean }[] = [
+    {
+      id: "intake",
+      label: "Room read",
+      detail: props.hasDiagnosis
+        ? "Brief, photos, dimensions, and diagnosis are together."
+        : props.photoCount
+          ? "Generate the room diagnosis from this page."
+          : "Add photos to complete the room read.",
+      done: props.hasDiagnosis
+    },
+    {
+      id: "concept",
+      label: "Concept",
+      detail: props.hasConcepts ? "Choose the mood board and palette that feel right." : "Generate the diagnosis-backed concept set.",
+      done: props.hasApproved
+    },
+    {
+      id: "render",
+      label: "Apply to photos",
+      detail: props.hasRenders ? "The approved direction is shown on the room." : "Render the approved concept onto a source photo.",
+      done: props.hasRenders
+    },
+    {
+      id: "refine",
+      label: "Refine",
+      detail: "Chat through changes or source products once the visual direction holds.",
+      done: props.hasRenders
+    }
+  ];
+
+  return (
+    <section data-testid="room-path-guide" className="grid gap-4 border-y border-hairline py-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="atelier-eyebrow">Room path</p>
+          <h2 className="mt-2 font-serif text-3xl text-atelier-ink">What happens next</h2>
+        </div>
+        <p className="max-w-xl text-sm font-light leading-7 text-atelier-umber">
+          Diagnosis and concepts are one design-direction moment: first the room is read, then three mood boards translate that read into a direction.
+        </p>
+      </div>
+      <ol className="grid gap-3 md:grid-cols-4">
+        {steps.map((step, index) => {
+          const isActive = step.id === props.activeStep;
+          return (
+            <li
+              key={step.id}
+              className={`border-t pt-4 ${
+                isActive ? "border-atelier-brass" : step.done ? "border-atelier-ink/30" : "border-hairline"
+              }`}
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <p className={isActive ? "atelier-eyebrow text-atelier-brass" : "atelier-label"}>{step.label}</p>
+                <span className="text-[10px] font-medium uppercase tracking-label text-atelier-fawn">
+                  {step.done ? "Done" : `0${index + 1}`}
+                </span>
+              </div>
+              <p className="mt-2 text-xs font-light leading-6 text-atelier-umber">{step.detail}</p>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function WorkInProgressNotice({ pending, elapsedSeconds }: { pending: PendingOutput; elapsedSeconds: number }) {
+  const label = outputLabel(pending.action);
+  const phaseText =
+    pending.phase === "request"
+      ? "Waiting for the model response and saved output."
+      : "The response returned. Placing the new output in the room.";
+
+  return (
+    <div data-testid="room-output-progress-state" aria-live="polite" className="atelier-notice grid gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+        <p className="atelier-label">{label}</p>
+        <p className="text-[10px] font-medium uppercase tracking-label text-atelier-fawn">
+          {elapsedSeconds < 1 ? "Just started" : `${elapsedSeconds} sec`}
+        </p>
+      </div>
+      <p className="text-sm font-light leading-7 text-atelier-umber">{phaseText}</p>
+      <div className="h-px w-full overflow-hidden bg-hairline">
+        <div className="h-px w-1/3 animate-[atelierLoad_1.8s_ease-in-out_infinite] bg-atelier-brass" />
+      </div>
+    </div>
+  );
+}
+
 function ConceptPanel(props: {
   moodBoards: MoodBoard[];
   hasDiagnosis: boolean;
+  canGenerate: boolean;
   conceptsStale: boolean;
   loadingAction: string | null;
   onGenerate: () => void;
@@ -295,16 +547,26 @@ function ConceptPanel(props: {
             Three directions, one <em className="italic">room</em>
           </>
         }
-        actionLabel={props.loadingAction === "moodboards" ? "Composing directions" : props.moodBoards.length ? "Regenerate concepts" : "Generate concepts"}
+        actionLabel={
+          props.loadingAction === "concept-package" || props.loadingAction === "moodboards"
+            ? "Composing directions"
+            : props.moodBoards.length
+              ? "Regenerate concepts"
+              : props.hasDiagnosis
+                ? "Generate concepts"
+                : "Generate diagnosis & concepts"
+        }
         actionTestId="concepts-generate-button"
-        disabled={!props.hasDiagnosis || props.loadingAction === "moodboards"}
+        disabled={!props.canGenerate || props.loadingAction === "moodboards" || props.loadingAction === "concept-package"}
         onAction={props.onGenerate}
       />
       {props.conceptsStale && (
         <StaleNotice text="Your diagnosis changed since these concepts were generated. Regenerate concepts so directions reflect the current room diagnosis." />
       )}
-      {!props.hasDiagnosis ? (
-        <EmptyState text="Three directions follow the diagnosis." />
+      {!props.canGenerate ? (
+        <EmptyState text="Add at least one room photo first. Then this creates the diagnosis-backed mood boards." />
+      ) : !props.hasDiagnosis ? (
+        <EmptyState text="Use Generate diagnosis & concepts to read the room and compose the first three directions in one pass." />
       ) : props.moodBoards.length === 0 ? (
         <EmptyState text="No concepts have been composed yet." />
       ) : (
@@ -1006,6 +1268,45 @@ function proposalHint(revisionType: string): string | null {
   }
 }
 
+function getOutputAction(label: string): OutputAction | null {
+  if (label === "analyze") return "analyze";
+  if (label === "moodboards") return "moodboards";
+  if (label === "products") return "products";
+  if (label === "render") return "render";
+  if (label === "chat") return "chat";
+  return null;
+}
+
+function outputTargetTab(action: OutputAction): TabName {
+  switch (action) {
+    case "analyze":
+      return "Photos & Brief";
+    case "moodboards":
+      return "Concepts";
+    case "products":
+      return "Products";
+    case "render":
+      return "Renders";
+    case "chat":
+      return "Chat";
+  }
+}
+
+function outputLabel(action: OutputAction) {
+  switch (action) {
+    case "analyze":
+      return "Reading the room";
+    case "moodboards":
+      return "Composing directions";
+    case "products":
+      return "Sourcing the product plan";
+    case "render":
+      return "Composing the photo edit";
+    case "chat":
+      return "Writing the reply";
+  }
+}
+
 function PanelHeader(props: {
   eyebrow: string;
   title: ReactNode;
@@ -1149,10 +1450,17 @@ function statusLabel(status: string) {
 
 function nextHint(photoCount: number, hasConcepts: boolean, hasApproved: boolean, hasRenders: boolean) {
   if (!photoCount) return "Add photos, dimensions, and a design brief.";
-  if (!hasConcepts) return "Generate three concept directions.";
+  if (!hasConcepts) return "Generate the diagnosis-backed concept directions.";
   if (!hasApproved) return "Approve the direction that feels right.";
   if (!hasRenders) return "See the approved direction on your real room photo.";
   return "Refine it in chat, or source the products to make it real.";
+}
+
+function currentFlowStep(photoCount: number, conceptCount: number, hasApproved: boolean, renderCount: number): FlowStepId {
+  if (!photoCount) return "intake";
+  if (!conceptCount || !hasApproved) return "concept";
+  if (!renderCount) return "render";
+  return "refine";
 }
 
 function formatDimensions(value: Json | unknown) {

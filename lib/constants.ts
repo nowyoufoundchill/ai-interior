@@ -15,14 +15,13 @@ export const PHOTO_LABELS = [
 
 // Order reflects the homeowner's mental model, not the pipeline: pick a
 // direction, see it on your real room, refine it — then source products.
-// Diagnosis is a supporting artifact, demoted to the end.
+// Diagnosis now lives inside the first room page instead of as a separate tab.
 export const ROOM_TABS = [
   "Photos & Brief",
   "Concepts",
   "Renders",
   "Chat",
-  "Products",
-  "Diagnosis"
+  "Products"
 ] as const;
 
 export const ROOM_STATUSES = {

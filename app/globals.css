@@ -174,8 +174,24 @@ h3 em {
   animation: atelier-rise 0.7s ease-out both;
 }
 
+@keyframes atelierLoad {
+  0% {
+    transform: translateX(-110%);
+  }
+  50% {
+    transform: translateX(80%);
+  }
+  100% {
+    transform: translateX(310%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .atelier-rise {
+    animation: none;
+  }
+
+  [class*="atelierLoad"] {
     animation: none;
   }
 }

@@ -15,6 +15,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
     .from("room_analyses")
     .select("*")
     .eq("room_id", roomId)
+    .eq("status", "current")
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();

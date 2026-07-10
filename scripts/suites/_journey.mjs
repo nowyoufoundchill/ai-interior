@@ -11,14 +11,12 @@ import { BASE_URL } from "./_lib.mjs";
 export async function buildFullJourney(page, roomId) {
   await page.goto(`${BASE_URL}/rooms/${roomId}`, { waitUntil: "networkidle" });
 
-  await page.getByTestId("tab-diagnosis").click();
-  await page.getByTestId("diagnosis-generate-button").click();
-  await page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST");
-  await page.waitForLoadState("networkidle");
-
   await page.getByTestId("tab-concepts").click();
+  const diagnosisResponse = page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST", { timeout: 300000 });
+  const conceptsResponse = page.waitForResponse((res) => res.url().includes("/generate-moodboards") && res.request().method() === "POST", { timeout: 300000 });
   await page.getByTestId("concepts-generate-button").click();
-  await page.waitForResponse((res) => res.url().includes("/generate-moodboards") && res.request().method() === "POST");
+  await diagnosisResponse;
+  await conceptsResponse;
   await page.waitForLoadState("networkidle");
 
   const firstCard = page.locator('[data-testid^="concept-card-"]').first();

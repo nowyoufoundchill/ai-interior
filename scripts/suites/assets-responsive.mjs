@@ -35,7 +35,7 @@ async function waitForNaturalWidth(imgLocator, timeoutMs = 8000, intervalMs = 20
  */
 
 const WIDTHS = [390, 768, 1440];
-const TABS = ["tab-photos-brief", "tab-diagnosis", "tab-concepts", "tab-products", "tab-renders", "tab-chat"];
+const TABS = ["tab-photos-brief", "tab-concepts", "tab-products", "tab-renders", "tab-chat"];
 const SCREENSHOT_DIR = path.join(process.cwd(), "test-runs", "screenshots", "assets-responsive");
 
 const reporter = new SuiteReporter("assets-responsive");

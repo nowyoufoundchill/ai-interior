@@ -75,24 +75,21 @@ async function main() {
     reporter.assert(await page.getByTestId("room-brief-info").isVisible(), "brief info card visible");
     reporter.assert(await page.getByTestId("photo-upload-input").count() === 1, "photo upload control present");
 
-    // --- Diagnosis ----------------------------------------------------------
-    await page.getByTestId("tab-diagnosis").click();
-    const diagnosisButton = page.getByTestId("diagnosis-generate-button");
-    reporter.assert(await diagnosisButton.isVisible(), "diagnosis generate button visible");
-    await diagnosisButton.click();
-    await page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
-    const diagnosisPanel = page.locator('[data-testid^="diagnosis-panel-"]');
-    reporter.assert(await waitForAtLeast(diagnosisPanel, 1) >= 1, "diagnosis panel renders after generation");
-
-    // --- Concepts: generate, edit, re-harmonize, lock ------------------------
+    // --- Concepts: one CTA reads the room, then composes directions ----------
     await page.getByTestId("tab-concepts").click();
+    const diagnosisResponse = page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST", { timeout: 300000 });
+    const conceptsResponse = page.waitForResponse((res) => res.url().includes("/generate-moodboards") && res.request().method() === "POST", { timeout: 300000 });
     await page.getByTestId("concepts-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-moodboards") && res.request().method() === "POST");
+    await diagnosisResponse;
+    await conceptsResponse;
     await page.waitForLoadState("networkidle");
     const conceptCards = page.locator('[data-testid^="concept-card-"]');
     const conceptCount = await waitForCount(conceptCards, 3);
     reporter.assert(conceptCount === 3, "exactly 3 concept cards render", conceptCount);
+    await page.getByTestId("tab-photos-brief").click();
+    const diagnosisPanel = page.locator('[data-testid^="diagnosis-panel-"]');
+    reporter.assert(await waitForAtLeast(diagnosisPanel, 1) >= 1, "diagnosis panel renders on the room intake page after concept generation");
+    await page.getByTestId("tab-concepts").click();
 
     const firstCard = conceptCards.nth(0);
     const firstKey = await extractKey(firstCard, "concept-card-");

@@ -127,7 +127,6 @@ export async function waitForAtLeast(locator, minCount, { timeoutMs = 8000, inte
 // for that instead of trusting "networkidle".
 const TAB_PANEL_MARKER = {
   "tab-photos-brief": "photo-upload-input",
-  "tab-diagnosis": "diagnosis-generate-button",
   "tab-concepts": "concepts-generate-button",
   "tab-products": "products-generate-button",
   "tab-renders": "render-generate-button",

@@ -44,7 +44,7 @@ async function main() {
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
       for (const [tabTestId, state] of [
-        ["tab-diagnosis", "empty-diagnosis"],
+        ["tab-photos-brief", "empty-room-read"],
         ["tab-concepts", "empty-concepts"],
         ["tab-products", "empty-products"],
         ["tab-renders", "empty-renders"],
@@ -62,7 +62,7 @@ async function main() {
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
       for (const [tabTestId, state] of [
-        ["tab-diagnosis", "populated-diagnosis"],
+        ["tab-photos-brief", "populated-room-read"],
         ["tab-concepts", "populated-locked-concepts"],
         ["tab-products", "populated-products"],
         ["tab-renders", "populated-before-after"],
@@ -83,7 +83,7 @@ async function main() {
     }
 
     // --- Stale state: rerun diagnosis so the locked concept set goes stale ---
-    await clickTabAndWait(page, "tab-diagnosis");
+    await clickTabAndWait(page, "tab-photos-brief");
     await page.getByTestId("diagnosis-generate-button").click();
     await page.waitForResponse((res) => res.url().includes("/analyze") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
