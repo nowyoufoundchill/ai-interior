@@ -2,13 +2,19 @@ import { createHomeAction } from "@/lib/data/actions";
 
 export function HomeForm() {
   return (
-    <form action={createHomeAction} className="atelier-card grid gap-6 p-6">
-      <div>
-        <p className="atelier-label">Home profile</p>
-        <h1 className="mt-2 font-serif text-3xl">Create a home project</h1>
+    <form action={createHomeAction} className="atelier-rise mx-auto grid max-w-4xl gap-10">
+      <div className="border-b border-hairline pb-8">
+        <p className="atelier-eyebrow">Home profile</p>
+        <h1 className="mt-3 font-serif text-5xl text-atelier-ink">
+          Begin a <em className="italic">home</em>
+        </h1>
+        <p className="mt-5 max-w-2xl text-sm font-light leading-7 text-atelier-umber">
+          Every room will inherit from what you set here — palette, architecture, budget, one
+          continuous taste.
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         <label className="grid gap-2">
           <span className="atelier-label">Home name</span>
           <input data-testid="home-name-input" name="name" required className="atelier-field" placeholder="Charleston house" />
@@ -33,7 +39,7 @@ export function HomeForm() {
             <option value="$3m-$6m">$3m – $6m — authored, full-service</option>
             <option value="$6m-$10m">$6m – $10m — fully authored, whole-system</option>
           </select>
-          <span className="text-xs text-atelier-charcoal/60">Sets the level of authorship concepts target. Optional.</span>
+          <span className="text-xs font-light text-atelier-fawn">Sets the level of authorship concepts target. Optional.</span>
         </label>
       </div>
 
@@ -59,8 +65,8 @@ export function HomeForm() {
         />
       </label>
 
-      <button data-testid="home-create-submit" className="w-fit rounded-md bg-atelier-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal">
-        Create home
+      <button data-testid="home-create-submit" className="atelier-btn w-fit">
+        Create the home
       </button>
     </form>
   );

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Check, ClipboardList, Loader2, MessageSquare, Package, Palette, Wand2 } from "lucide-react";
 import { ROOM_STATUSES, ROOM_TABS } from "@/lib/constants";
 import type { Database, Json, Photo } from "@/types/database";
 import { PhotoUploader } from "@/components/rooms/photo-uploader";
@@ -97,42 +96,45 @@ export function RoomWorkspace(props: {
   }
 
   return (
-    <div className="grid gap-7">
-      <section className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+    <div className="atelier-rise grid gap-12">
+      <section className="grid gap-10 border-b border-hairline pb-10 lg:grid-cols-[1.4fr_0.8fr] lg:gap-16">
         <div>
-          <p className="atelier-label">{props.home.name}</p>
-          <h1 className="mt-2 font-serif text-4xl text-atelier-ink">{props.room.name}</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-atelier-charcoal">
+          <p className="atelier-eyebrow">{props.home.name}</p>
+          <h1 className="mt-3 font-serif text-5xl leading-tight text-atelier-ink">{props.room.name}</h1>
+          <p className="mt-5 max-w-3xl text-sm font-light leading-7 text-atelier-umber">
             {props.room.design_brief || "Add a fuller design brief to sharpen the diagnosis, concepts, products, renders, and chat guidance."}
           </p>
         </div>
-        <div className="atelier-card grid gap-3 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="atelier-label">Stage</span>
-            <span className="rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
+        {/* The dusk card: the room's standing sits on a charcoal ground. */}
+        <div className="grid gap-4 self-start border border-hairline bg-atelier-charcoal p-7">
+          <div className="flex items-baseline justify-between gap-3 border-b border-hairline-light pb-3">
+            <span className="atelier-eyebrow">Stage</span>
+            <span className="text-[10px] font-medium uppercase tracking-label text-atelier-ivory/70">
               {statusLabel(props.room.current_stage || props.room.status)}
             </span>
           </div>
-          <div className="text-sm text-atelier-charcoal">
+          <div className="text-sm font-light leading-7 text-atelier-ivory/60">
             <p>
-              Approved direction:{" "}
-              <span className="font-semibold text-atelier-ink">{lockedMoodBoard?.concept_name ?? "Not chosen yet"}</span>
+              Approved direction —{" "}
+              <span className="font-serif italic text-atelier-ivory">{lockedMoodBoard?.concept_name ?? "not chosen yet"}</span>
             </p>
-            <p className="mt-2">What&apos;s next: {nextHint(props.photos.length, props.moodBoards.length > 0, Boolean(lockedMoodBoard), props.renders.length > 0)}</p>
-            <p className="mt-2">Saved photos: {props.photos.length}</p>
+            <p className="mt-2">{nextHint(props.photos.length, props.moodBoards.length > 0, Boolean(lockedMoodBoard), props.renders.length > 0)}</p>
+            <p className="mt-2">Saved photos — {props.photos.length}</p>
           </div>
         </div>
       </section>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-atelier-taupe/20 pb-2">
+      <div className="grid grid-cols-2 gap-x-6 border-b border-hairline sm:flex sm:gap-8 sm:overflow-x-auto">
         {ROOM_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
             data-testid={`tab-${TAB_TESTID[tab]}`}
             onClick={() => setActiveTab(tab)}
-            className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-semibold transition ${
-              activeTab === tab ? "bg-atelier-ink text-white" : "bg-white/60 text-atelier-charcoal hover:bg-atelier-linen"
+            className={`-mb-px inline-flex min-h-11 min-w-11 items-center justify-start whitespace-nowrap border-b pb-3 pt-1 font-sans text-xs font-medium uppercase tracking-eyebrow transition-colors duration-300 sm:justify-center ${
+              activeTab === tab
+                ? "border-atelier-brass text-atelier-ink"
+                : "border-transparent text-atelier-fawn hover:text-atelier-ink"
             }`}
           >
             {tab}
@@ -141,8 +143,8 @@ export function RoomWorkspace(props: {
       </div>
 
       {activeTab === "Photos & Brief" && (
-        <section className="grid gap-5">
-          <div className="grid gap-4 lg:grid-cols-2">
+        <section className="grid gap-8">
+          <div className="grid gap-8 lg:grid-cols-2">
             <InfoBlock testId="room-dimensions-info" title="Dimensions" value={formatDimensions(props.room.dimensions)} />
             <InfoBlock testId="room-brief-info" title="Brief" value={props.room.design_brief || "No design brief saved yet."} />
           </div>
@@ -230,36 +232,39 @@ function DiagnosisPanel(props: {
   const diagnosis = asRecord(props.diagnosis?.analysis);
 
   return (
-    <section className="grid gap-5">
+    <section className="grid gap-8">
       <PanelHeader
-        eyebrow="Designer diagnosis"
-        title="Professional room readout"
-        actionLabel={props.isLoading ? "Generating" : "Generate diagnosis"}
+        eyebrow="The diagnosis"
+        title={
+          <>
+            The room, <em className="italic">read</em> closely
+          </>
+        }
+        actionLabel={props.isLoading ? "Reading the room" : "Generate diagnosis"}
         actionTestId="diagnosis-generate-button"
         disabled={!props.canGenerate || props.isLoading}
-        icon={ClipboardList}
         onAction={props.onGenerate}
       />
       {!props.canGenerate ? (
-        <EmptyState text="Upload room photos to begin your designer diagnosis." />
+        <EmptyState text="Photographs first. The diagnosis follows." />
       ) : !props.diagnosis ? (
-        <EmptyState text="Generate the first room diagnosis after photos and dimensions have been added." />
+        <EmptyState text="Generate the first reading once photos and dimensions are in." />
       ) : (
-        <div data-testid={`diagnosis-panel-${props.diagnosis.version ?? props.diagnosis.id}`} className="grid gap-4">
-          <div className="flex items-center gap-3 text-sm text-atelier-charcoal">
+        <div data-testid={`diagnosis-panel-${props.diagnosis.version ?? props.diagnosis.id}`} className="grid gap-6">
+          <div className="flex flex-wrap items-center gap-4">
             <span className="atelier-label">Diagnosis v{props.diagnosis.version ?? 1}</span>
             <StatusBadge status={props.diagnosis.status} />
-            <span className="text-xs text-atelier-charcoal/70">
+            <span className="text-xs font-light text-atelier-fawn">
               Regenerating the diagnosis marks existing concepts stale.
             </span>
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-          <InfoBlock title="Room Summary" value={String(diagnosis.room_summary ?? "")} />
-          <InfoBlock title="Recommended Strategy" value={String(diagnosis.recommended_strategy ?? "")} />
-          <ListBlock title="Opportunities" items={toStringArray(diagnosis.opportunities)} />
-          <ListBlock title="Design Risks" items={toStringArray(diagnosis.design_risks)} />
-          <ListBlock title="Constraints" items={toStringArray(diagnosis.constraints)} />
-          <ListBlock title="Uncertainties" items={toStringArray(diagnosis.uncertainties)} />
+          <div className="grid gap-8 lg:grid-cols-2">
+            <InfoBlock title="Room summary" value={String(diagnosis.room_summary ?? "")} />
+            <InfoBlock title="Recommended strategy" value={String(diagnosis.recommended_strategy ?? "")} />
+            <ListBlock title="Opportunities" items={toStringArray(diagnosis.opportunities)} />
+            <ListBlock title="Design risks" items={toStringArray(diagnosis.design_risks)} />
+            <ListBlock title="Constraints" items={toStringArray(diagnosis.constraints)} />
+            <ListBlock title="Uncertainties" items={toStringArray(diagnosis.uncertainties)} />
           </div>
         </div>
       )}
@@ -282,26 +287,29 @@ function ConceptPanel(props: {
   const staleConcepts = props.moodBoards.filter((board) => board.status === "stale");
 
   return (
-    <section className="grid gap-5">
+    <section className="grid gap-8">
       <PanelHeader
         eyebrow="Concept directions"
-        title="Three distinct concept directions"
-        actionLabel={props.loadingAction === "moodboards" ? "Generating" : props.moodBoards.length ? "Regenerate concepts" : "Generate concepts"}
+        title={
+          <>
+            Three directions, one <em className="italic">room</em>
+          </>
+        }
+        actionLabel={props.loadingAction === "moodboards" ? "Composing directions" : props.moodBoards.length ? "Regenerate concepts" : "Generate concepts"}
         actionTestId="concepts-generate-button"
         disabled={!props.hasDiagnosis || props.loadingAction === "moodboards"}
-        icon={Palette}
         onAction={props.onGenerate}
       />
       {props.conceptsStale && (
         <StaleNotice text="Your diagnosis changed since these concepts were generated. Regenerate concepts so directions reflect the current room diagnosis." />
       )}
       {!props.hasDiagnosis ? (
-        <EmptyState text="Generate three design directions after the room diagnosis is ready." />
+        <EmptyState text="Three directions follow the diagnosis." />
       ) : props.moodBoards.length === 0 ? (
-        <EmptyState text="No concepts have been generated yet." />
+        <EmptyState text="No concepts have been composed yet." />
       ) : (
-        <div className="grid gap-6">
-          <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-10">
+          <div className="grid gap-8 lg:grid-cols-3">
             {(activeConcepts.length ? activeConcepts : staleConcepts).map((board) => (
               <ConceptCard
                 key={board.id}
@@ -315,11 +323,11 @@ function ConceptPanel(props: {
             ))}
           </div>
           {activeConcepts.length > 0 && staleConcepts.length > 0 && (
-            <details className="rounded-md border border-atelier-taupe/20 bg-white/40 p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-atelier-charcoal">
+            <details className="border-t border-hairline pt-5">
+              <summary className="atelier-label cursor-pointer">
                 Previous versions ({staleConcepts.length})
               </summary>
-              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="mt-6 grid gap-8 lg:grid-cols-3">
                 {staleConcepts.map((board) => (
                   <ConceptCard
                     key={board.id}
@@ -363,7 +371,9 @@ function ConceptCard(props: {
   return (
     <article
       data-testid={`concept-card-${conceptKey}`}
-      className={`atelier-card grid gap-4 p-5 ${isLocked ? "atelier-approved" : ""} ${isStale ? "opacity-70" : ""}`}
+      className={`atelier-card grid gap-5 p-7 transition-[outline-color,outline-offset,transform] duration-300 hover:-translate-y-1 hover:outline hover:outline-1 hover:outline-atelier-brass/50 hover:outline-offset-4 ${
+        isLocked ? "atelier-approved" : ""
+      } ${isStale ? "opacity-60" : ""}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -371,24 +381,21 @@ function ConceptCard(props: {
             {isLocked ? "Approved direction" : `Version ${board.version ?? "n/a"}`}
             {!isLocked && board.parent_version ? ` · from v${board.parent_version}` : ""}
           </p>
-          <h3 className="mt-2 font-serif text-2xl">{board.concept_name}</h3>
-          <p className="mt-1 text-xs text-atelier-charcoal/70">{originLabel(board.origin)}</p>
+          <h3 className="mt-2 font-serif text-2xl text-atelier-ink">{board.concept_name}</h3>
+          <p className="mt-1 text-[10px] font-medium uppercase tracking-label text-atelier-fawn">{originLabel(board.origin)}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={board.status} />
-          {isLocked && <Check className="h-5 w-5 text-atelier-moss" />}
-        </div>
+        <StatusBadge status={board.status} />
       </div>
-      <p className="text-sm leading-6 text-atelier-charcoal">{String(concept.design_thesis ?? "")}</p>
+      <p className="text-sm font-light leading-7 text-atelier-umber">{String(concept.design_thesis ?? "")}</p>
       <PaletteStrip boardId={board.id} palette={palette} />
       <MaterialSwatches materials={toStringArray(concept.materials).slice(0, 6)} />
-      <div>
+      <div className="border-t border-hairline pt-4">
         <p className="atelier-label">Why it works</p>
-        <p className="mt-2 text-sm leading-6 text-atelier-charcoal">{String(concept.why_it_works ?? "")}</p>
+        <p className="mt-2 text-sm font-light leading-7 text-atelier-umber">{String(concept.why_it_works ?? "")}</p>
       </div>
 
       {mode === "reharmonize" && (
-        <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
+        <div className="grid gap-3 border-t border-hairline pt-4">
           <span className="atelier-label">Re-harmonize direction</span>
           <textarea
             data-testid={`concept-reharmonize-input-${conceptKey}`}
@@ -398,7 +405,7 @@ function ConceptCard(props: {
             onChange={(event) => setInstructions(event.target.value)}
             placeholder="Optional: keep the palette but make it more formal, resolve the empty corner, add a stronger lighting layer..."
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-5">
             <button
               type="button"
               data-testid={`concept-reharmonize-submit-${conceptKey}`}
@@ -407,7 +414,7 @@ function ConceptCard(props: {
                 props.onReharmonize(board.id, instructions);
                 setMode("none");
               }}
-              className="inline-flex min-h-11 items-center justify-center rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+              className="atelier-btn"
             >
               {props.busy ? "Re-harmonizing" : "Create refined version"}
             </button>
@@ -415,7 +422,7 @@ function ConceptCard(props: {
               type="button"
               data-testid={`concept-reharmonize-cancel-${conceptKey}`}
               onClick={() => setMode("none")}
-              className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm text-atelier-charcoal"
+              className="atelier-btn-quiet"
             >
               Cancel
             </button>
@@ -424,7 +431,7 @@ function ConceptCard(props: {
       )}
 
       {mode === "edit" && (
-        <div className="grid gap-2 rounded-md border border-atelier-taupe/20 bg-white/60 p-3">
+        <div className="grid gap-3 border-t border-hairline pt-4">
           <span className="atelier-label">Edit concept</span>
           <input
             data-testid={`concept-edit-name-input-${conceptKey}`}
@@ -441,8 +448,8 @@ function ConceptCard(props: {
             onChange={(event) => setEditThesis(event.target.value)}
             placeholder="Design thesis"
           />
-          <p className="text-xs text-atelier-charcoal/70">Saves as a new draft version; the current version is kept in history.</p>
-          <div className="flex gap-2">
+          <p className="text-xs font-light text-atelier-fawn">Saves as a new draft version; the current version is kept in history.</p>
+          <div className="flex flex-wrap items-center gap-5">
             <button
               type="button"
               data-testid={`concept-edit-submit-${conceptKey}`}
@@ -451,7 +458,7 @@ function ConceptCard(props: {
                 props.onEdit(board.id, { concept_name: editName, design_thesis: editThesis });
                 setMode("none");
               }}
-              className="inline-flex min-h-11 items-center justify-center rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+              className="atelier-btn"
             >
               {props.busy ? "Saving" : "Save as new version"}
             </button>
@@ -459,7 +466,7 @@ function ConceptCard(props: {
               type="button"
               data-testid={`concept-edit-cancel-${conceptKey}`}
               onClick={() => setMode("none")}
-              className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm text-atelier-charcoal"
+              className="atelier-btn-quiet"
             >
               Cancel
             </button>
@@ -468,14 +475,14 @@ function ConceptCard(props: {
       )}
 
       {mode === "none" && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-5 border-t border-hairline pt-4">
           {isLocked ? (
             <button
               type="button"
               data-testid={`concept-unlock-button-${conceptKey}`}
               onClick={() => props.onUnlock(board.id)}
               disabled={props.busy}
-              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
+              className="atelier-btn"
             >
               {props.busy ? "Working" : "Change direction"}
             </button>
@@ -485,7 +492,7 @@ function ConceptCard(props: {
               data-testid={`concept-lock-button-${conceptKey}`}
               onClick={() => props.onLock(board.id)}
               disabled={props.busy}
-              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ink transition hover:bg-atelier-ink hover:text-white disabled:opacity-60"
+              className="atelier-btn"
             >
               {props.busy ? "Working" : isStale ? "Re-approve this direction" : "Approve this direction"}
             </button>
@@ -495,7 +502,7 @@ function ConceptCard(props: {
             data-testid={`concept-reharmonize-button-${conceptKey}`}
             onClick={() => setMode("reharmonize")}
             disabled={props.busy}
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+            className="atelier-btn-line"
           >
             Re-harmonize
           </button>
@@ -505,7 +512,7 @@ function ConceptCard(props: {
               data-testid={`concept-edit-button-${conceptKey}`}
               onClick={() => setMode("edit")}
               disabled={props.busy}
-              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-taupe/40 px-4 py-2 text-sm font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+              className="atelier-btn-line"
             >
               Edit
             </button>
@@ -556,28 +563,31 @@ function ProductsPanel(props: {
   });
 
   return (
-    <section className="grid gap-5">
+    <section className="grid gap-8">
       <PanelHeader
-        eyebrow="Product plan"
-        title="Shoppable direction with rationale"
-        actionLabel={props.isLoading ? "Sourcing" : "Generate products"}
+        eyebrow="The product plan"
+        title={
+          <>
+            The pieces that make it <em className="italic">real</em>
+          </>
+        }
+        actionLabel={props.isLoading ? "Sourcing the plan" : "Generate products"}
         actionTestId="products-generate-button"
         disabled={!props.hasLockedConcept || !props.hasRender || props.isLoading}
-        icon={Package}
         onAction={props.onGenerate}
       />
       {props.isStale && (
-        <StaleNotice text="The locked concept changed, so this product plan is stale. Regenerate products to match the current locked concept." />
+        <StaleNotice text="The approved direction changed, so this product plan is stale. Regenerate products to match the current direction." />
       )}
       {!props.hasLockedConcept ? (
-        <EmptyState text="Lock a concept before sourcing products." />
+        <EmptyState text="Products follow an approved direction." />
       ) : !props.hasRender ? (
-        <EmptyState text="Edit a room photo first. Products come after the approved direction has been proven against your real room." />
+        <EmptyState text="See the direction on your real room first. The pieces come after the picture." />
       ) : props.products.length === 0 ? (
-        <EmptyState text="Generate a curated product plan for the locked direction." />
+        <EmptyState text="A curated plan for the approved direction, when you are ready." />
       ) : (
-        <div className="grid gap-4">
-          <div className={`flex-col gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-3 md:flex-row md:items-end ${props.products.length > 8 ? "flex" : "hidden"}`}>
+        <div className="grid gap-8">
+          <div className={`flex-col gap-4 border-y border-hairline py-5 md:flex-row md:items-end ${props.products.length > 8 ? "flex" : "hidden"}`}>
             <label className="grid gap-2">
               <span className="atelier-label">Category</span>
               <select
@@ -637,53 +647,47 @@ function ProductsPanel(props: {
               />
             </label>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product) => {
-              const scores = asRecord(product.scores);
               return (
                 <article
                   key={product.id}
                   data-testid={`product-card-${product.id}`}
-                  className={`atelier-card overflow-hidden ${product.status === "rejected" ? "opacity-60" : ""}`}
+                  className={`atelier-card atelier-hover-img overflow-hidden ${product.status === "rejected" ? "opacity-60" : ""}`}
                 >
                   <ProductImage product={product} />
-                  <div className="grid gap-3 p-5">
+                  <div className="grid gap-4 border-t border-hairline p-7">
                     <div className="flex items-center justify-between gap-3">
                       <p className="atelier-label">{product.category}</p>
                       <StatusBadge status={product.status} />
                     </div>
-                    <h3 className="font-serif text-xl">{product.name}</h3>
-                    <p className="text-sm text-atelier-charcoal">
-                      {product.retailer} {product.price ? `- $${product.price}` : ""}
+                    <h3 className="font-serif text-xl text-atelier-ink">{product.name}</h3>
+                    <p className="text-[11px] font-medium uppercase tracking-label text-atelier-fawn">
+                      {product.retailer}
+                      {product.price ? ` — $${product.price}` : ""}
                     </p>
-                    <p className="text-sm leading-6 text-atelier-charcoal">{product.reason_selected}</p>
-                    <dl className="grid gap-2 text-xs text-atelier-charcoal">
+                    <p className="text-sm font-light leading-7 text-atelier-umber">{product.reason_selected}</p>
+                    <dl className="grid gap-3 border-t border-hairline pt-4 text-xs font-light text-atelier-umber">
                       <div>
-                        <dt className="font-semibold text-atelier-ink">Dimensions</dt>
-                        <dd>{Object.entries(asRecord(product.dimensions)).map(([key, value]) => `${key}: ${String(value)}`).join("; ") || "Confirm before purchase."}</dd>
+                        <dt className="atelier-label">Dimensions</dt>
+                        <dd className="mt-1">{Object.entries(asRecord(product.dimensions)).map(([key, value]) => `${key}: ${String(value)}`).join("; ") || "Confirm before purchase."}</dd>
                       </div>
                       <div>
-                        <dt className="font-semibold text-atelier-ink">Risks</dt>
-                        <dd>{toStringArray(product.risks).join("; ") || "No risks saved."}</dd>
+                        <dt className="atelier-label">Risks</dt>
+                        <dd className="mt-1">{toStringArray(product.risks).join("; ") || "No risks saved."}</dd>
                       </div>
                       <div>
-                        <dt className="font-semibold text-atelier-ink">Alternatives</dt>
-                        <dd>{toStringArray(product.alternatives).join("; ") || "No alternatives saved."}</dd>
+                        <dt className="atelier-label">Alternatives</dt>
+                        <dd className="mt-1">{toStringArray(product.alternatives).join("; ") || "No alternatives saved."}</dd>
                       </div>
                     </dl>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-atelier-charcoal">
-                      <span>Style {String(scores.style_fit ?? "N/A")}</span>
-                      <span>Scale {String(scores.scale_fit ?? "N/A")}</span>
-                      <span>Budget {String(scores.budget_fit ?? "N/A")}</span>
-                      <span>Luxury {String(scores.luxury_signal ?? "N/A")}</span>
-                    </div>
                     {product.url?.startsWith("http") && (
                       <a
                         data-testid={`product-source-link-${product.id}`}
                         href={product.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-sm font-semibold text-atelier-ink underline underline-offset-4"
+                        className="atelier-btn-line w-fit"
                       >
                         View at {product.retailer ?? "retailer"}
                       </a>
@@ -691,14 +695,14 @@ function ProductsPanel(props: {
                     {(() => {
                       const busy = props.loadingAction === `product-${product.id}`;
                       return (
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="flex flex-wrap items-center gap-5 pt-1">
                           {product.status !== "approved" && (
                             <button
                               type="button"
                               data-testid={`product-approve-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "approve")}
-                              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-moss px-3 py-1.5 text-xs font-semibold text-atelier-moss transition hover:bg-atelier-moss hover:text-white disabled:opacity-60"
+                              className="atelier-btn-line text-atelier-brass"
                             >
                               {busy ? "Saving" : "Approve"}
                             </button>
@@ -709,7 +713,7 @@ function ProductsPanel(props: {
                               data-testid={`product-reject-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "reject")}
-                              className="inline-flex min-h-11 items-center justify-center rounded-md border border-atelier-taupe/40 px-3 py-1.5 text-xs font-semibold text-atelier-charcoal transition hover:bg-atelier-linen disabled:opacity-60"
+                              className="atelier-btn-quiet"
                             >
                               {busy ? "Saving" : "Reject"}
                             </button>
@@ -720,7 +724,7 @@ function ProductsPanel(props: {
                               data-testid={`product-reset-button-${product.id}`}
                               disabled={busy}
                               onClick={() => props.onSetStatus(product.id, "reset")}
-                              className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-1.5 text-xs text-atelier-charcoal underline underline-offset-4 disabled:opacity-60"
+                              className="atelier-btn-quiet"
                             >
                               Reset
                             </button>
@@ -752,26 +756,29 @@ function RendersPanel(props: {
   const [instructions, setInstructions] = useState("");
 
   return (
-    <section className="grid gap-5">
+    <section className="grid gap-8">
       <PanelHeader
-        eyebrow="Photo edit studio"
-        title="Restyle your real room photos"
-        actionLabel={props.isLoading ? "Editing" : "Edit this photo"}
+        eyebrow="The studio"
+        title={
+          <>
+            Your room, <em className="italic">reimagined</em>
+          </>
+        }
+        actionLabel={props.isLoading ? "Composing the edit" : "Edit this photo"}
         actionTestId="render-generate-button"
         disabled={!props.hasLockedConcept || props.photos.length === 0 || props.isLoading}
-        icon={Wand2}
         onAction={() => props.onGenerate(sourcePhotoId || undefined, instructions || undefined)}
       />
       {props.isStale && (
-        <StaleNotice text="The locked concept changed, so these photo edits are stale. Re-edit from the current locked concept and a source photo." />
+        <StaleNotice text="The approved direction changed, so these photo edits are stale. Re-edit from the current direction and a source photo." />
       )}
       {!props.hasLockedConcept ? (
-        <EmptyState text="Lock the active concept before editing a room photo." />
+        <EmptyState text="Approve a direction first. The picture follows." />
       ) : props.photos.length === 0 ? (
         <EmptyState text="Add a source photo before editing it." />
       ) : (
-        <div className="grid gap-4">
-          <div className="grid gap-3 rounded-md border border-atelier-taupe/20 bg-white/60 p-4 md:grid-cols-2">
+        <div className="grid gap-8">
+          <div className="grid gap-6 border-y border-hairline py-6 md:grid-cols-2">
             <label className="grid gap-2">
               <span className="atelier-label">Source photo</span>
               <select
@@ -795,17 +802,17 @@ function RendersPanel(props: {
                 rows={2}
                 value={instructions}
                 onChange={(event) => setInstructions(event.target.value)}
-                placeholder="Keep my leather chair, make the walls darker, add a larger rug..."
+          placeholder="Keep my leather chair, make the walls darker, add a larger rug..."
               />
             </label>
           </div>
-          <p className="text-xs text-atelier-charcoal/70">
-            Every edit preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the locked concept plus your instructions.
+          <p className="text-xs font-light leading-6 text-atelier-fawn">
+            Every edit preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the approved direction plus your instructions.
           </p>
           {props.renders.length === 0 ? (
-            <EmptyState text="Edit a source photo to see a before/after for the locked concept." />
+            <EmptyState text="One photograph, restyled in place — the before and after of the approved direction." />
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-10">
               {props.renders.map((render) => {
                 const sourcePhoto = props.photos.find((photo) => photo.id === render.source_photo_id);
                 const critique = asRecord(render.critique);
@@ -815,52 +822,59 @@ function RendersPanel(props: {
                         artifact, shown large; the source photo sits beneath as a
                         smaller labeled "before" reference. */}
                     <figure className="relative">
-                      <figcaption className="atelier-eyebrow absolute left-4 top-4 z-10 rounded-full bg-atelier-paper/85 px-3 py-1 shadow-soft">
+                      <figcaption className="absolute left-5 top-5 z-10 border border-hairline bg-atelier-paper/90 px-3 py-1.5 text-[10px] font-medium uppercase tracking-eyebrow text-atelier-brass">
                         After · {props.conceptName ?? "Approved direction"}
                       </figcaption>
                       {render.file_url ? (
                         <img src={render.file_url} alt="Edited room photo" className="aspect-[16/10] w-full object-cover" />
                       ) : (
-                        <div className="flex aspect-[16/10] items-center justify-center bg-atelier-linen text-xs text-atelier-charcoal">
-                          Image pending — edit plan saved
+                        <div className="flex aspect-[16/10] items-center justify-center bg-atelier-charcoal">
+                          {/* Principle VIII — type as image for the imageless state. */}
+                          <span className="font-serif text-4xl text-atelier-ivory/80">
+                            A<em className="italic text-atelier-brass">i</em>D
+                            <span className="ml-4 align-middle font-sans text-[10px] font-medium uppercase tracking-wide2 text-atelier-ivory/40">
+                              Image pending — edit plan saved
+                            </span>
+                          </span>
                         </div>
                       )}
                     </figure>
-                    <div className="flex items-center gap-3 border-b border-atelier-taupe/15 px-5 py-3">
-                      <figure className="flex items-center gap-3">
+                    <div className="grid gap-4 border-b border-t border-hairline px-7 py-4 sm:flex sm:items-center">
+                      <figure className="grid gap-3 sm:flex sm:items-center">
                         <figcaption className="atelier-label">Before</figcaption>
                         {sourcePhoto?.file_url ? (
                           <img
                             src={sourcePhoto.file_url}
                             alt="Source room photo"
-                            className="h-14 w-20 rounded border border-atelier-taupe/25 object-cover"
+                            className="h-20 w-full border border-hairline object-cover sm:h-14 sm:w-20"
                           />
                         ) : (
-                          <div className="flex h-14 w-20 items-center justify-center rounded bg-atelier-linen text-[0.6rem] text-atelier-charcoal">
+                          <div className="flex h-20 w-full items-center justify-center border border-hairline bg-atelier-ivory text-[0.6rem] font-light text-atelier-fawn sm:h-14 sm:w-20">
                             No source
                           </div>
                         )}
                       </figure>
-                      <p className="text-xs leading-5 text-atelier-charcoal/70">
+                      <p className="text-xs font-light leading-5 text-atelier-fawn">
                         Your real {sourcePhoto?.label ?? "room"} photo, restyled in place — architecture, camera, windows and doors preserved.
                       </p>
                     </div>
-                    <div className="grid gap-3 p-5">
+                    <div className="grid gap-4 p-7">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="atelier-label">{props.conceptName ?? "Approved direction"}</p>
+                        <p className="atelier-eyebrow">{props.conceptName ?? "Approved direction"}</p>
                         <StatusBadge status={render.status} />
                       </div>
-                      <p className="text-sm leading-6 text-atelier-charcoal">
+                      <p className="text-sm font-light leading-7 text-atelier-umber">
                         {props.conceptName ?? "Your approved direction"} applied to your {sourcePhoto?.label ?? "room"} photo, preserving the real architecture, camera angle, windows, and doors.
                       </p>
                       {render.user_regeneration_instructions && (
-                        <p className="text-sm text-atelier-charcoal">
-                          <span className="font-semibold text-atelier-ink">Your instructions:</span> {render.user_regeneration_instructions}
+                        <p className="text-sm font-light leading-7 text-atelier-umber">
+                          <span className="atelier-label">Your instructions — </span>
+                          {render.user_regeneration_instructions}
                         </p>
                       )}
-                      <details className="text-sm text-atelier-charcoal">
-                        <summary className="cursor-pointer font-semibold text-atelier-ink">Preservation &amp; edit details</summary>
-                        <div className="mt-3 grid gap-3">
+                      <details className="border-t border-hairline pt-4 text-sm text-atelier-umber">
+                        <summary className="atelier-label cursor-pointer">Preservation &amp; edit details</summary>
+                        <div className="mt-4 grid gap-4">
                           <ListBlock title="Preserved" items={toStringArray(render.preservation_constraints)} compact />
                           <ListBlock title="Applied changes" items={toStringArray(render.transformation_instructions)} compact />
                           <ListBlock title="Avoided" items={toStringArray(render.negative_instructions)} compact />
@@ -868,7 +882,7 @@ function RendersPanel(props: {
                           {(render.render_prompt || render.prompt) && (
                             <div>
                               <p className="atelier-label">Full edit brief</p>
-                              <p className="mt-2 text-xs leading-6 text-atelier-charcoal/80">{render.render_prompt ?? render.prompt}</p>
+                              <p className="mt-2 text-xs font-light leading-6 text-atelier-fawn">{render.render_prompt ?? render.prompt}</p>
                             </div>
                           )}
                         </div>
@@ -897,65 +911,71 @@ function ChatPanel(props: {
   onSend: () => void;
 }) {
   return (
-    <section className="grid gap-5">
-      <PanelHeader eyebrow="Design chat" title="Talk it through with your designer" icon={MessageSquare} />
+    <section className="grid gap-8">
+      <PanelHeader
+        eyebrow="Design chat"
+        title={
+          <>
+            Talk it <em className="italic">through</em>
+          </>
+        }
+      />
       {/* Context chips make the conversation feel grounded in the current work,
           not a blind text box. */}
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
-          Direction: {props.conceptName ?? "not chosen yet"}
-        </span>
-        <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
-          {props.hasRender ? "Working from your latest render" : "No render yet"}
-        </span>
+      <div className="flex flex-wrap gap-3">
+        <span className="atelier-chip">Direction — {props.conceptName ?? "not chosen yet"}</span>
+        <span className="atelier-chip">{props.hasRender ? "Working from your latest render" : "No render yet"}</span>
         {props.latestRenderInstructions && (
-          <span className="rounded-full bg-atelier-linen px-3 py-1 font-semibold text-atelier-charcoal">
-            Last change: {props.latestRenderInstructions}
-          </span>
+          <span className="atelier-chip">Last change — {props.latestRenderInstructions}</span>
         )}
       </div>
       {props.isLoading && (
-        <div data-testid="chat-progress-state" className="rounded-md border border-atelier-taupe/20 bg-white/60 p-4 text-sm text-atelier-charcoal">
+        <div data-testid="chat-progress-state" className="atelier-notice">
           Reviewing the approved direction, latest render, and your requested change before replying.
         </div>
       )}
-      <div className="atelier-card grid gap-3 p-5">
+      <div className="grid gap-4 border-y border-hairline py-6">
         <textarea
           data-testid="chat-message-input"
           className="atelier-field"
           rows={4}
           value={props.message}
           onChange={(event) => props.onMessageChange(event.target.value)}
-          placeholder="Tell your designer what to change — 'the room feels too full, what would you pull out?' or 'keep my leather chair but warm up the walls.'"
+          placeholder="Describe the change you want to study."
         />
         <button
           type="button"
           data-testid="chat-send-button"
           onClick={props.onSend}
           disabled={props.isLoading}
-          className="flex min-h-11 w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+          className="atelier-btn w-fit"
         >
-          {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-          {props.isLoading ? "Thinking…" : "Send"}
+          {props.isLoading ? "Composing a reply" : "Send"}
         </button>
       </div>
       {props.messages.length === 0 ? (
-        <EmptyState text="Ask your designer anything about this room — why a choice was made, or what to change. They'll talk it through and point you to the next step, but never alter your design without you." />
+        <EmptyState text="Ask your designer anything about this room — why a choice was made, or what to change. They will talk it through and point you to the next step, but never alter your design without you." />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           {props.messages.map((message) => {
             const proposal = message.role === "assistant" ? proposalHint(message.classified_intent ?? "") : null;
             return (
-              <article key={message.id} data-testid={`chat-message-card-${message.id}`} className={`atelier-card grid gap-3 p-5 ${message.role === "user" ? "bg-white/70" : ""}`}>
-                <p className="atelier-label">
+              <article
+                key={message.id}
+                data-testid={`chat-message-card-${message.id}`}
+                className={`grid gap-3 border-l p-6 ${
+                  message.role === "user" ? "border-hairline bg-atelier-paper" : "border-atelier-brass/60 bg-atelier-ivory"
+                }`}
+              >
+                <p className={message.role === "assistant" ? "atelier-eyebrow" : "atelier-label"}>
                   {message.role === "assistant" ? "Designer" : "You"}
-                  {message.classified_intent ? ` - ${message.classified_intent.replaceAll("_", " ")}` : ""}
+                  {message.classified_intent ? ` — ${message.classified_intent.replaceAll("_", " ")}` : ""}
                 </p>
-                <p className={message.role === "assistant" ? "text-sm leading-6 text-atelier-charcoal" : "font-semibold text-atelier-ink"}>
+                <p className={message.role === "assistant" ? "text-sm font-light leading-7 text-atelier-umber" : "font-serif text-lg leading-relaxed text-atelier-ink"}>
                   {message.content}
                 </p>
                 {proposal && (
-                  <p className="rounded-md border border-atelier-taupe/30 bg-atelier-linen/60 px-3 py-2 text-xs text-atelier-charcoal">
+                  <p className="border-t border-hairline pt-3 text-xs font-light text-atelier-fawn">
                     Proposal only — {proposal}
                   </p>
                 )}
@@ -988,19 +1008,17 @@ function proposalHint(revisionType: string): string | null {
 
 function PanelHeader(props: {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   actionLabel?: string;
   actionTestId?: string;
   disabled?: boolean;
-  icon: ComponentType<{ className?: string }>;
   onAction?: () => void;
 }) {
-  const Icon = props.icon;
   return (
-    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+    <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
       <div>
-        <p className="atelier-label">{props.eyebrow}</p>
-        <h2 className="mt-2 font-serif text-3xl">{props.title}</h2>
+        <p className="atelier-eyebrow">{props.eyebrow}</p>
+        <h2 className="mt-3 font-serif text-4xl text-atelier-ink">{props.title}</h2>
       </div>
       {props.actionLabel && props.onAction && (
         <button
@@ -1008,10 +1026,10 @@ function PanelHeader(props: {
           data-testid={props.actionTestId}
           onClick={props.onAction}
           disabled={props.disabled}
-          className="flex min-h-11 w-fit items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:cursor-not-allowed disabled:opacity-50"
+          className="atelier-btn"
         >
-          {props.actionLabel.endsWith("ing") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
           {props.actionLabel}
+          {props.actionLabel.endsWith("ing") || props.actionLabel.includes("ing ") ? "…" : ""}
         </button>
       )}
     </div>
@@ -1020,18 +1038,18 @@ function PanelHeader(props: {
 
 function InfoBlock({ title, value, testId }: { title: string; value: string; testId?: string }) {
   return (
-    <article data-testid={testId} className="atelier-card p-5">
+    <article data-testid={testId} className="border-t border-hairline pt-4">
       <p className="atelier-label">{title}</p>
-      <p className="mt-3 text-sm leading-6 text-atelier-charcoal">{value}</p>
+      <p className="mt-3 text-sm font-light leading-7 text-atelier-umber">{value}</p>
     </article>
   );
 }
 
 function ListBlock({ title, items, compact = false }: { title: string; items: string[]; compact?: boolean }) {
   return (
-    <article className={compact ? "" : "atelier-card p-5"}>
+    <article className={compact ? "" : "border-t border-hairline pt-4"}>
       <p className="atelier-label">{title}</p>
-      <ul className="mt-3 grid gap-2 text-sm leading-6 text-atelier-charcoal">
+      <ul className="mt-3 grid gap-2 text-sm font-light leading-7 text-atelier-umber">
         {(items.length ? items : ["No details saved yet."]).map((item) => (
           <li key={item}>{item}</li>
         ))}
@@ -1044,17 +1062,17 @@ function PaletteStrip({ boardId, palette }: { boardId: string; palette: unknown[
   const swatches = palette.slice(0, 6).map((item) => asRecord(item));
   if (!swatches.length) return null;
   return (
-    <div>
+    <div className="border-t border-hairline pt-4">
       <p className="atelier-label">Palette</p>
-      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+      <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
         {swatches.map((swatch, index) => {
-          const hex = String(swatch.hex ?? "#f7f2ea");
+          const hex = String(swatch.hex ?? "#f5f1ea");
           const name = String(swatch.name ?? "Tone");
           return (
-            <div key={`${boardId}-sw-${index}`} className="grid gap-1">
+            <div key={`${boardId}-sw-${index}`} className="grid gap-1.5">
               <span className="atelier-swatch" style={{ backgroundColor: hex }} title={`${name} ${hex}`} />
-              <span className="text-[0.7rem] font-medium leading-tight text-atelier-charcoal">{name}</span>
-              <span className="text-[0.65rem] uppercase tracking-wide text-atelier-taupe">{hex}</span>
+              <span className="text-[0.68rem] font-light leading-tight text-atelier-umber">{name}</span>
+              <span className="text-[0.6rem] font-medium uppercase tracking-label text-atelier-taupe">{hex}</span>
             </div>
           );
         })}
@@ -1066,9 +1084,9 @@ function PaletteStrip({ boardId, palette }: { boardId: string; palette: unknown[
 function MaterialSwatches({ materials }: { materials: string[] }) {
   if (!materials.length) return null;
   return (
-    <div>
+    <div className="border-t border-hairline pt-4">
       <p className="atelier-label">Materials</p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {materials.map((material) => (
           <span key={material} className="atelier-chip">
             {material}
@@ -1084,12 +1102,12 @@ function ProductImage({ product }: { product: Product }) {
   const [failed, setFailed] = useState(!src);
 
   // Never render a broken-image icon. A product whose image can't load (dead
-  // or fabricated URL) falls back to a calm labeled tile rather than the
-  // browser's broken-image glyph, which reads as "AI slop."
+  // or fabricated URL) falls back to Principle VIII: the category set as quiet
+  // type on a dark ground, rather than the browser's broken-image glyph.
   if (failed || !src) {
     return (
-      <div className="flex aspect-[4/3] w-full items-center justify-center bg-atelier-linen">
-        <span className="atelier-label text-atelier-taupe">{product.category}</span>
+      <div className="flex aspect-[4/3] w-full items-center justify-center bg-atelier-charcoal">
+        <span className="font-serif text-2xl italic text-atelier-ivory/50">{product.category}</span>
       </div>
     );
   }
@@ -1106,33 +1124,23 @@ function ProductImage({ product }: { product: Product }) {
 
 function StatusBadge({ status }: { status: string }) {
   const tone =
-    status === "locked"
-      ? "bg-atelier-moss/15 text-atelier-moss"
-      : status === "stale"
-        ? "bg-amber-100 text-amber-800"
-        : status === "rejected"
-          ? "bg-rose-100 text-rose-700"
-          : status === "approved"
-            ? "bg-atelier-moss/15 text-atelier-moss"
-            : "bg-atelier-linen text-atelier-charcoal";
+    status === "locked" || status === "approved"
+      ? "atelier-status atelier-status-approved"
+      : status === "stale" || status === "rejected"
+        ? "atelier-status atelier-status-stale"
+        : "atelier-status";
   // Owner-facing language: a "locked" concept reads as the approved direction;
   // a "stale" artifact reads as needing a refresh, not a database state.
   const label = status === "locked" ? "Approved" : status === "stale" ? "Needs refresh" : status;
-  return <span className={`rounded-md px-3 py-1 text-xs font-semibold capitalize ${tone}`}>{label}</span>;
+  return <span className={tone}>{label}</span>;
 }
 
 function StaleNotice({ text }: { text: string }) {
-  return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{text}</div>
-  );
+  return <div className="atelier-notice-stale">{text}</div>;
 }
 
 function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-md border border-dashed border-atelier-taupe/40 bg-white/50 p-8 text-center text-sm text-atelier-charcoal">
-      {text}
-    </div>
-  );
+  return <div className="atelier-empty">{text}</div>;
 }
 
 function statusLabel(status: string) {
@@ -1144,7 +1152,7 @@ function nextHint(photoCount: number, hasConcepts: boolean, hasApproved: boolean
   if (!hasConcepts) return "Generate three concept directions.";
   if (!hasApproved) return "Approve the direction that feels right.";
   if (!hasRenders) return "See the approved direction on your real room photo.";
-  return "Refine it in chat, or source products to make the look real.";
+  return "Refine it in chat, or source the products to make it real.";
 }
 
 function formatDimensions(value: Json | unknown) {

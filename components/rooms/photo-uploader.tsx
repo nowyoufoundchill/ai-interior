@@ -2,7 +2,6 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { PHOTO_LABELS } from "@/lib/constants";
 import type { Photo } from "@/types/database";
 
@@ -66,17 +65,20 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
   }
 
   return (
-    <div className="grid gap-6">
-      <div className="atelier-card grid gap-4 p-5">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+    <div className="grid gap-10">
+      <div className="grid gap-6 border-t border-hairline pt-6">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <p className="atelier-label">Photo intake</p>
-            <h2 className="mt-2 font-serif text-2xl">Upload and label room photos</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-atelier-charcoal">
-              Capture the main angle, each wall, corners, ceiling, floor, and any existing pieces that should stay.
+            <p className="atelier-eyebrow">Photo intake</p>
+            <h2 className="mt-3 font-serif text-3xl text-atelier-ink">
+              Begin with <em className="italic">photographs</em>
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm font-light leading-7 text-atelier-umber">
+              The main angle, each wall, corners, ceiling, floor, and any existing pieces that
+              should stay.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
               data-testid="photo-upload-label-select"
               className="atelier-field min-w-44"
@@ -87,8 +89,7 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
                 <option key={item}>{item}</option>
               ))}
             </select>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal">
-              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+            <label className={`atelier-btn ${isUploading ? "pointer-events-none opacity-40" : ""}`}>
               {isUploading ? "Uploading" : "Add photo"}
               <input
                 data-testid="photo-upload-input"
@@ -102,14 +103,16 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-5">
           {PHOTO_LABELS.map((item) => {
             const complete = photos.some((photo) => photo.label === item);
             return (
               <div
                 key={item}
-                className={`rounded-md border px-3 py-2 text-xs ${
-                  complete ? "border-atelier-moss/40 bg-atelier-moss/10 text-atelier-charcoal" : "border-atelier-taupe/25 bg-white/60 text-atelier-taupe"
+                className={`border px-3 py-2.5 text-[10px] font-medium uppercase tracking-label ${
+                  complete
+                    ? "border-atelier-brass/50 bg-atelier-ivory text-atelier-brass"
+                    : "border-hairline bg-atelier-paper text-atelier-taupe"
                 }`}
               >
                 {item}
@@ -120,15 +123,13 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
       </div>
 
       {photos.length === 0 ? (
-        <div className="rounded-md border border-dashed border-atelier-taupe/40 p-8 text-center text-sm text-atelier-charcoal">
-          Upload room photos to begin your designer diagnosis.
-        </div>
+        <div className="atelier-empty">One photograph begins the room.</div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
           {photos.map((photo) => (
-            <figure key={photo.id} data-testid={`photo-card-${photo.id}`} className="atelier-card overflow-hidden">
+            <figure key={photo.id} data-testid={`photo-card-${photo.id}`} className="atelier-card atelier-hover-img overflow-hidden">
               <img src={photo.file_url} alt={photo.label ?? "Room photo"} className="aspect-[4/3] w-full object-cover" />
-              <figcaption className="flex items-center justify-between gap-3 p-3">
+              <figcaption className="flex items-center justify-between gap-3 border-t border-hairline p-4">
                 <select
                   data-testid={`photo-label-select-${photo.id}`}
                   className="atelier-field"
@@ -143,10 +144,10 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
                   type="button"
                   data-testid={`photo-delete-button-${photo.id}`}
                   onClick={() => deletePhoto(photo)}
-                  className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-atelier-taupe/30 p-2 text-atelier-charcoal transition hover:bg-atelier-linen"
+                  className="flex min-h-11 min-w-11 items-center justify-center border border-hairline text-sm text-atelier-umber transition-colors duration-300 hover:border-atelier-clay/50 hover:text-atelier-clay"
                   aria-label="Delete photo"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  ✕
                 </button>
               </figcaption>
             </figure>

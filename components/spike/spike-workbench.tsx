@@ -109,7 +109,7 @@ export function SpikeWorkbench() {
               type="button"
               onClick={run}
               disabled={loading}
-              className="rounded-md bg-atelier-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+              className="bg-atelier-ink px-4 py-2 text-sm font-semibold text-atelier-ivory transition hover:bg-atelier-charcoal disabled:opacity-60"
             >
               {loading ? "Running spike..." : "Run spike"}
             </button>
@@ -125,9 +125,9 @@ export function SpikeWorkbench() {
         <article className="atelier-card grid gap-4 p-5">
           <h2 className="font-serif text-2xl text-atelier-ink">Result summary</h2>
           {error ? (
-            <pre className="overflow-auto rounded-md bg-rose-50 p-4 text-xs text-rose-900">{error}</pre>
+            <pre className="overflow-auto bg-atelier-ivory p-4 text-xs text-atelier-clay">{error}</pre>
           ) : !result ? (
-            <div className="rounded-md border border-dashed border-atelier-taupe/40 bg-white/50 p-8 text-sm text-atelier-charcoal">
+            <div className="border border-hairline bg-atelier-ivory p-8 text-sm text-atelier-charcoal">
               The spike output will appear here after a successful run.
             </div>
           ) : (
@@ -168,7 +168,7 @@ export function SpikeWorkbench() {
 
 function SummaryBlock(props: { title: string; value: string }) {
   return (
-    <div className="rounded-md bg-atelier-linen p-4">
+    <div className="bg-atelier-ivory p-4">
       <p className="atelier-label">{props.title}</p>
       <p className="mt-2 text-sm leading-6 text-atelier-charcoal">{props.value}</p>
     </div>

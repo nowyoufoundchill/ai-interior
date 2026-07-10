@@ -104,7 +104,9 @@ export async function roomVisionAnalyst(input: {
     roomName: input.room.name,
     roomPurpose: input.room.purpose,
     roomType,
-    photoCount: input.photoCount
+    photoCount: input.photoCount,
+    dimensions: input.room.dimensions,
+    designBrief: input.room.design_brief
   });
 
   if (!input.photos?.length) {
@@ -210,28 +212,31 @@ const MOCK_CONCEPT_PROFILES: Array<{
   layoutDirection: string;
   decorDirection: string;
   budgetStrategy: string;
+  whyItWorks: string;
 }> = [
   {
     conceptName: "Tidewater Study",
     thesis: "An airy, architectural coastal direction that leans on light and material honesty instead of beach props.",
     palette: [
       { name: "Warm white", hex: "#f7f2ea" },
-      { name: "Haint blue", hex: "#a9c4c2" },
+      { name: "Oyster plaster", hex: "#d8cfc1" },
       { name: "Sand", hex: "#d9c7a8" },
       { name: "Natural oak", hex: "#b9895a" },
-      { name: "Sea grass green", hex: "#8a9a6b" }
+      { name: "Weathered taupe", hex: "#8A8073" }
     ],
     whyMayReject: "It may feel too light and airy if the desired outcome is darker or more enclosed.",
     layoutDirection: "Float the main desk toward the window wall to work with natural light; keep circulation to the interior side clear.",
     decorDirection: "One or two woven or ceramic pieces with visible handwork; nothing glossy or overly polished.",
-    budgetStrategy: "Invest in the desk and task lighting; keep rug and accessories mid-range."
+    budgetStrategy: "Invest in the desk and task lighting; keep rug and accessories mid-range.",
+    whyItWorks:
+      "This is the lightest reading: oyster plaster, sand, natural oak, and weathered taupe keep the 11 ft by 14 ft office bright for daytime work while rejecting beach props. The desk sits with the window light, woven texture stays secondary, and the three doors remain visually clear."
   },
   {
     conceptName: "Dusk Harbor Room",
     thesis: "A moodier coastal direction pulled toward dusk: darker accents and tactile materials over literal beach signifiers.",
     palette: [
       { name: "Warm white", hex: "#f2ede2" },
-      { name: "Blue-gray", hex: "#5c6b73" },
+      { name: "Smoke taupe", hex: "#6d6258" },
       { name: "Mushroom", hex: "#a9998a" },
       { name: "Natural oak", hex: "#a67b4d" },
       { name: "Blackened bronze", hex: "#3b342c" }
@@ -239,7 +244,9 @@ const MOCK_CONCEPT_PROFILES: Array<{
     whyMayReject: "It may feel too dark or reserved if the desired outcome is bright and high-energy.",
     layoutDirection: "Anchor the room with a substantial desk or console against the darkest wall, balanced by a layered lighting plan.",
     decorDirection: "Fewer, larger objects — one oversized art piece and one sculptural accent rather than many small ones.",
-    budgetStrategy: "Invest in lighting layers and one statement material moment; save on secondary seating."
+    budgetStrategy: "Invest in lighting layers and one statement material moment; save on secondary seating.",
+    whyItWorks:
+      "This is the executive dusk option: smoke taupe, mushroom, oak, leather, and blackened bronze make the white shell feel quieter on camera. It solves the brief through depth, task light, and one substantial desk wall rather than coastal decoration."
   },
   {
     conceptName: "Quiet Organic Atelier",
@@ -249,12 +256,14 @@ const MOCK_CONCEPT_PROFILES: Array<{
       { name: "Greige", hex: "#b8ab97" },
       { name: "Walnut", hex: "#6b4a35" },
       { name: "Charcoal", hex: "#3a3a38" },
-      { name: "Sage", hex: "#8a9482" }
+      { name: "Stone taupe", hex: "#B8A99A" }
     ],
     whyMayReject: "It may feel too restrained if the desired outcome is highly colorful or maximal.",
     layoutDirection: "Keep the center of the room open; push storage and secondary pieces to the perimeter for a calm, uncluttered feel.",
     decorDirection: "A single large plant and one soft textile layer (throw or woven basket); resist adding more than that.",
-    budgetStrategy: "Invest in the anchor seating piece and rug texture; keep storage and lighting simple and functional."
+    budgetStrategy: "Invest in the anchor seating piece and rug texture; keep storage and lighting simple and functional.",
+    whyItWorks:
+      "This is the most tactile and restrained option: bone, greige, walnut, charcoal, plaster, and travertine turn the office into a quiet workroom. It keeps the center open, uses the oak floor as warmth, and lets one sculptural chair or table carry the luxury signal."
   }
 ];
 
@@ -277,7 +286,7 @@ export async function styleDirector(input: {
       decor_direction: profile.decorDirection,
       plant_direction: style.plants.join(", "),
       budget_strategy: profile.budgetStrategy,
-      why_it_works: `${style.summary} This reading of ${style.style_name.toLowerCase()} gives ${input.room.name} a clear, specific point of view.`,
+      why_it_works: profile.whyItWorks,
       why_user_may_reject_it: profile.whyMayReject,
       risk_profile: style.common_mistakes.slice(0, 3),
       quality_score: 86 - index

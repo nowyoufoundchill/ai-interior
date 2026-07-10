@@ -23,7 +23,7 @@ export default async function DebugPage() {
         </section>
 
         {error ? (
-          <div className="rounded-md border border-dashed border-atelier-taupe/40 bg-white/50 p-8 text-sm text-atelier-charcoal">
+          <div className="border border-hairline bg-atelier-ivory p-8 text-sm text-atelier-charcoal">
             {error.message}
           </div>
         ) : (
@@ -35,7 +35,7 @@ export default async function DebugPage() {
                     <p className="atelier-label">{run.provider ?? "provider unknown"}</p>
                     <h2 className="mt-1 font-serif text-2xl text-atelier-ink">{run.service_name}</h2>
                   </div>
-                  <span className="rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
+                  <span className="bg-atelier-ivory px-3 py-1 text-xs font-semibold text-atelier-charcoal">
                     {run.status}
                   </span>
                 </div>
@@ -44,7 +44,7 @@ export default async function DebugPage() {
                   <p>Model: {run.model_name ?? "n/a"}</p>
                   <p>Quality: {run.quality_score ?? "n/a"}</p>
                 </div>
-                <pre className="overflow-auto rounded-md bg-atelier-linen p-3 text-xs">
+                <pre className="overflow-auto bg-atelier-ivory p-3 text-xs">
                   {JSON.stringify(
                     {
                       room_id: run.room_id,

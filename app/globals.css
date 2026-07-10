@@ -2,9 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Brand system per brand-guidelines.html (gospel):
+   warm paper ground, ink text, hairlines instead of boxes, brass as the only
+   accent, no rounded corners, no drop shadows, motion like slow air. */
+
 :root {
   color-scheme: light;
-  background: #f7f2ea;
+  background: #faf8f4;
 }
 
 * {
@@ -13,10 +17,12 @@
 
 body {
   margin: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 250, 243, 0.92), rgba(247, 242, 234, 0.98)),
-    #f7f2ea;
-  color: #221f1b;
+  background: #faf8f4;
+  color: #1e1b17;
+  font-weight: 300;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -30,41 +36,159 @@ select {
   font: inherit;
 }
 
-.atelier-field {
-  @apply w-full rounded-md border border-atelier-taupe/30 bg-white/80 px-3 py-2 text-sm text-atelier-ink outline-none transition focus:border-atelier-charcoal focus:ring-2 focus:ring-atelier-brass/20;
+/* Serif headline defaults: weight 400 only, never bold. */
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-weight: 400;
 }
 
+h1 em,
+h2 em,
+h3 em {
+  font-style: italic;
+}
+
+/* ---------- primitives ---------- */
+
+/* Muted label: tracked-out light sans whisper (taupe). */
 .atelier-label {
-  @apply text-xs font-semibold uppercase tracking-[0.18em] text-atelier-taupe;
+  @apply font-sans text-[11px] font-medium uppercase tracking-label text-atelier-taupe;
 }
 
-.atelier-card {
-  @apply rounded-md border border-atelier-taupe/20 bg-atelier-paper shadow-soft;
-}
-
-/* Phase 8 editorial layer ------------------------------------------------- */
-
-/* Premium treatment for the single approved direction: a warm brass frame and
-   a faint paper-gold wash so the chosen concept reads final and set-apart from
-   the working drafts, not just another card with a green badge. */
-.atelier-approved {
-  @apply border-atelier-brass/50 shadow-soft;
-  background-image: linear-gradient(180deg, rgba(176, 138, 76, 0.06), rgba(255, 250, 243, 0.9));
-  box-shadow: 0 0 0 1px rgba(176, 138, 76, 0.25), 0 18px 60px rgba(59, 57, 51, 0.11);
-}
-
-/* A single labeled palette swatch: color chip with its name + hex beneath, so
-   a concept reads like a studio board instead of anonymous colored dots. */
-.atelier-swatch {
-  @apply h-12 w-full rounded-md border border-atelier-taupe/25;
-}
-
-/* Material / keyword chip styled as a tactile swatch, not a bare list item. */
-.atelier-chip {
-  @apply inline-flex items-center rounded-full border border-atelier-taupe/30 bg-white/70 px-3 py-1 text-xs font-medium text-atelier-charcoal;
-}
-
-/* Small caps eyebrow used above editorial section titles. */
+/* Brass eyebrow: the single voice of emphasis above headlines. */
 .atelier-eyebrow {
-  @apply text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-atelier-brass;
+  @apply font-sans text-[11px] font-medium uppercase tracking-eyebrow text-atelier-brass;
+}
+
+/* Inputs: square, paper ground, hairline border. Focus deepens the hairline
+   to ink — no rings, no glows. */
+.atelier-field {
+  @apply w-full border border-hairline bg-atelier-paper px-3 py-2.5 text-sm font-light text-atelier-ink outline-none transition-colors duration-300 focus:border-atelier-ink;
+}
+
+/* Card: an ivory stage inside a hairline. Never a shadowed, rounded panel. */
+.atelier-card {
+  @apply border border-hairline bg-atelier-ivory;
+}
+
+/* The approved direction: a brass gallery frame — a second hairline offset
+   like a mat around the card. Shadow-free premium. */
+.atelier-approved {
+  border-color: rgba(165, 130, 75, 0.55);
+  outline: 1px solid rgba(165, 130, 75, 0.35);
+  outline-offset: 4px;
+  background: #f5f1ea;
+}
+
+/* A labeled palette swatch: flat square chip within a hairline. */
+.atelier-swatch {
+  @apply h-12 w-full border border-hairline;
+}
+
+/* Material / keyword chip: a small tracked caption in a hairline rectangle —
+   never a filled pill. */
+.atelier-chip {
+  @apply inline-flex items-center border border-hairline bg-atelier-paper px-3 py-1.5 text-[10px] font-medium uppercase tracking-label text-atelier-umber;
+}
+
+/* ---------- buttons ---------- */
+
+/* Primary action: outlined rectangle, tracked uppercase, ink fill on hover. */
+.atelier-btn {
+  @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 border border-atelier-ink bg-transparent px-7 py-3 font-sans text-xs font-medium uppercase tracking-eyebrow text-atelier-ink transition-colors duration-300 hover:bg-atelier-ink hover:text-atelier-ivory disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-atelier-ink;
+}
+
+/* Primary action on a dark ground. */
+.atelier-btn-dark {
+  @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 border border-atelier-ivory/60 bg-transparent px-7 py-3 font-sans text-xs font-medium uppercase tracking-eyebrow text-atelier-ivory transition-colors duration-300 hover:bg-atelier-ivory hover:text-atelier-ink disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+/* Secondary action: tracked text link with a brass underline that draws in. */
+.atelier-btn-line {
+  @apply inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 border-0 bg-transparent p-0 pb-1 font-sans text-xs font-medium uppercase tracking-eyebrow text-atelier-ink disabled:cursor-not-allowed disabled:opacity-40;
+  background-image: linear-gradient(#a5824b, #a5824b);
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 0% 1px;
+  transition: background-size 0.4s ease;
+}
+
+.atelier-btn-line:hover {
+  background-size: 100% 1px;
+}
+
+/* Quiet tertiary: muted tracked text, no underline until hover. */
+.atelier-btn-quiet {
+  @apply inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 border-0 bg-transparent p-0 pb-1 font-sans text-xs font-medium uppercase tracking-eyebrow text-atelier-fawn transition-colors duration-300 hover:text-atelier-ink disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+/* ---------- status language ---------- */
+
+/* Statuses are captions, not colored pills: tracked small caps in a hairline. */
+.atelier-status {
+  @apply inline-flex items-center border border-hairline px-2.5 py-1 text-[10px] font-medium uppercase tracking-label text-atelier-umber;
+}
+
+.atelier-status-approved {
+  @apply border-atelier-brass/50 text-atelier-brass;
+}
+
+.atelier-status-stale {
+  @apply border-atelier-clay/40 text-atelier-clay;
+}
+
+/* Advisory note: an ivory field with a brass left rule, never an alert box. */
+.atelier-notice {
+  @apply border-l border-atelier-brass bg-atelier-ivory px-5 py-4 text-sm font-light leading-6 text-atelier-umber;
+}
+
+/* Caution note (stale artifacts): same form, clay rule. */
+.atelier-notice-stale {
+  @apply border-l border-atelier-clay bg-atelier-ivory px-5 py-4 text-sm font-light leading-6 text-atelier-umber;
+}
+
+/* Empty state: emptiness is the most expensive material on the page — a
+   quiet serif line inside a hairline, no dashed borders. */
+.atelier-empty {
+  @apply border border-hairline bg-atelier-paper px-8 py-14 text-center font-serif text-lg italic leading-relaxed text-atelier-fawn;
+}
+
+/* ---------- motion ---------- */
+
+/* Entrances fade and rise 24px over 700ms ease-out. Nothing bounces. */
+@keyframes atelier-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.atelier-rise {
+  animation: atelier-rise 0.7s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atelier-rise {
+    animation: none;
+  }
+}
+
+/* Image hover: scale 1.03 over 800ms — slow air. */
+.atelier-hover-img {
+  overflow: hidden;
+}
+
+.atelier-hover-img img {
+  transition: transform 0.8s cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+.atelier-hover-img:hover img {
+  transform: scale(1.03);
 }

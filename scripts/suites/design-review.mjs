@@ -134,7 +134,21 @@ async function dumpFullContent(roomId) {
 async function capture(page, manifest, { width, tab, state }) {
   const filename = `${width}-${tab}-${state}.png`;
   const filePath = path.join(SCREENSHOT_DIR, filename);
-  await page.screenshot({ path: filePath, fullPage: true });
+  await page.screenshot({
+    path: filePath,
+    fullPage: true,
+    style: `
+      nextjs-portal,
+      [data-nextjs-dev-tools-button],
+      [data-nextjs-toast],
+      [data-nextjs-dialog-overlay],
+      [aria-label*="Next.js"],
+      [aria-label*="Next.js Dev"] {
+        display: none !important;
+        visibility: hidden !important;
+      }
+    `
+  });
   manifest.push({ file: filename, width, tab, state });
 }
 

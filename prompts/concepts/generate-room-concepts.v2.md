@@ -48,3 +48,4 @@ Return exactly three concepts matching the required schema. In particular:
 - Keep the response compact enough to be executable: `design_thesis`, each `*_direction` field, `budget_strategy`, `why_it_works`, and `why_user_may_reject_it` should each be 1-2 sentences max.
 - Keep list fields tight: `style_keywords` 3-5 items, `palette` 4-5 colors, `materials` 4-6 items, and `risk_profile` 2-4 items.
 - Prefer dense, specific phrasing over repetition. Do not restate the same rationale in multiple fields.
+- Voice (brand rule): owner-facing text (`concept_name`, `design_thesis`, `why_it_works`) is declarative, short, unhurried — no exclamation points, no "AI" self-reference, no sales hype. Concept names read like editorial titles ("Dusk Study," "Linen Hour"), never like product SKUs or tech features.

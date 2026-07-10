@@ -1,4 +1,4 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
@@ -13,14 +13,15 @@ export default async function NewRoomPage({ params }: { params: Promise<{ homeId
 
   return (
     <AppShell>
-      <div className="grid gap-5">
-        <div>
-          <p className="atelier-label">{home.name}</p>
-          <h1 className="mt-2 font-serif text-4xl">New room workspace</h1>
+      <div className="atelier-rise mx-auto grid max-w-4xl gap-10">
+        <div className="border-b border-hairline pb-8">
+          <p className="atelier-eyebrow">{home.name}</p>
+          <h1 className="mt-3 font-serif text-5xl text-atelier-ink">
+            A new <em className="italic">room</em>
+          </h1>
         </div>
         <RoomForm homeId={homeId} />
       </div>
     </AppShell>
   );
 }
-

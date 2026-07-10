@@ -4,13 +4,8 @@ export function RoomForm({ homeId }: { homeId: string }) {
   const action = createRoomAction.bind(null, homeId);
 
   return (
-    <form action={action} className="atelier-card grid gap-6 p-6">
-      <div>
-        <p className="atelier-label">Room brief</p>
-        <h1 className="mt-2 font-serif text-3xl">Add a room</h1>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
+    <form action={action} className="grid gap-10">
+      <div className="grid gap-6 md:grid-cols-2">
         <label className="grid gap-2">
           <span className="atelier-label">Room name</span>
           <input data-testid="room-name-input" name="name" required className="atelier-field" placeholder="Office" />
@@ -45,7 +40,7 @@ export function RoomForm({ homeId }: { homeId: string }) {
         </label>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         <label className="grid gap-2">
           <span className="atelier-label">Style preferences</span>
           <textarea data-testid="room-style-preferences-input" name="style_preferences" rows={3} className="atelier-field" placeholder="moody coastal, masculine executive, organic modern" />
@@ -75,8 +70,8 @@ export function RoomForm({ homeId }: { homeId: string }) {
         />
       </label>
 
-      <button data-testid="room-create-submit" className="w-fit rounded-md bg-atelier-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal">
-        Create room
+      <button data-testid="room-create-submit" className="atelier-btn w-fit">
+        Create the room
       </button>
     </form>
   );

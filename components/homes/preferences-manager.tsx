@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
 import type { DesignPreference } from "@/lib/data/queries";
 
 const PREFERENCE_TYPES = [
@@ -14,9 +13,10 @@ const PREFERENCE_TYPES = [
   { value: "preference", label: "General" }
 ] as const;
 
+// Cautionary types carry the clay tone; everything else stays hairline-quiet.
 const TYPE_TONE: Record<string, string> = {
-  avoid: "bg-rose-100 text-rose-700",
-  constraint: "bg-amber-100 text-amber-800"
+  avoid: "border-atelier-clay/50 text-atelier-clay",
+  constraint: "border-atelier-brass/50 text-atelier-brass"
 };
 
 export function PreferencesManager(props: { homeId: string; initialPreferences: DesignPreference[] }) {
@@ -65,16 +65,20 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
   }
 
   return (
-    <section className="grid gap-4">
-      <div>
-        <p className="atelier-label">Design preferences</p>
-        <h2 className="mt-2 font-serif text-3xl">Your confirmed taste</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-atelier-charcoal">
-          These home-level preferences are the source of truth for the studio&apos;s taste graph and outrank a first brief. Design chat can suggest new ones, but nothing is saved here until you add it.
+    <section className="grid gap-8">
+      <div className="border-b border-hairline pb-6">
+        <p className="atelier-eyebrow">Design preferences</p>
+        <h2 className="mt-3 font-serif text-4xl text-atelier-ink">
+          Your confirmed <em className="italic">taste</em>
+        </h2>
+        <p className="mt-4 max-w-2xl text-sm font-light leading-7 text-atelier-umber">
+          Home-level preferences are the source of truth for the studio&apos;s taste graph and
+          outrank a first brief. Design chat can suggest new ones, but nothing is saved here until
+          you add it.
         </p>
       </div>
 
-      <div className="atelier-card grid gap-3 p-5 md:grid-cols-[0.4fr_1fr_auto] md:items-end">
+      <div className="grid gap-4 md:grid-cols-[0.4fr_1fr_auto] md:items-end">
         <label className="grid gap-2">
           <span className="atelier-label">Type</span>
           <select data-testid="preferences-type-select" className="atelier-field" value={type} onChange={(event) => setType(event.target.value)}>
@@ -103,36 +107,35 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
           data-testid="preferences-add-button"
           onClick={add}
           disabled={busy || !label.trim()}
-          className="flex items-center justify-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal disabled:opacity-60"
+          className="atelier-btn"
         >
-          <Plus className="h-4 w-4" />
           Add
         </button>
       </div>
 
       {preferences.length === 0 ? (
-        <div className="rounded-md border border-dashed border-atelier-taupe/40 bg-white/50 p-8 text-center text-sm text-atelier-charcoal">
-          No confirmed preferences yet. Add the standing taste rules this home should always follow.
-        </div>
+        <div className="atelier-empty">The standing taste rules this home should always follow.</div>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {preferences.map((preference) => (
             <span
               key={preference.id}
               data-testid={`preference-card-${preference.id}`}
-              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${TYPE_TONE[preference.preference_type] ?? "bg-atelier-linen text-atelier-charcoal"}`}
+              className={`flex min-h-11 items-center gap-3 border bg-atelier-paper px-4 py-2 text-sm ${
+                TYPE_TONE[preference.preference_type] ?? "border-hairline text-atelier-umber"
+              }`}
             >
-              <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{preference.preference_type}</span>
-              <span className="font-medium">{preference.label}</span>
+              <span className="text-[9px] font-medium uppercase tracking-label opacity-70">{preference.preference_type}</span>
+              <span className="font-light text-atelier-ink">{preference.label}</span>
               <button
                 type="button"
                 data-testid={`preference-remove-button-${preference.id}`}
                 onClick={() => remove(preference.id)}
                 disabled={busy}
                 aria-label="Remove preference"
-                className="text-current opacity-60 transition hover:opacity-100 disabled:opacity-30"
+                className="text-xs text-atelier-brass opacity-70 transition-opacity duration-300 hover:opacity-100 disabled:opacity-30"
               >
-                <X className="h-3.5 w-3.5" />
+                ✕
               </button>
             </span>
           ))}

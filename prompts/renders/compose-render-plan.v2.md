@@ -35,6 +35,12 @@ Every `transformation_instructions` item must name the **exact surface being cha
 - Weak: "Make it cozier and more high-end."
 Use the concept's palette/materials and the style library's `lighting_layers`/`luxury_mechanics`. Name the real fixed surfaces from the diagnosis (this wall, that window bank, the floor).
 
+## Grade & finish (brand imagery standard)
+The finished edit must read as architectural photography, never as a synthetic render. Within the source photo's real camera and light direction (never invent a new light source or time of day that contradicts the photo):
+- Warm grade only — no cold blue daylight, no clinical white render lighting; bias toward golden-hour or linen-daylight warmth where the photo plausibly allows.
+- Lifted, soft shadows; matte and natural material finishes — never glossy, plasticky, or over-sharpened.
+- Sparse styling wins: if the composition feels furnished, remove rather than add (this reinforces the object budget).
+
 ## Negative instructions
 `negative_instructions` must include: no distorted or bowed geometry, no blocked doors/paths, no warped/duplicated furniture or fixtures, no unrealistic scale, no new openings, no over-filling past the object budget, and no theming that lands on `trend_intelligence.reject_now` (when present).
 

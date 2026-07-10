@@ -77,6 +77,18 @@ The flagship moment is transforming the owner's real room photos into concept-al
 - Current app behavior now preserves older diagnoses, concepts, products, and renders instead of deleting them on rerun.
 - Additive migration `006_home_value_band.sql` adds nullable `homes.value_band` (property tier register for the trend brain). **Written but not yet applied to the live project** — apply via GitHub → Supabase before the live owner cycle; the app is graceful without it (defaults to the middle register) but the create-home form errors on the missing column until applied.
 
+## Brand System (landed 2026-07-09 — gospel)
+[brand-guidelines.html](/C:/Users/darre/Documents/AI%20Interior%20Designer/brand-guidelines.html) (V1.0, "Space, composed.") is the **single visual/verbal authority** for the app — colors, spacing, content, fonts, and feeling. It overrides prior visual conventions and extends PRD v3 §3/§11 for Suite 5 design judgment. Applied aggressively across the UI, prompts, and copy on 2026-07-09:
+- **Identity:** the owner-facing brand is **"AI Interior Designer"** (serif wordmark with *Designer* italicized; descriptor "Intelligent Spaces, Composed"; monogram A*i*D). "AI Interior Atelier" is retired from owner-facing surfaces (internal names/prompt ids may still carry it).
+- **Tokens** (`tailwind.config.ts`, namespace `atelier.*` retained): Paper `#FAF8F4` (ground), Ivory `#F5F1EA` (cards), Sand `#D9CFC0`, Taupe `#B8A99A` (muted labels), Ink `#1E1B17` (text — never #000), Charcoal `#171512` (dark ground), Brass `#A5824B` (**the only accent**), Pine `#23403C` (statement fields, ≤1/page), plus support text tones Umber `#5A5348` / Fawn `#8A8073`, caution Clay `#B06A52`, and `hairline` `rgba(30,27,23,.18)`. Old linen/moss/old-clay tokens are gone — do not reintroduce green/amber/rose semantic colors.
+- **Type:** Playfair Display (weight 400 only, italics as the sole emphasis — one italic word per headline max) + Inter (300 body, 500 tracked labels), loaded via `next/font` CSS variables. No bold body text, no middle sizes: display/headline/eyebrow/body/caption.
+- **Form language:** no rounded corners, no drop shadows, no filled pills, hairlines instead of boxes. Primitives live in `globals.css`: `.atelier-label/.atelier-eyebrow/.atelier-field/.atelier-card/.atelier-approved` (brass gallery frame via offset outline) `/.atelier-chip/.atelier-status[-approved|-stale]/.atelier-notice[-stale]/.atelier-empty/.atelier-btn[-dark]/.atelier-btn-line/.atelier-btn-quiet/.atelier-rise/.atelier-hover-img`. Buttons are outlined rectangles or brass-underline text links. Room tabs are tracked text links with a brass active underline.
+- **Motion:** entrances fade+rise 24px/700ms ease-out (`.atelier-rise`), hovers 300–450ms, image hover scale 1.03/800ms. No bounce/spring, no spinners, no skeleton shimmer — imageless/loading states use Principle VIII (type as image, e.g. the A*i*D mark on charcoal).
+- **Iconography:** none. Lucide removed from owner-facing components; typographic glyphs only (→, ✕).
+- **Voice:** declarative, short, unhurried; sell the feeling, never the feature; **no exclamation points ever**; "AI" appears in the name and almost nowhere else. Enforced in UI copy and appended as standing rules to `prompts/chat/design-chat.v1.md` and `prompts/concepts/generate-room-concepts.v2.md`.
+- **Imagery:** brand grade wired into the render director (`prompts/renders/compose-render-plan.v2.md` "Grade & finish"): warm grade only, lifted shadows, matte finishes, never glossy/synthetic — always subordinate to the source photo's real camera and light (preservation contract still outranks brand grade).
+- Hidden `/debug` and `/spike` instruments got a token-compatibility pass only; they are exempt from full brand polish.
+
 ## UI Shape
 - Room Detail is the primary workspace.
 - Current room tabs (reordered 2026-07-08 to concept-→render-first): `Photos & Brief`, `Concepts`, `Renders`, `Chat`, `Products`, `Diagnosis` (diagnosis demoted to a supporting artifact). The workspace now **opens on the render** when one exists, not the upload tab. Approval language is "Approve/Change direction" (not "Lock/Unlock concept"); global nav is trimmed to Studio + Homes (no pipeline stages). See [docs/PHASE2_BUILD_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_BUILD_PLAN_2026-07-08.md) Phase 1.
@@ -85,7 +97,7 @@ The flagship moment is transforming the owner's real room photos into concept-al
 - Hidden debug route: `/debug`.
 - Hidden spike route: `/spike`.
 - Home-level preferences UI does not exist yet even though the migration path is defined.
-- The current UI is functional but not yet at the owner's desired level of visual maturity; Phase 2 now explicitly includes a full interface redesign covering typography, palette, spacing, hierarchy, concept presentation, and render-page composition.
+- The full interface redesign (typography, palette, spacing, hierarchy, concept presentation, render-page composition) landed 2026-07-09 as the Brand System application above; brand-guidelines.html is now the reference for any future visual work.
 
 ## Agent Rules
 - Treat [docs/AI_Interior_Atelier_PRD_v3.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/AI_Interior_Atelier_PRD_v3.md) as the single product spec. v2 is historical context only.
@@ -108,8 +120,8 @@ Phases 2-6 of `BUILD_PLAN.md` are now implemented and pass the type gate (`tsc -
 
 Remaining owner-side deploy actions: apply migration 004 via the GitHub->Supabase workflow + `verify:live`; run `npm run build` on Windows; commit from Windows (the sandbox mount is a stale snapshot this session).
 
-## PRD v3 status (updated 2026-07-08 — Release Gate green)
-All PRD v3 delta items are built and verified. `AI_MODE` mock/live harness, full `data-testid` coverage, the 6-style library, the debug state-assertion endpoint, and all 5 verification suites (`scripts/suites/*.mjs` + `.claude/skills/atelier-*`) exist and pass. The Release Gate (§12.4) ran to green: Suite 1 55/55, Suite 2 21/21, Suite 3 (live) 19/19, Suite 4 62/62, Suite 5 31/32 screens ≥8/10 with zero named rubric violations. Full detail, every fix made, and remaining owner-judgment items: `/reports/release-2026-07-08.md`.
+## PRD v3 status (updated 2026-07-10 — Brand verification green)
+All PRD v3 delta items remain built and verified after the 2026-07-09 Brand System redesign. `AI_MODE` mock/live harness, full `data-testid` coverage, the 6-style library, the debug state-assertion endpoint, and all 5 verification suites (`scripts/suites/*.mjs` + `.claude/skills/atelier-*`) exist and pass. The 2026-07-10 mock verification cycle ran green with a fresh `npm run seed:test` before every suite and teardown plus `npm run check:residue` clean after every suite: Suite 1 55/55, Suite 2 25/25, Suite 4 63/63, Suite 5 captured 32/32 screens and passed rubric review against PRD v3 §3/§11 as extended by `brand-guidelines.html` with zero named brand violations. Suite 3 live smoke was intentionally not rerun because provider-facing behavior did not change and the brand verification scope avoided live spend. Original Release Gate detail remains in `/reports/release-2026-07-08.md`.
 
 **Still open, by explicit scope decision (not oversights):**
 - No dedicated `.env.test` Supabase project — the harness runs against the same project as production, mitigated by `test_run_id` tagging (verified complete across every artifact table, including `ai_runs`, which had a real gap found and fixed this session) + teardown + a residue check confirmed clean after all 10 cycles run (8 mock + 2 live).

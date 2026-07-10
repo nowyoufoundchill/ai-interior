@@ -71,15 +71,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   // saved" placeholder, not be treated as a live OpenAI failure. Only a live
   // call that returns no image is a real, user-facing error.
   const isLiveImageEdit = isOpenAiConfigured() && resolveAiMode() !== "mock";
+  if (resolveAiMode() === "mock") {
+    fileUrl = sourcePhoto.file_url;
+  }
 
   try {
-    const imageBase64 = await generateImageEdit({
-      roomId,
-      serviceName: "Render Image Generator",
-      promptVersion: "render_image_v1",
-      prompt: plan.render_prompt,
-      sourceImageUrl: sourcePhoto.file_url
-    });
+    const imageBase64 =
+      resolveAiMode() === "mock"
+        ? null
+        : await generateImageEdit({
+            roomId,
+            serviceName: "Render Image Generator",
+            promptVersion: "render_image_v1",
+            prompt: plan.render_prompt,
+            sourceImageUrl: sourcePhoto.file_url
+          });
 
     if (isLiveImageEdit && !imageBase64) {
       throw new Error("OpenAI image generation returned no image output.");

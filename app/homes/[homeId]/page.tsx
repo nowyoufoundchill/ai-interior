@@ -1,8 +1,7 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, Plus } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PreferencesManager } from "@/components/homes/preferences-manager";
 import { ROOM_STATUSES } from "@/lib/constants";
@@ -19,69 +18,66 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
 
   return (
     <AppShell>
-      <div className="grid gap-8">
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="atelier-rise grid gap-20">
+        <section className="grid gap-10 border-b border-hairline pb-14 lg:grid-cols-[1.2fr_0.8fr] lg:gap-16">
           <div>
-            <p className="atelier-label">{home.region || home.home_type || "Home project"}</p>
-            <h1 className="mt-2 font-serif text-5xl">{home.name}</h1>
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-atelier-charcoal">
+            <p className="atelier-eyebrow">{home.region || home.home_type || "Home"}</p>
+            <h1 className="mt-3 font-serif text-5xl leading-tight text-atelier-ink md:text-6xl">{home.name}</h1>
+            <p className="mt-6 max-w-3xl text-sm font-light leading-7 text-atelier-umber">
               {home.style_notes || "Add whole-home style notes to keep each room connected."}
             </p>
           </div>
-          <div className="atelier-card grid gap-4 p-5">
-            <div>
+          <div className="grid gap-6 self-end">
+            <div className="border-t border-hairline pt-4">
               <p className="atelier-label">Whole-home palette</p>
-              <p className="mt-2 text-sm leading-6 text-atelier-charcoal">{jsonList(home.whole_home_palette)}</p>
+              <p className="mt-2 text-sm font-light leading-7 text-atelier-umber">{jsonList(home.whole_home_palette)}</p>
             </div>
-            <div>
+            <div className="border-t border-hairline pt-4">
               <p className="atelier-label">Constraints</p>
-              <p className="mt-2 text-sm leading-6 text-atelier-charcoal">{jsonList(home.whole_home_constraints)}</p>
+              <p className="mt-2 text-sm font-light leading-7 text-atelier-umber">{jsonList(home.whole_home_constraints)}</p>
             </div>
           </div>
         </section>
 
         <PreferencesManager homeId={home.id} initialPreferences={preferences} />
 
-        <section className="grid gap-4">
-          <div className="flex items-end justify-between gap-4">
+        <section className="grid gap-10">
+          <div className="flex items-end justify-between gap-4 border-b border-hairline pb-6">
             <div>
-              <p className="atelier-label">Rooms</p>
-              <h2 className="mt-2 font-serif text-3xl">Design workspaces</h2>
+              <p className="atelier-eyebrow">Rooms</p>
+              <h2 className="mt-3 font-serif text-4xl text-atelier-ink">
+                Room by <em className="italic">room</em>
+              </h2>
             </div>
-            <Link
-              href={`/homes/${home.id}/rooms/new`}
-              data-testid="room-new-link"
-              className="flex items-center gap-2 rounded-md bg-atelier-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-atelier-charcoal"
-            >
-              <Plus className="h-4 w-4" />
-              Add room
+            <Link href={`/homes/${home.id}/rooms/new`} data-testid="room-new-link" className="atelier-btn">
+              Add a room
             </Link>
           </div>
 
           {rooms.length === 0 ? (
-            <div className="rounded-md border border-dashed border-atelier-taupe/40 bg-white/50 p-8 text-center text-sm text-atelier-charcoal">
-              Add the first room for this home.
-            </div>
+            <div className="atelier-empty">The first room begins the home.</div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               {rooms.map((room) => (
                 <Link
                   key={room.id}
                   href={`/rooms/${room.id}`}
                   data-testid={`room-card-${room.id}`}
-                  className="atelier-card grid gap-4 p-5 transition hover:-translate-y-0.5"
+                  className="atelier-card grid gap-5 p-8 transition-colors duration-300 hover:border-atelier-brass/50"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="atelier-label">{room.room_type || "Room"}</p>
-                      <h3 className="mt-2 font-serif text-2xl">{room.name}</h3>
+                      <h3 className="mt-2 font-serif text-2xl text-atelier-ink">{room.name}</h3>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-atelier-taupe" />
+                    <span aria-hidden="true" className="font-serif text-xl text-atelier-taupe">
+                      →
+                    </span>
                   </div>
-                  <p className="text-sm leading-6 text-atelier-charcoal">{room.purpose || "Add a purpose and design brief."}</p>
-                  <span className="w-fit rounded-md bg-atelier-linen px-3 py-1 text-xs font-semibold text-atelier-charcoal">
-                    {statusLabel(room.current_stage || room.status)}
-                  </span>
+                  <p className="text-sm font-light leading-7 text-atelier-umber">
+                    {room.purpose || "Add a purpose and design brief."}
+                  </p>
+                  <span className="atelier-status w-fit">{statusLabel(room.current_stage || room.status)}</span>
                 </Link>
               ))}
             </div>
@@ -99,4 +95,3 @@ function jsonList(value: unknown) {
 function statusLabel(status: string) {
   return ROOM_STATUSES[status as keyof typeof ROOM_STATUSES] ?? status;
 }
-
