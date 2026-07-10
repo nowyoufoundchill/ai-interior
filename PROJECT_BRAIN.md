@@ -5,6 +5,8 @@ AI Interior Atelier is a private, premium virtual interior design studio for one
 
 `Home -> Room -> Diagnosis -> 3 Concepts -> Lock one concept -> Products and Renders -> Design Chat`
 
+The active household-readiness execution program is `docs/P0_P1_EXECUTION_PLAN_2026-07-10.md`. It converts the July 10 live-room audit into strict P0/P1 agent loops. It supersedes older execution plans where they conflict, especially for durable generation jobs, all-perspective rendering, confirmed chat actions, five concept directions, and the final six-room release gate.
+
 Near-term Phase 2 direction: this visible owner flow is moving to a concept-first, render-first journey centered on approved direction and photo transformation, with products demoted to a supporting role after visual approval. The **Phase 1 flow reorder landed 2026-07-08** (tabs reordered, room opens on the render, "Approve direction" language). Strategy in [docs/PHASE2_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_PLAN_2026-07-08.md); the sequenced 9-phase execution program (all six E2E findings + the taste/trend brain) is [docs/PHASE2_BUILD_PLAN_2026-07-08.md](/C:/Users/darre/Documents/AI%20Interior%20Designer/docs/PHASE2_BUILD_PLAN_2026-07-08.md).
 
 The flagship moment is transforming the owner's real room photos into concept-aligned renders. The locked concept is the contract that downstream products and renders must follow.
