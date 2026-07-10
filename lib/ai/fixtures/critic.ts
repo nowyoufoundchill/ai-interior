@@ -29,7 +29,14 @@ export function buildConceptCritiqueFixture(concepts: MoodBoardConcept[]): Conce
       // violation detection needs a live critic call.
       layout_violations: []
     })),
-    concept_differentiation_score: 65,
+    // Kept >= the governance regeneration threshold (70, see
+    // buildConceptRegenerationFeedback) — this used to sit at 65 and silently
+    // forced every mock-mode generation through a second full round every
+    // time, which the old bulk-insert-at-the-end code happened to discard
+    // invisibly. Checkpointed persistence surfaced it as a real extra "stale"
+    // batch, which is what exposed this as a fixture bug rather than
+    // intended mock behavior.
+    concept_differentiation_score: 74,
     differentiation_notes: "Mock differentiation score — real scoring requires a live critic call.",
     currency_score: 72,
     currency_notes: "Mock currency score — real regional-currency scoring requires a live critic call."

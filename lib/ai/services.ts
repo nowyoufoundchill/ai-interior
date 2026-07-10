@@ -590,6 +590,15 @@ export async function moodBoardGenerator(input: {
   provider?: GatewayProvider;
   skipCritic?: boolean;
   designPreferences?: { preference_type: string; label: string }[];
+  // Checkpoint hooks: a full concept batch + critique is a multi-minute chain
+  // of sequential model calls. Without these, nothing is durable until the
+  // very last await resolves, so a mid-flight failure (timeout, process
+  // restart, dropped connection) loses every concept that was already
+  // generated. Callers use these to persist each concept the moment it's
+  // ready, rather than holding everything in memory until the end.
+  onConceptGenerated?: (concept: MoodBoardConcept, slotIndex: number) => Promise<void> | void;
+  onRegenerating?: () => Promise<void> | void;
+  onCritiqued?: (concepts: MoodBoardConcept[], critique: ConceptCritique) => Promise<void> | void;
 }): Promise<MoodBoardConcept[]> {
   const mockConcepts = await styleDirector({ room: input.room });
   const contextBrain = buildContextBrain(input);
@@ -639,6 +648,7 @@ export async function moodBoardGenerator(input: {
     for (let slotIndex = 1; slotIndex <= 3; slotIndex += 1) {
       const concept = await generateOne(slotIndex, concepts, regenerationFeedback);
       concepts.push(concept);
+      await input.onConceptGenerated?.(concept, slotIndex);
     }
     return concepts;
   };
@@ -650,6 +660,7 @@ export async function moodBoardGenerator(input: {
   }
 
   let critique = await critiqueConcepts({ roomId: input.room.id, concepts, contextBrain: criticContextBrain, provider });
+  await input.onCritiqued?.(concepts, critique);
 
   // Governance enforcement (Phase 2): a concept landing on a `reject_now` item,
   // a set that reads generic against the direction of travel, or a set that
@@ -659,8 +670,10 @@ export async function moodBoardGenerator(input: {
   // unbounded loop).
   const regenerationFeedback = buildConceptRegenerationFeedback(critique);
   if (regenerationFeedback) {
+    await input.onRegenerating?.();
     concepts = await generateSet(regenerationFeedback);
     critique = await critiqueConcepts({ roomId: input.room.id, concepts, contextBrain: criticContextBrain, provider });
+    await input.onCritiqued?.(concepts, critique);
   }
 
   // Replace the model's self-reported quality_score (observed to drift onto a
