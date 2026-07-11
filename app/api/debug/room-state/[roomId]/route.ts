@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
   const { roomId } = await params;
   const supabase = createServerSupabaseClient();
 
-  const [room, diagnoses, moodBoards, products, renders, chatMessages] = await Promise.all([
+  const [room, diagnoses, moodBoards, products, renders, chatMessages, jobs] = await Promise.all([
     supabase.from("rooms").select("*").eq("id", roomId).maybeSingle(),
     supabase
       .from("room_analyses")
@@ -38,6 +38,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
       .from("chat_messages")
       .select("id, role, classified_intent, created_at")
       .eq("room_id", roomId)
+      .order("created_at", { ascending: true }),
+    // P0.1 durable jobs (tolerant of the table being absent pre-migration 008).
+    supabase
+      .from("generation_jobs")
+      .select("id, job_type, status, stage, attempt_count, max_attempts, idempotency_key, progress_current, progress_total, result_refs, error_code, correlation_id, created_at")
+      .eq("room_id", roomId)
       .order("created_at", { ascending: true })
   ]);
 
@@ -62,6 +68,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
     products: products.data ?? [],
     renders: renders.data ?? [],
     chat_messages: chatMessages.data ?? [],
+    generation_jobs: jobs.error ? [] : (jobs.data ?? []),
     derived: {
       current_diagnosis_version: (diagnoses.data ?? []).find((d) => d.status === "current")?.version ?? null,
       stale_diagnosis_count: (diagnoses.data ?? []).filter((d) => d.status === "stale").length,

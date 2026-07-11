@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ROOM_STATUSES, ROOM_TABS } from "@/lib/constants";
 import type { Database, Json, Photo } from "@/types/database";
 import { PhotoUploader } from "@/components/rooms/photo-uploader";
+import { observeJob } from "@/components/jobs/job-observer";
 
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
 type Home = Database["public"]["Tables"]["homes"]["Row"];
@@ -170,6 +171,72 @@ export function RoomWorkspace(props: {
     }
   }
 
+  // Diagnosis via the durable generation-job path (P0.1): the job keeps running
+  // and completes even if this tab is closed; the observer polls status and
+  // refreshes when the artifact lands. Falls back to the synchronous route if
+  // the jobs table isn't migrated yet.
+  async function runDurableDiagnosis() {
+    setLoadingAction("analyze");
+    setElapsedSeconds(0);
+    setPendingOutput({
+      action: "analyze",
+      phase: "request",
+      targetTab: "Photos & Brief",
+      startedAt: Date.now(),
+      baseline: {
+        diagnosisId: latestDiagnosis?.id,
+        moodBoardCount: props.moodBoards.length,
+        productCount: props.products.length,
+        renderId: currentRender?.id,
+        renderCount: props.renders.length,
+        chatCount: props.chatMessages.length
+      }
+    });
+
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_type: "diagnosis" })
+      });
+
+      if (response.status === 503) {
+        // Jobs table not migrated yet — use the synchronous compatibility route.
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return runAction("analyze", `/api/rooms/${props.room.id}/analyze`);
+      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        alert(payload.error ?? "The diagnosis request failed.");
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return false;
+      }
+
+      const { job } = await response.json();
+      setPendingOutput((current) => (current ? { ...current, phase: "refresh" } : current));
+
+      const settled = await observeJob(props.room.id, job.id);
+      if (settled?.status === "completed") {
+        router.refresh();
+        return true;
+      }
+
+      alert(settled?.error_message ?? "The room reading didn't finish. You can try again.");
+      setLoadingAction(null);
+      setPendingOutput(null);
+      setElapsedSeconds(0);
+      return false;
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "The diagnosis request failed.");
+      setLoadingAction(null);
+      setPendingOutput(null);
+      setElapsedSeconds(0);
+      return false;
+    }
+  }
+
   async function generateConceptPackage() {
     if (hasCurrentDiagnosis) {
       await runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`);
@@ -308,7 +375,7 @@ export function RoomWorkspace(props: {
             diagnosis={latestDiagnosis}
             isLoading={loadingAction === "analyze"}
             canGenerate={props.photos.length > 0}
-            onGenerate={() => runAction("analyze", `/api/rooms/${props.room.id}/analyze`)}
+            onGenerate={runDurableDiagnosis}
           />
         </section>
       )}

@@ -29,6 +29,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 // test_run_id. Explicit per-table deletes make "removes everything carrying
 // this id" true regardless of each table's FK behavior (PRD v3 §3).
 const TABLES_CHILD_TO_PARENT = [
+  "generation_jobs",
   "ai_runs",
   "revisions",
   "design_memories",
