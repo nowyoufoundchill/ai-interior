@@ -3,7 +3,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 import { loadTestEnv } from "../test-env.mjs";
-import { BASE_URL, clickTabAndWait, getRoomState, readCurrentTestRun, waitForAtLeast, waitForServer } from "./_lib.mjs";
+import { BASE_URL, clickTabAndWait, getRoomState, readCurrentTestRun, waitForAtLeast, waitForServer, requireServerIsolation } from "./_lib.mjs";
 import { buildFullJourney } from "./_journey.mjs";
 
 /**
@@ -31,6 +31,7 @@ const SCREENSHOT_DIR = path.join(process.cwd(), "test-runs", "screenshots", "des
 
 async function main() {
   await waitForServer();
+  await requireServerIsolation();
   const { roomId } = readCurrentTestRun();
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
 

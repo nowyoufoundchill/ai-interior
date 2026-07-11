@@ -1,3 +1,4 @@
+import { currentCorrelationId, logStructured } from "@/lib/observability";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
 
@@ -17,6 +18,8 @@ export async function logAiRun(input: {
   tokenEstimate?: number;
   costEstimate?: number;
   latencyMs?: number;
+  errorCode?: string;
+  attempt?: number;
 }) {
   const supabase = createServerSupabaseClient();
 
@@ -33,7 +36,20 @@ export async function logAiRun(input: {
     testRunId = data?.test_run_id ?? null;
   }
 
-  const { error } = await supabase.from("ai_runs").insert({
+  const correlationId = await currentCorrelationId();
+
+  logStructured("ai_run", {
+    correlation_id: correlationId,
+    room_id: input.roomId ?? null,
+    service: input.serviceName,
+    provider: input.provider ?? "unknown",
+    status: input.status ?? "completed",
+    error_code: input.errorCode ?? null,
+    attempt: input.attempt ?? null,
+    latency_ms: input.latencyMs ?? null
+  });
+
+  const row = {
     room_id: input.roomId,
     test_run_id: testRunId,
     service_name: input.serviceName,
@@ -49,8 +65,20 @@ export async function logAiRun(input: {
     quality_score: input.qualityScore,
     token_estimate: input.tokenEstimate ?? estimateTokens(input.inputPayload, input.outputPayload),
     cost_estimate: input.costEstimate,
-    latency_ms: input.latencyMs
-  });
+    latency_ms: input.latencyMs,
+    correlation_id: correlationId,
+    error_code: input.errorCode ?? null,
+    attempt: input.attempt ?? null
+  };
+
+  let { error } = await supabase.from("ai_runs").insert(row);
+
+  // Backward tolerance until migration 007 is applied: if the observability
+  // columns don't exist yet, keep the run logged rather than losing it.
+  if (error && /correlation_id|error_code|attempt/.test(error.message)) {
+    const { correlation_id: _c, error_code: _e, attempt: _a, ...legacyRow } = row;
+    ({ error } = await supabase.from("ai_runs").insert(legacyRow));
+  }
 
   if (error) {
     console.error("Failed to log AI run", error);

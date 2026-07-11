@@ -20,10 +20,13 @@ import {
 } from "@/lib/schemas/json";
 import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
 import { SCALE_ANCHORS, CRITIC_DIMENSION_GUIDANCE } from "@/lib/ai/critic-rubric";
+import { activeFailureFixture } from "@/lib/ai/failure-fixtures";
 import {
   buildConceptCritiqueFixture,
   buildDiagnosisCritiqueFixture,
   buildProductCritiqueFixture,
+  buildRejectingConceptCritiqueFixture,
+  buildRejectingRenderCritiqueFixture,
   buildRenderCritiqueFixture
 } from "@/lib/ai/fixtures/critic";
 
@@ -39,6 +42,10 @@ export async function critiqueConcepts(input: {
   contextBrain: unknown;
   provider?: GatewayProvider;
 }): Promise<ConceptCritique> {
+  // P0.0 critic_rejection fixture: deterministic blocking critique in mock
+  // mode so the rejection path (bounded regeneration, no silent pass) is
+  // testable without a paid call. Inert outside AI_MODE=mock.
+  const rejecting = (await activeFailureFixture()) === "critic_rejection";
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Design Critic",
@@ -55,7 +62,8 @@ export async function critiqueConcepts(input: {
       scale_anchors: SCALE_ANCHORS,
       dimension_guidance: CRITIC_DIMENSION_GUIDANCE
     },
-    mock: () => buildConceptCritiqueFixture(input.concepts)
+    mock: () =>
+      rejecting ? buildRejectingConceptCritiqueFixture(input.concepts) : buildConceptCritiqueFixture(input.concepts)
   });
 }
 
@@ -117,6 +125,8 @@ export async function critiqueRender(input: {
   userInstructions?: string | null;
   provider?: GatewayProvider;
 }): Promise<RenderCritique> {
+  // P0.0 critic_rejection fixture — see critiqueConcepts.
+  const rejecting = (await activeFailureFixture()) === "critic_rejection";
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Render Critic",
@@ -134,7 +144,7 @@ export async function critiqueRender(input: {
       user_instructions: input.userInstructions,
       scale_anchors: SCALE_ANCHORS
     },
-    mock: () => buildRenderCritiqueFixture()
+    mock: () => (rejecting ? buildRejectingRenderCritiqueFixture() : buildRenderCritiqueFixture())
   });
 }
 

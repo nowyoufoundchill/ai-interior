@@ -1,5 +1,54 @@
 import type { ConceptCritique, DiagnosisCritique, MoodBoardConcept, ProductCritique, RenderCritique } from "@/lib/schemas";
 
+/**
+ * P0.0 `critic_rejection` fixture: a deterministic BLOCKING critique so the
+ * critic-rejection failure path (bounded regeneration, score floor, "no image
+ * generated on design violation") is exercisable in mock mode without a paid
+ * call. Selected by the critic services when the fixture header is active.
+ */
+export function buildRejectingConceptCritiqueFixture(concepts: MoodBoardConcept[]): ConceptCritique {
+  return {
+    per_concept: concepts.map((concept) => ({
+      concept_name: concept.concept_name,
+      scores: {
+        style_clarity: 55,
+        room_fit: 42,
+        functional_fit: 38,
+        scale_realism: 40,
+        color_material_cohesion: 55,
+        luxury_signal: 50,
+        originality: 52,
+        practicality: 40,
+        budget_alignment: 55,
+        whole_home_alignment: 52
+      },
+      issues: ["Simulated blocking critique (critic_rejection fixture)."],
+      reject_now_violations: [],
+      layout_violations: [
+        "Simulated: seating placement blocks the entry door clearance zone (critic_rejection fixture)."
+      ]
+    })),
+    concept_differentiation_score: 72,
+    differentiation_notes: "Simulated rejection — differentiation unaffected (critic_rejection fixture).",
+    currency_score: 72,
+    currency_notes: "Simulated rejection — currency unaffected (critic_rejection fixture)."
+  };
+}
+
+export function buildRejectingRenderCritiqueFixture(): RenderCritique {
+  return {
+    preservation_score: 40,
+    constraint_adherence_score: 30,
+    density_discipline_score: 45,
+    realism_score: 50,
+    blocking_violations: [
+      "Simulated: planned credenza blocks the entry door swing arc (critic_rejection fixture)."
+    ],
+    issues: ["Simulated blocking critique (critic_rejection fixture)."],
+    notes: ["Deterministic rejection for failure-path testing — no model call made."]
+  };
+}
+
 export function buildConceptCritiqueFixture(concepts: MoodBoardConcept[]): ConceptCritique {
   return {
     // A small deterministic per-index offset keeps mock quality_score from

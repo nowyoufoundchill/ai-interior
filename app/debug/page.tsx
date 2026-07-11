@@ -43,14 +43,21 @@ export default async function DebugPage() {
                   <p>Prompt: {run.prompt_version}</p>
                   <p>Model: {run.model_name ?? "n/a"}</p>
                   <p>Quality: {run.quality_score ?? "n/a"}</p>
+                  <p>Error code: {run.error_code ?? "none"}</p>
+                  <p>Attempt: {run.attempt ?? "n/a"}</p>
+                  <p>Correlation: {run.correlation_id ?? "n/a"}</p>
                 </div>
                 <pre className="overflow-auto bg-atelier-ivory p-3 text-xs">
                   {JSON.stringify(
                     {
                       room_id: run.room_id,
+                      correlation_id: run.correlation_id,
+                      error_code: run.error_code,
+                      attempt: run.attempt,
                       validation_errors: run.validation_errors,
                       token_estimate: run.token_estimate,
                       cost_estimate: run.cost_estimate,
+                      latency_ms: run.latency_ms,
                       created_at: run.created_at
                     },
                     null,

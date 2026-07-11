@@ -1,4 +1,5 @@
 import type { ZodType } from "zod";
+import { activeFailureFixture, simulateProviderFixture, FixtureFailureError } from "@/lib/ai/failure-fixtures";
 import { logAiRun } from "@/lib/ai/logging";
 import { runAnthropicStructuredResponse, isAnthropicConfigured } from "@/lib/ai/anthropic";
 import { runOpenAiImageGeneration, runOpenAiStructuredResponse, isOpenAiConfigured } from "@/lib/ai/openai";
@@ -71,7 +72,8 @@ export async function runStructuredTask<T>(input: {
           rawInput: JSON.stringify(result.requestBody),
           rawOutput: JSON.stringify(result.responsePayload),
           tokenEstimate: (result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0),
-          latencyMs: Date.now() - startedAt
+          latencyMs: Date.now() - startedAt,
+          attempt
         });
 
         return parsed;
@@ -89,6 +91,8 @@ export async function runStructuredTask<T>(input: {
             inputPayload,
             outputPayload: {},
             validationErrors: [lastError.message],
+            errorCode: classifyProviderError(lastError),
+            attempt,
             latencyMs: Date.now() - startedAt
           });
         }
@@ -128,7 +132,8 @@ export async function runStructuredTask<T>(input: {
           outputPayload: parsed as Json,
           rawInput: JSON.stringify(result.requestBody),
           rawOutput: JSON.stringify(result.responsePayload),
-          latencyMs: Date.now() - startedAt
+          latencyMs: Date.now() - startedAt,
+          attempt
         });
 
         return parsed;
@@ -146,6 +151,8 @@ export async function runStructuredTask<T>(input: {
             inputPayload,
             outputPayload: {},
             validationErrors: [lastError.message],
+            errorCode: classifyProviderError(lastError),
+            attempt,
             latencyMs: Date.now() - startedAt
           });
         }
@@ -163,6 +170,34 @@ export async function runStructuredTask<T>(input: {
     );
   }
 
+  // P0.0 failure fixtures: simulate the named provider failure classes at
+  // this boundary in mock mode, so every failure path is exercisable without
+  // a paid call. Inert unless AI_MODE=mock AND the request carries the
+  // fixture header (see lib/ai/failure-fixtures.ts).
+  const fixture = await activeFailureFixture();
+  const mockStartedAt = Date.now();
+  try {
+    await simulateProviderFixture(fixture);
+  } catch (error) {
+    if (error instanceof FixtureFailureError) {
+      await logAiRun({
+        roomId: input.roomId,
+        serviceName: input.serviceName,
+        promptVersion: prompt.version,
+        provider: "mock",
+        modelName: "mock",
+        status: "failed",
+        inputPayload,
+        outputPayload: {},
+        validationErrors: [error.message],
+        errorCode: error.errorCode,
+        attempt: 1,
+        latencyMs: Date.now() - mockStartedAt
+      });
+    }
+    throw error;
+  }
+
   const mocked = input.mock();
   await logAiRun({
     roomId: input.roomId,
@@ -172,9 +207,26 @@ export async function runStructuredTask<T>(input: {
     modelName: "mock",
     status: "mocked",
     inputPayload,
-    outputPayload: mocked as Json
+    outputPayload: mocked as Json,
+    latencyMs: Date.now() - mockStartedAt
   });
   return mocked;
+}
+
+/**
+ * Machine-readable error code for ai_runs.error_code / the /debug panel.
+ * Classification is by message shape because provider SDK errors reach the
+ * gateway as plain Errors; a FixtureFailureError carries its own code.
+ */
+function classifyProviderError(error: Error): string {
+  if (error instanceof FixtureFailureError) return error.errorCode;
+  const message = error.message.toLowerCase();
+  if (message.includes("timeout") || message.includes("timed out")) return "provider_timeout";
+  if (message.includes("429") || message.includes("rate limit")) return "provider_rate_limit";
+  if (/\b(500|502|503|529)\b/.test(message) || message.includes("overloaded")) return "provider_server_error";
+  if (message.includes("max_tokens")) return "provider_max_tokens";
+  if (error.name === "ZodError" || message.includes("json")) return "output_validation_failed";
+  return "provider_unknown_error";
 }
 
 function getExpandedAnthropicMaxTokens(maxTokens: number | undefined, previousError: Error | null) {
@@ -194,6 +246,41 @@ export async function generateImageEdit(input: {
   sourceImageUrl?: string;
 }) {
   if (!isOpenAiConfigured() || resolveAiMode() === "mock") {
+    // P0.0 failure fixtures at the image boundary: provider classes throw,
+    // image_no_image simulates "OpenAI responded but returned no image".
+    const fixture = await activeFailureFixture();
+    const mockStartedAt = Date.now();
+    try {
+      await simulateProviderFixture(fixture);
+      if (fixture === "image_no_image") {
+        throw new FixtureFailureError(
+          "image_no_image",
+          "Simulated image edit: provider responded without an image (fixture)."
+        );
+      }
+    } catch (error) {
+      if (error instanceof FixtureFailureError) {
+        await logAiRun({
+          roomId: input.roomId,
+          serviceName: input.serviceName,
+          promptVersion: input.promptVersion,
+          provider: "mock",
+          modelName: "mock",
+          status: "failed",
+          inputPayload: {
+            prompt: input.prompt,
+            source_image_url: input.sourceImageUrl ?? null
+          },
+          outputPayload: { image_generated: false },
+          validationErrors: [error.message],
+          errorCode: error.errorCode,
+          attempt: 1,
+          latencyMs: Date.now() - mockStartedAt
+        });
+      }
+      throw error;
+    }
+
     await logAiRun({
       roomId: input.roomId,
       serviceName: input.serviceName,
@@ -251,6 +338,8 @@ export async function generateImageEdit(input: {
       },
       outputPayload: {},
       validationErrors: [message],
+      errorCode: classifyProviderError(error instanceof Error ? error : new Error(message)),
+      attempt: 1,
       latencyMs: Date.now() - startedAt
     });
     throw error;

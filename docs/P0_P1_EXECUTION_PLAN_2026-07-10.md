@@ -30,6 +30,7 @@ The release is not successful because routes return `200`, mocks pass, or a sing
 - “Apply to all photos” is a first-class batch operation with per-photo progress and retry.
 - Chat never silently mutates design state, but a confirmed chat proposal can execute the relevant concept/render/product action without retyping.
 - Automated tests never write to production. A dedicated test Supabase project/branch is a hard prerequisite for mutation-heavy loops.
+  - **Owner amendment 2026-07-10:** the owner explicitly declined a dedicated test project ("I want everything working in prod") and gave standing authorization for suites to run against the production project. The binding regime is `test-isolation.config.json` (owner-acknowledged production mode): every row/object tagged with `test_run_id`, teardown after every cycle, residue check as a failing gate. The fail-closed guard remains for any state that is neither an isolated `.env.test` nor the acknowledged config. Provisioning `.env.test` later restores strict isolation automatically and always takes precedence.
 - Existing append-only artifact history, concept coherence, render preservation, and stale-state semantics remain intact.
 
 ## 2. Priority definitions

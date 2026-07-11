@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { activeFailureFixture } from "@/lib/ai/failure-fixtures";
 import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
 import { isOpenAiConfigured } from "@/lib/ai/openai";
 import { renderPromptDirector } from "@/lib/ai/services";
+import { currentCorrelationId, logStructured } from "@/lib/observability";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
@@ -65,6 +67,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
+  // P0.0 failure fixtures at the boundaries this route owns. Each simulates
+  // its real failure exactly where it would occur, after the plan succeeded
+  // (so "provider work preserved, later stage failed" is what gets tested).
+  // Inert unless AI_MODE=mock and the request carries the fixture header.
+  const fixture = await activeFailureFixture();
+  const correlationId = await currentCorrelationId();
+
+  if (fixture === "image_no_image") {
+    logStructured("render_failure", {
+      correlation_id: correlationId,
+      room_id: roomId,
+      error_code: "image_no_image",
+      stage: "generating"
+    });
+    return NextResponse.json(
+      {
+        error: "The photo edit finished without producing an image. Your instructions and plan were saved — try again.",
+        error_code: "image_no_image"
+      },
+      { status: 502 }
+    );
+  }
+
   let fileUrl: string | null = null;
   // A null image is expected whenever AI_MODE=mock (the gateway short-circuits
   // to a mocked plan with no image) — that must fall through to the "edit plan
@@ -73,6 +98,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const isLiveImageEdit = isOpenAiConfigured() && resolveAiMode() !== "mock";
   if (resolveAiMode() === "mock") {
     fileUrl = sourcePhoto.file_url;
+  }
+
+  if (fixture === "storage_upload_failure") {
+    logStructured("render_failure", {
+      correlation_id: correlationId,
+      room_id: roomId,
+      error_code: "storage_upload_failure",
+      stage: "persisting"
+    });
+    return NextResponse.json(
+      {
+        error: "The edited image could not be stored. The generated work is recoverable — try again.",
+        error_code: "storage_upload_failure"
+      },
+      { status: 502 }
+    );
   }
 
   try {
@@ -119,6 +160,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .eq("room_id", roomId)
     .eq("source_photo_id", body.source_photo_id)
     .eq("status", "current");
+
+  // db_persist_failure simulates the insert below failing AFTER provider
+  // success and after the stale-marking above — faithfully reproducing
+  // today's non-atomic ordering (the state this leaves behind is the exact
+  // defect class P0.2's atomic mark-current/stale stage exists to fix).
+  if (fixture === "db_persist_failure") {
+    logStructured("render_failure", {
+      correlation_id: correlationId,
+      room_id: roomId,
+      error_code: "db_persist_failure",
+      stage: "persisting"
+    });
+    return NextResponse.json(
+      {
+        error: "The finished edit could not be saved. The generated work is recoverable — try again.",
+        error_code: "db_persist_failure"
+      },
+      { status: 500 }
+    );
+  }
 
   const { data, error } = await supabase
     .from("renders")

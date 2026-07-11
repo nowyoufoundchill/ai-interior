@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { BASE_URL, getRoomState, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForCount, waitForServer } from "./_lib.mjs";
+import { BASE_URL, getRoomState, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForCount, waitForServer, requireServerIsolation } from "./_lib.mjs";
 
 // Phase 9 governance extensions: mirrors the sc-luxury-2026 reject_now list
 // (lib/ai/context-brain/trend-intelligence.ts) as a cheap sanity check that no
@@ -38,6 +38,7 @@ const reporter = new SuiteReporter("e2e");
 
 async function main() {
   await waitForServer();
+  await requireServerIsolation();
   const { roomId } = readCurrentTestRun();
   console.log(`[e2e] room=${roomId}`);
 

@@ -364,6 +364,9 @@ export type Database = {
           cost_estimate: number | null;
           latency_ms: number | null;
           test_run_id: string | null;
+          correlation_id: string | null;
+          error_code: string | null;
+          attempt: number | null;
           created_at: string;
         };
         Insert: {
@@ -384,6 +387,9 @@ export type Database = {
           cost_estimate?: number | null;
           latency_ms?: number | null;
           test_run_id?: string | null;
+          correlation_id?: string | null;
+          error_code?: string | null;
+          attempt?: number | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["ai_runs"]["Insert"]>;

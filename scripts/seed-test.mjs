@@ -6,7 +6,10 @@ import { loadTestEnv } from "./test-env.mjs";
 
 const SINGLE_HOUSEHOLD_USER_ID = "00000000-0000-0000-0000-000000000001";
 
-loadTestEnv();
+// P0.0 guard: throws before any client is created unless a supported test
+// mode applies (isolated .env.test project, or the owner-acknowledged
+// production mode in test-isolation.config.json).
+const { activeFingerprint } = loadTestEnv();
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -99,6 +102,11 @@ async function main() {
     homeId: home.id,
     roomId: room.id,
     photoIds: photos.map((p) => p.id),
+    // Which Supabase project these rows live in. Suites compare this against
+    // the running server's /api/debug/env-fingerprint before their first
+    // mutation so a server pointed at a DIFFERENT project than the seed
+    // cannot be driven by an automated suite (P0.0).
+    supabaseProjectFingerprint: activeFingerprint,
     createdAt: new Date().toISOString()
   };
 

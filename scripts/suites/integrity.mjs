@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { BASE_URL, fetchJson, getRoomState, readCurrentTestRun, SuiteReporter, waitForServer } from "./_lib.mjs";
+import { BASE_URL, fetchJson, getRoomState, readCurrentTestRun, SuiteReporter, waitForServer, requireServerIsolation } from "./_lib.mjs";
 
 /**
  * PRD v3 §12.1 Suite 1 — Integrity. Drives every upstream change in the §4
@@ -17,6 +17,7 @@ const reporter = new SuiteReporter("integrity");
 
 async function main() {
   await waitForServer();
+  await requireServerIsolation();
   const { roomId, homeId } = readCurrentTestRun();
   console.log(`[integrity] room=${roomId} home=${homeId}`);
 

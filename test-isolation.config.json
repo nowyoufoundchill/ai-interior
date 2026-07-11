@@ -1,0 +1,6 @@
+{
+  "mode": "production",
+  "acknowledged": "Owner decision 2026-07-10: no dedicated test Supabase project. Automated suites run against the production project with mandatory test_run_id tagging on every row and storage object, teardown after every cycle, and the residue check as a failing gate. This file is the explicit acknowledgment the fail-closed guard requires; deleting it (or provisioning .env.test, which always takes precedence) restores strict isolation.",
+  "decided_by": "owner",
+  "date": "2026-07-10"
+}

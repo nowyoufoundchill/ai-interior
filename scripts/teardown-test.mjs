@@ -1,9 +1,25 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { loadTestEnv } from "./test-env.mjs";
+import { loadTestEnv, parseEnvFile, projectFingerprint } from "./test-env.mjs";
 
-loadTestEnv();
+// Fail closed (P0.0) like every other mutation-capable script. One explicit,
+// never-silent exception: TEARDOWN_ALLOW_PRODUCTION=1 lets the OWNER remove
+// legacy tagged residue from production (rows created back when the harness
+// fell back to .env.local). It only ever deletes rows carrying the given
+// test_run_id, and it announces the target loudly.
+if (process.env.TEARDOWN_ALLOW_PRODUCTION === "1") {
+  const localVars = parseEnvFile(path.join(process.cwd(), ".env.local"));
+  for (const [key, value] of Object.entries(localVars)) {
+    if (!(key in process.env)) process.env[key] = value;
+  }
+  console.warn(
+    `[teardown-test] TEARDOWN_ALLOW_PRODUCTION=1 — targeting PRODUCTION project ` +
+      `${projectFingerprint(process.env.NEXT_PUBLIC_SUPABASE_URL)} to remove tagged residue only.`
+  );
+} else {
+  loadTestEnv();
+}
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 

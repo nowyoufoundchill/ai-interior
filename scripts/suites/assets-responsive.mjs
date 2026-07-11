@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
-import { BASE_URL, clickTabAndWait, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForServer } from "./_lib.mjs";
+import { BASE_URL, clickTabAndWait, readCurrentTestRun, SuiteReporter, waitForAtLeast, waitForServer, requireServerIsolation } from "./_lib.mjs";
 import { buildFullJourney } from "./_journey.mjs";
 
 // Some cached product photos are multi-megabyte originals; naturalWidth can
@@ -42,6 +42,7 @@ const reporter = new SuiteReporter("assets-responsive");
 
 async function main() {
   await waitForServer();
+  await requireServerIsolation();
   const { roomId } = readCurrentTestRun();
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
 

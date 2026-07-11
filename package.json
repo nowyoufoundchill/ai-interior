@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:test": "node scripts/dev-test.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,6 +16,7 @@
     "teardown:test": "node scripts/teardown-test.mjs",
     "check:residue": "node scripts/check-test-residue.mjs",
     "suite:integrity": "node scripts/suites/integrity.mjs",
+    "suite:failure-fixtures": "node scripts/suites/failure-fixtures.mjs",
     "suite:e2e": "node scripts/suites/e2e.mjs",
     "suite:live-smoke": "node scripts/suites/live-smoke.mjs",
     "suite:assets-responsive": "node scripts/suites/assets-responsive.mjs",

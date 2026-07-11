@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { loadTestEnv } from "../test-env.mjs";
-import { BASE_URL, fetchJson, getRoomState, readCurrentTestRun, SuiteReporter, waitForServer } from "./_lib.mjs";
+import { BASE_URL, fetchJson, getRoomState, readCurrentTestRun, SuiteReporter, waitForServer, requireServerIsolation } from "./_lib.mjs";
 
 /**
  * PRD v3 §12.1 Suite 3 — Live API smoke. The one paid suite: run against a
@@ -19,10 +19,10 @@ import { BASE_URL, fetchJson, getRoomState, readCurrentTestRun, SuiteReporter, w
  * this suite should silently paper over by skipping the provider check.
  */
 
-const { usingDedicatedTestProject } = loadTestEnv();
-if (!usingDedicatedTestProject) {
-  console.warn("[live-smoke] Running against the SAME Supabase project as production (no .env.test project provisioned yet).");
-}
+// Fail closed (P0.0): throws before any client exists when .env.test is
+// absent or resolves to the production project. requireServerIsolation()
+// in main() additionally proves the RUNNING SERVER is on the test project.
+loadTestEnv();
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const reporter = new SuiteReporter("live-smoke");
@@ -39,6 +39,7 @@ async function main() {
   requireEnv("TAVILY_API_KEY");
 
   await waitForServer();
+  await requireServerIsolation();
   const { roomId } = readCurrentTestRun();
   console.log(`[live-smoke] room=${roomId}`);
 
