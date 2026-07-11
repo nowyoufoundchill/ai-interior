@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:test": "node scripts/dev-test.mjs",
+    "kill-servers": "node scripts/kill-servers.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
