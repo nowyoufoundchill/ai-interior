@@ -42,7 +42,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
     // P0.1 durable jobs (tolerant of the table being absent pre-migration 008).
     supabase
       .from("generation_jobs")
-      .select("id, job_type, status, stage, attempt_count, max_attempts, idempotency_key, progress_current, progress_total, result_refs, error_code, correlation_id, created_at")
+      .select("id, job_type, status, stage, parent_job_id, attempt_count, max_attempts, idempotency_key, progress_current, progress_total, result_refs, error_code, correlation_id, created_at")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true })
   ]);

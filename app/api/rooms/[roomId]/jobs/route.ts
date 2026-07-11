@@ -12,7 +12,7 @@ import {
 import { scheduleJob } from "@/lib/ai/jobs/runtime";
 import type { GenerationJob } from "@/types/database";
 
-const SUPPORTED_JOB_TYPES: JobType[] = ["diagnosis", "render"];
+const SUPPORTED_JOB_TYPES: JobType[] = ["diagnosis", "render", "batch_render"];
 
 /**
  * P0.1 durable job surface (docs/P0_P1_EXECUTION_PLAN_2026-07-10.md §P0.1).

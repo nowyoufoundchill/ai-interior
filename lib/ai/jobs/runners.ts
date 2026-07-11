@@ -2,6 +2,7 @@ import { roomVisionAnalyst } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { advanceStage, claimJob, completeJob, failJob, getJob } from "./service";
 import { executeRender } from "./render-runner";
+import { executeBatchRender } from "./batch-render-runner";
 import type { GenerationJob } from "@/types/database";
 
 /**
@@ -41,9 +42,13 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
         const job = await executeRender(claimed);
         return { ran: true, job };
       }
+      case "batch_render": {
+        const job = await executeBatchRender(claimed);
+        return { ran: true, job };
+      }
       default: {
-        // Remaining job types (batch_render, chat_action, products) land in
-        // P0.3+. Fail closed rather than silently completing.
+        // Remaining job types (chat_action, products) land in P0.4+.
+        // Fail closed rather than silently completing.
         const job = await failJob(claimed.id, {
           errorCode: "unsupported_job_type",
           ownerMessage: "This operation is not available yet.",

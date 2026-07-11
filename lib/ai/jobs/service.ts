@@ -80,6 +80,10 @@ export interface CreateJobInput {
   testRunId?: string | null;
   maxAttempts?: number;
   progressTotal?: number;
+  /** Override the derived idempotency key (e.g. batch children keyed per batch). */
+  idempotencyKey?: string;
+  /** Parent batch job id for a per-photo child render. */
+  parentJobId?: string | null;
 }
 
 export interface CreateJobResult {
@@ -95,7 +99,7 @@ export interface CreateJobResult {
  */
 export async function createOrGetActiveJob(input: CreateJobInput, client?: Supabase): Promise<CreateJobResult> {
   const supabase = client ?? createServerSupabaseClient();
-  const idempotencyKey = deriveIdempotencyKey(input.jobType, input.roomId, input.requestPayload);
+  const idempotencyKey = input.idempotencyKey ?? deriveIdempotencyKey(input.jobType, input.roomId, input.requestPayload);
 
   const insertRow: Database["public"]["Tables"]["generation_jobs"]["Insert"] = {
     room_id: input.roomId,
@@ -105,6 +109,7 @@ export async function createOrGetActiveJob(input: CreateJobInput, client?: Supab
     requested_by: input.requestedBy ?? null,
     request_payload: (input.requestPayload ?? {}) as Json,
     idempotency_key: idempotencyKey,
+    parent_job_id: input.parentJobId ?? null,
     max_attempts: input.maxAttempts ?? 3,
     progress_total: input.progressTotal ?? 1,
     correlation_id: input.correlationId ?? null,
@@ -418,6 +423,16 @@ export async function findLatestActiveJobForRoom(
 export function toOwnerSafeJob(job: GenerationJob): Omit<GenerationJob, "error_detail"> {
   const { error_detail: _internal, ...rest } = job;
   return rest;
+}
+
+export async function listChildJobs(parentJobId: string, client?: Supabase): Promise<GenerationJob[]> {
+  const supabase = client ?? createServerSupabaseClient();
+  const { data } = await supabase
+    .from("generation_jobs")
+    .select("*")
+    .eq("parent_job_id", parentJobId)
+    .order("created_at", { ascending: true });
+  return (data as GenerationJob[]) ?? [];
 }
 
 function logJob(event: string, job: GenerationJob, extra?: Record<string, unknown>): void {

@@ -188,6 +188,79 @@ async function main() {
   const scoped = await fetchJson(`${BASE_URL}/api/rooms/${wrongRoom}/jobs/${jobId}`);
   reporter.assert(scoped.status === 404, "a job is not readable under a different room id (room scoping)", scoped);
 
+  // --- 8. All-perspective render batch (P0.3) ---------------------------
+  // Set up an approved direction so the batch has something to render.
+  await fetchJson(`${BASE_URL}/api/rooms/${roomId}/generate-moodboards`, { method: "POST" });
+  let batchState = await getRoomState(roomId);
+  const board = (batchState.mood_boards ?? []).find((b) => b.status !== "stale");
+  reporter.assert(Boolean(board), "batch setup: a concept exists to approve", batchState.mood_boards);
+  const lock = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/select-moodboard`, {
+    method: "POST",
+    body: JSON.stringify({ mood_board_id: board.id })
+  });
+  reporter.assert(lock.ok, "batch setup: a concept is approved (locked)", lock.body);
+
+  const batchCreate = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs`, {
+    method: "POST",
+    body: JSON.stringify({ job_type: "batch_render" })
+  });
+  reporter.assert(batchCreate.status === 202 && batchCreate.body?.created === true, "batch: POST /jobs batch_render accepted", batchCreate);
+  const batchId = batchCreate.body?.job?.id;
+
+  // Rapid second submission dedupes to the same batch (no duplicate paid calls).
+  const batchDupe = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs`, {
+    method: "POST",
+    body: JSON.stringify({ job_type: "batch_render" })
+  });
+  reporter.assert(
+    batchDupe.body?.job?.id === batchId && batchDupe.body?.created === false,
+    "batch: a rapid second submission dedupes to one batch job",
+    { first: batchId, second: batchDupe.body?.job?.id }
+  );
+
+  const batchSettled = await pollJob(roomId, batchId, { timeoutMs: 120000, until: (j) => TERMINAL.includes(j.status) || j.status === "retryable_failed" });
+  reporter.assert(batchSettled?.status === "completed", "batch: completes with every eligible perspective rendered", batchSettled);
+
+  // Children + current renders: one per eligible perspective.
+  const childrenRead = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs/${batchId}`);
+  const children = childrenRead.body?.children ?? [];
+  const eligibleCount = (await admin.from("photos").select("id, label").eq("room_id", roomId)).data
+    .filter((p) => !["Ceiling", "Floor", "Existing item", "Inspiration"].includes((p.label ?? "").trim())).length;
+  reporter.assert(children.length === eligibleCount, "batch: one child render job per eligible perspective", { children: children.length, eligibleCount });
+  reporter.assert(children.every((c) => c.status === "completed"), "batch: every child render completed", children);
+  reporter.assert(batchSettled?.progress_current === batchSettled?.progress_total, "batch: progress is n of n", batchSettled);
+
+  batchState = await getRoomState(roomId);
+  const currentRenders = batchState.renders.filter((r) => r.status === "current");
+  reporter.assert(currentRenders.length === eligibleCount, "batch: one current render per eligible photo", currentRenders);
+
+  // --- 9. Partial failure: a failed photo leaves siblings intact --------
+  // Simulate one perspective having failed: mark its child terminal and remove
+  // its render, leaving the other perspectives' renders untouched.
+  const victim = children[0];
+  const survivorRenderIds = children.slice(1).map((c) => c.render_id).sort();
+  await admin.from("renders").delete().eq("id", victim.render_id);
+  await admin
+    .from("generation_jobs")
+    .update({ status: "terminal_failed", result_refs: {}, error_code: "forced" })
+    .eq("id", victim.id);
+
+  const batchRetry = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs/${batchId}/retry`, { method: "POST" });
+  reporter.assert(batchRetry.status === 202, "batch retry: accepted", batchRetry);
+  const retrySettled = await pollJob(roomId, batchId, { timeoutMs: 120000 });
+  reporter.assert(retrySettled?.status === "completed", "batch retry: batch completes again", retrySettled);
+
+  batchState = await getRoomState(roomId);
+  const afterCurrent = batchState.renders.filter((r) => r.status === "current");
+  reporter.assert(afterCurrent.length === eligibleCount, "batch retry: the failed perspective is re-rendered (count restored)", afterCurrent);
+  const afterRetryChildren = (await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs/${batchId}`)).body?.children ?? [];
+  const survivorAfter = afterRetryChildren.filter((c) => c.id !== victim.id).map((c) => c.render_id).sort();
+  reporter.assert(
+    JSON.stringify(survivorAfter) === JSON.stringify(survivorRenderIds),
+    "batch retry: successful siblings are NOT regenerated (same render ids)",
+    { before: survivorRenderIds, after: survivorAfter }
+  );
+
   reporter.finish();
 }
 

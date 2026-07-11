@@ -454,6 +454,7 @@ export type Database = {
           request_payload: Json;
           result_refs: Json;
           idempotency_key: string;
+          parent_job_id: string | null;
           attempt_count: number;
           max_attempts: number;
           progress_current: number;
@@ -479,6 +480,7 @@ export type Database = {
           request_payload?: Json;
           result_refs?: Json;
           idempotency_key: string;
+          parent_job_id?: string | null;
           attempt_count?: number;
           max_attempts?: number;
           progress_current?: number;

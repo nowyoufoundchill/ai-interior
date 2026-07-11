@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ROOM_STATUSES, ROOM_TABS } from "@/lib/constants";
+import { ROOM_STATUSES, ROOM_TABS, isEligiblePerspectiveLabel } from "@/lib/constants";
 import type { Database, Json, Photo } from "@/types/database";
 import { PhotoUploader } from "@/components/rooms/photo-uploader";
 import { observeJob } from "@/components/jobs/job-observer";
@@ -76,6 +76,7 @@ export function RoomWorkspace(props: {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [chatMessage, setChatMessage] = useState("");
   const [renderJobError, setRenderJobError] = useState<{ jobId: string; message: string; retryable: boolean } | null>(null);
+  const [batchJob, setBatchJob] = useState<{ jobId: string; current: number; total: number; status: string; message?: string } | null>(null);
   const router = useRouter();
 
   const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
@@ -333,6 +334,76 @@ export function RoomWorkspace(props: {
     }
   }
 
+  // Render-all-perspectives (P0.3): one confirmed action renders every eligible
+  // room-angle photo as a durable batch job. The observer streams `n of m`
+  // progress from the parent; successful perspectives persist even if one fails.
+  async function observeBatch(jobId: string, total: number) {
+    setBatchJob({ jobId, current: 0, total, status: "generating" });
+    const settled = await observeJob(props.room.id, jobId, {
+      onUpdate: (job) =>
+        setBatchJob({ jobId, current: job.progress_current, total: job.progress_total || total, status: job.status })
+    });
+    if (settled?.status === "completed") {
+      setBatchJob(null);
+      router.refresh();
+      return;
+    }
+    setBatchJob({
+      jobId,
+      current: settled?.progress_current ?? 0,
+      total: settled?.progress_total ?? total,
+      status: settled?.status ?? "retryable_failed",
+      message: settled?.error_message ?? "Some perspectives didn't finish."
+    });
+    router.refresh();
+  }
+
+  async function runBatchRender() {
+    setRenderJobError(null);
+    setActiveTab("Renders");
+    const total = props.photos.filter((photo) => isEligiblePerspectiveLabel(photo.label)).length;
+    setBatchJob({ jobId: "", current: 0, total, status: "queued" });
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_type: "batch_render" })
+      });
+      if (response.status === 503) {
+        setBatchJob(null);
+        alert("Rendering all perspectives isn't available yet.");
+        return;
+      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setBatchJob({ jobId: "", current: 0, total, status: "terminal_failed", message: payload.error ?? "Couldn't start the batch." });
+        return;
+      }
+      const { job } = await response.json();
+      await observeBatch(job.id, total);
+    } catch (error) {
+      setBatchJob({ jobId: "", current: 0, total, status: "terminal_failed", message: error instanceof Error ? error.message : "Batch failed." });
+    }
+  }
+
+  async function retryBatch() {
+    if (!batchJob?.jobId) return;
+    const jobId = batchJob.jobId;
+    setBatchJob({ ...batchJob, status: "queued" });
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs/${jobId}/retry`, { method: "POST" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setBatchJob({ ...batchJob, status: "terminal_failed", message: payload.error ?? "This batch can't be retried." });
+        return;
+      }
+      const { job } = await response.json();
+      await observeBatch(job.id, batchJob.total);
+    } catch (error) {
+      setBatchJob({ ...batchJob, status: "retryable_failed", message: error instanceof Error ? error.message : "Retry failed." });
+    }
+  }
+
   async function generateConceptPackage() {
     if (hasCurrentDiagnosis) {
       await runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`);
@@ -519,9 +590,13 @@ export function RoomWorkspace(props: {
           isStale={rendersStale}
           isLoading={loadingAction === "render"}
           jobError={renderJobError}
+          eligibleCount={props.photos.filter((photo) => isEligiblePerspectiveLabel(photo.label)).length}
+          batchJob={batchJob}
           onGenerate={runDurableRender}
           onRetry={retryRenderJob}
           onDismissError={() => setRenderJobError(null)}
+          onRenderAll={runBatchRender}
+          onRetryBatch={retryBatch}
         />
       )}
 
@@ -1179,12 +1254,18 @@ function RendersPanel(props: {
   isStale: boolean;
   isLoading: boolean;
   jobError: { jobId: string; message: string; retryable: boolean } | null;
+  eligibleCount: number;
+  batchJob: { jobId: string; current: number; total: number; status: string; message?: string } | null;
   onGenerate: (photoId?: string, instructions?: string) => void;
   onRetry: () => void;
   onDismissError: () => void;
+  onRenderAll: () => void;
+  onRetryBatch: () => void;
 }) {
   const [sourcePhotoId, setSourcePhotoId] = useState(props.photos[0]?.id ?? "");
   const [instructions, setInstructions] = useState("");
+  const batchRunning = props.batchJob !== null && ["queued", "planning", "validating", "generating", "persisting"].includes(props.batchJob.status);
+  const batchFailed = props.batchJob !== null && ["retryable_failed", "terminal_failed", "batch_partial"].includes(props.batchJob.status);
 
   return (
     <section className="grid gap-8">
@@ -1271,6 +1352,55 @@ function RendersPanel(props: {
           <p className="text-xs font-light leading-6 text-atelier-fawn">
             Every edit preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the approved direction plus your instructions.
           </p>
+          {/* P0.3 — the dominant post-approval action: render every eligible
+              perspective at once, with live progress and partial-failure retry. */}
+          {props.eligibleCount > 0 && (
+            <div data-testid="render-batch-panel" className="grid gap-4 border border-atelier-brass/40 bg-atelier-paper px-6 py-6">
+              <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="atelier-eyebrow text-atelier-brass">All perspectives</p>
+                  <p className="mt-1 text-sm font-light leading-6 text-atelier-umber">
+                    Apply the approved direction across every room-angle photo in one pass.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-testid="render-all-button"
+                  onClick={props.onRenderAll}
+                  disabled={batchRunning}
+                  className="atelier-btn-dark min-h-11 px-6 text-xs"
+                >
+                  {batchRunning
+                    ? `Rendering ${props.batchJob?.current ?? 0} of ${props.batchJob?.total ?? props.eligibleCount}`
+                    : `Render all ${props.eligibleCount} perspective${props.eligibleCount === 1 ? "" : "s"}`}
+                </button>
+              </div>
+              {props.batchJob && (batchRunning || batchFailed) && (
+                <div data-testid="render-batch-progress" className="grid gap-2">
+                  <div className="h-1.5 w-full overflow-hidden bg-atelier-ivory">
+                    <div
+                      className="h-full bg-atelier-brass transition-all duration-500"
+                      style={{ width: `${props.batchJob.total ? Math.round((props.batchJob.current / props.batchJob.total) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-xs font-light leading-5 text-atelier-fawn">
+                    {props.batchJob.current} of {props.batchJob.total} perspectives complete
+                    {batchFailed && props.batchJob.message ? ` — ${props.batchJob.message}` : ""}
+                  </p>
+                  {batchFailed && (
+                    <button
+                      type="button"
+                      data-testid="render-batch-retry-button"
+                      onClick={props.onRetryBatch}
+                      className="atelier-btn-line min-h-11 justify-self-start px-5 text-xs"
+                    >
+                      Retry the unfinished perspectives
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {props.renders.length === 0 ? (
             <EmptyState text="One photograph, restyled in place — the before and after of the approved direction." />
           ) : (
