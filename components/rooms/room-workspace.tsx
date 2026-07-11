@@ -75,6 +75,7 @@ export function RoomWorkspace(props: {
   const [pendingOutput, setPendingOutput] = useState<PendingOutput | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [chatMessage, setChatMessage] = useState("");
+  const [renderJobError, setRenderJobError] = useState<{ jobId: string; message: string; retryable: boolean } | null>(null);
   const router = useRouter();
 
   const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
@@ -234,6 +235,101 @@ export function RoomWorkspace(props: {
       setPendingOutput(null);
       setElapsedSeconds(0);
       return false;
+    }
+  }
+
+  // Single-photo render via the durable job path (P0.2): the staged, checkpoint-
+  // resumable render job survives disconnect; the observer polls stage/attempt
+  // and refreshes when the render lands. Failures become an inline recoverable
+  // notice with Retry — never a raw alert that loses the owner's instructions.
+  function startRenderPending() {
+    setRenderJobError(null);
+    setLoadingAction("render");
+    setActiveTab("Renders");
+    setElapsedSeconds(0);
+    setPendingOutput({
+      action: "render",
+      phase: "request",
+      targetTab: "Renders",
+      startedAt: Date.now(),
+      baseline: {
+        diagnosisId: latestDiagnosis?.id,
+        moodBoardCount: props.moodBoards.length,
+        productCount: props.products.length,
+        renderId: currentRender?.id,
+        renderCount: props.renders.length,
+        chatCount: props.chatMessages.length
+      }
+    });
+  }
+
+  async function settleRenderJob(jobId: string) {
+    setPendingOutput((current) => (current ? { ...current, phase: "refresh" } : current));
+    const settled = await observeJob(props.room.id, jobId);
+    if (settled?.status === "completed") {
+      router.refresh();
+      return;
+    }
+    setRenderJobError({
+      jobId,
+      message: settled?.error_message ?? "The photo edit didn't finish. You can try again.",
+      retryable: settled?.status === "retryable_failed"
+    });
+    setLoadingAction(null);
+    setPendingOutput(null);
+    setElapsedSeconds(0);
+  }
+
+  async function runDurableRender(photoId?: string, instructions?: string) {
+    startRenderPending();
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_type: "render", payload: { source_photo_id: photoId, instructions } })
+      });
+
+      if (response.status === 503) {
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return runAction("render", `/api/rooms/${props.room.id}/generate-render`, { source_photo_id: photoId, instructions });
+      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setRenderJobError({ jobId: "", message: payload.error ?? "The edit request failed.", retryable: false });
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return;
+      }
+
+      const { job } = await response.json();
+      await settleRenderJob(job.id);
+    } catch (error) {
+      setRenderJobError({ jobId: "", message: error instanceof Error ? error.message : "The edit request failed.", retryable: false });
+      setLoadingAction(null);
+      setPendingOutput(null);
+    }
+  }
+
+  async function retryRenderJob() {
+    if (!renderJobError?.jobId) return;
+    const jobId = renderJobError.jobId;
+    startRenderPending();
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs/${jobId}/retry`, { method: "POST" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setRenderJobError({ jobId, message: payload.error ?? "This edit can't be retried.", retryable: false });
+        setLoadingAction(null);
+        setPendingOutput(null);
+        return;
+      }
+      const { job } = await response.json();
+      await settleRenderJob(job.id);
+    } catch (error) {
+      setRenderJobError({ jobId, message: error instanceof Error ? error.message : "Retry failed.", retryable: true });
+      setLoadingAction(null);
+      setPendingOutput(null);
     }
   }
 
@@ -422,7 +518,10 @@ export function RoomWorkspace(props: {
           hasLockedConcept={Boolean(lockedMoodBoard)}
           isStale={rendersStale}
           isLoading={loadingAction === "render"}
-          onGenerate={(photoId, instructions) => runAction("render", `/api/rooms/${props.room.id}/generate-render`, { source_photo_id: photoId, instructions })}
+          jobError={renderJobError}
+          onGenerate={runDurableRender}
+          onRetry={retryRenderJob}
+          onDismissError={() => setRenderJobError(null)}
         />
       )}
 
@@ -1079,7 +1178,10 @@ function RendersPanel(props: {
   hasLockedConcept: boolean;
   isStale: boolean;
   isLoading: boolean;
+  jobError: { jobId: string; message: string; retryable: boolean } | null;
   onGenerate: (photoId?: string, instructions?: string) => void;
+  onRetry: () => void;
+  onDismissError: () => void;
 }) {
   const [sourcePhotoId, setSourcePhotoId] = useState(props.photos[0]?.id ?? "");
   const [instructions, setInstructions] = useState("");
@@ -1100,6 +1202,37 @@ function RendersPanel(props: {
       />
       {props.isStale && (
         <StaleNotice text="The approved direction changed, so these photo edits are stale. Re-edit from the current direction and a source photo." />
+      )}
+      {props.jobError && (
+        <div data-testid="render-job-error" className="grid gap-3 border border-atelier-brass/50 bg-atelier-paper px-6 py-5">
+          <p className="atelier-label text-atelier-brass">The edit didn&apos;t finish</p>
+          <p className="text-sm font-light leading-6 text-atelier-umber">{props.jobError.message}</p>
+          <p className="text-xs font-light leading-5 text-atelier-fawn">
+            Your instructions and the edit plan were saved — nothing was lost.
+          </p>
+          <div className="flex flex-wrap gap-3 pt-1">
+            {props.jobError.retryable && (
+              <button
+                type="button"
+                data-testid="render-retry-button"
+                onClick={props.onRetry}
+                disabled={props.isLoading}
+                className="atelier-btn-dark min-h-11 px-5 text-xs"
+              >
+                {props.isLoading ? "Retrying" : "Retry the edit"}
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="render-error-dismiss-button"
+              onClick={props.onDismissError}
+              disabled={props.isLoading}
+              className="atelier-btn-line min-h-11 px-5 text-xs"
+            >
+              Edit instructions
+            </button>
+          </div>
+        </div>
       )}
       {!props.hasLockedConcept ? (
         <EmptyState text="Approve a direction first. The picture follows." />

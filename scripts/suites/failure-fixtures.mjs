@@ -154,8 +154,8 @@ async function main() {
   state = await getRoomState(roomId);
   reporter.assert(
     state.renders.length === baseRenders &&
-      state.renders.find((render) => render.id === currentRender.id)?.status === "stale",
-    "db_persist_failure: faithfully reproduces today's non-atomic defect (current staled, nothing inserted) — the P0.2 target",
+      state.renders.find((render) => render.id === currentRender.id)?.status === "current",
+    "db_persist_failure: P0.2 atomicity — persistence fails before any state change, so the prior current render is untouched (never staled-with-nothing-inserted)",
     state.renders
   );
 

@@ -127,21 +127,25 @@ async function main() {
       "locked concept no longer shows a direct Edit control (must unlock first)"
     );
 
-    // --- Renders: generate, regenerate with instructions ---------------------
+    // --- Renders: generate, regenerate with instructions (durable job P0.2) ---
+    // The render button now starts a durable generation job (POST /jobs) and a
+    // client observer polls status and refreshes when the render lands, so the
+    // card appearing IS the completion signal (no /generate-render round-trip).
     await page.getByTestId("tab-renders").click();
     await page.getByTestId("render-instructions-input").fill("Keep the leather chair, make the walls darker.");
+    const firstRenderPost = page.waitForResponse((res) => /\/jobs$/.test(new URL(res.url()).pathname) && res.request().method() === "POST", { timeout: 300000 });
     await page.getByTestId("render-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
+    await firstRenderPost;
     const renderCards = page.locator('[data-testid^="render-card-"]');
-    const firstRenderCount = await waitForCount(renderCards, 1);
-    reporter.assert(firstRenderCount === 1, "first render card appears after edit", firstRenderCount);
+    const firstRenderCount = await waitForCount(renderCards, 1, { timeoutMs: 60000 });
+    reporter.assert(firstRenderCount === 1, "first render card appears after a durable render job completes", firstRenderCount);
+    reporter.assert((await page.getByTestId("render-job-error").count()) === 0, "no render failure notice on a successful edit");
 
     await page.getByTestId("render-instructions-input").fill("Regenerate with a larger rug.");
+    const secondRenderPost = page.waitForResponse((res) => /\/jobs$/.test(new URL(res.url()).pathname) && res.request().method() === "POST", { timeout: 300000 });
     await page.getByTestId("render-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
-    const secondRenderCount = await waitForCount(renderCards, 2);
+    await secondRenderPost;
+    const secondRenderCount = await waitForCount(renderCards, 2, { timeoutMs: 60000 });
     reporter.assert(secondRenderCount === 2, "regeneration adds a second render card (history kept)", secondRenderCount);
 
     // --- Products: generate after render, approve, reject ---------------------

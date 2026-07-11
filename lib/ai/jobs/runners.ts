@@ -1,6 +1,7 @@
 import { roomVisionAnalyst } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { advanceStage, claimJob, completeJob, failJob, getJob } from "./service";
+import { executeRender } from "./render-runner";
 import type { GenerationJob } from "@/types/database";
 
 /**
@@ -36,10 +37,13 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
         const job = await executeDiagnosis(claimed);
         return { ran: true, job };
       }
+      case "render": {
+        const job = await executeRender(claimed);
+        return { ran: true, job };
+      }
       default: {
-        // P0.1 converts one low-risk operation (diagnosis) to prove the
-        // contract; other job types land in P0.2+. Fail closed rather than
-        // silently completing.
+        // Remaining job types (batch_render, chat_action, products) land in
+        // P0.3+. Fail closed rather than silently completing.
         const job = await failJob(claimed.id, {
           errorCode: "unsupported_job_type",
           ownerMessage: "This operation is not available yet.",
