@@ -18,6 +18,7 @@
     "suite:integrity": "node scripts/suites/integrity.mjs",
     "suite:failure-fixtures": "node scripts/suites/failure-fixtures.mjs",
     "suite:jobs": "node scripts/suites/jobs.mjs",
+    "verify:p0-1": "node scripts/verify-p0-1.mjs",
     "suite:e2e": "node scripts/suites/e2e.mjs",
     "suite:live-smoke": "node scripts/suites/live-smoke.mjs",
     "suite:assets-responsive": "node scripts/suites/assets-responsive.mjs",
