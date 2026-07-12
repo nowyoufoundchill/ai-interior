@@ -93,6 +93,24 @@ async function main() {
   const seedSettled = await pollJob(roomId, seedRender.body.job.id);
   reporter.assert(seedSettled?.status === "completed", "bootstrap: seed render completes", seedSettled);
 
+  // Preflight: P0.4 requires migration 009 (action_proposals) to be live in the
+  // API. If the app can't persist a proposal, fail fast with a clear message
+  // instead of dereferencing a null proposal downstream — the whole gate is
+  // blocked on the schema, not on the scenarios.
+  const preflight = await chat(roomId, "Replace the ocean artwork with a calm sky painting across all renders");
+  if (!preflight.ok || !preflight.body?.proposal) {
+    reporter.assert(
+      false,
+      "preflight: chat surfaces a structured proposal (requires migration 009 / action_proposals live in the API)",
+      preflight.body?.proposal ?? preflight.body
+    );
+    reporter.finish();
+    return;
+  }
+  // The preflight created a real proposed proposal; dismiss it so it doesn't
+  // perturb the scenario counts below (teardown would clean it either way).
+  await fetchJson(`${BASE_URL}/api/rooms/${roomId}/proposals/${preflight.body.proposal.id}/dismiss`, { method: "POST" });
+
   // ========================================================================
   // Scenario 4 — a question stays a question (no proposal, no mutation).
   // ========================================================================
