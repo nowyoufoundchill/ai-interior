@@ -16,6 +16,15 @@ import { loadTestEnv } from "./test-env.mjs";
  */
 loadTestEnv();
 
+// Safety default: a bare `npm run dev:test` must never silently drive LIVE
+// (paid) provider calls. gateway.ts treats anything but "mock" as live, and
+// .env.test does not set AI_MODE, so default it here when unset. An explicit
+// `AI_MODE=live npm run dev:test` (Suite 3) still wins — loadTestEnv() and this
+// guard both leave an already-set process var untouched.
+if (!process.env.AI_MODE) {
+  process.env.AI_MODE = "mock";
+}
+
 const port = process.env.PORT || "3000";
 console.log(`[dev-test] starting next dev on port ${port} (AI_MODE=${process.env.AI_MODE ?? "unset"})`);
 

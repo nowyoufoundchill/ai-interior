@@ -28,6 +28,8 @@ export interface ObservedJob {
   stage: string | null;
   progress_current: number;
   progress_total: number;
+  attempt_count?: number;
+  max_attempts?: number;
   error_code: string | null;
   error_message: string | null;
   result_refs: Record<string, unknown>;
