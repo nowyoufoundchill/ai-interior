@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { revisionAgent } from "@/lib/ai/services";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { buildProposalDraft, PROPOSAL_VERSION } from "@/lib/ai/proposals";
+import { insertProposal } from "@/lib/data/proposals";
 import type { Json } from "@/types/database";
 
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
@@ -107,11 +109,45 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
 
   if (messageError) return NextResponse.json({ error: messageError.message }, { status: 500 });
 
-  // Chat no longer silently mutates taste state. A preference the owner states
-  // in chat is surfaced as a proposal (revision_type "memory_update"); the owner
-  // confirms it explicitly via the home-level Design preferences UI, which is the
-  // single source of truth for the taste graph. design_memories is no longer
-  // written from chat.
+  // Chat NEVER mutates a design artifact here (§P0.4: "No chat message mutates an
+  // artifact before explicit confirmation"). Instead, when the turn asks for a
+  // change, we persist a structured ActionProposal linked to the assistant
+  // message. It is inert until the owner confirms it, at which point exactly one
+  // durable `chat_action` job runs the change. A pure question persists no
+  // proposal (a question stays a question); a vague change becomes a
+  // clarification card with no Apply control. Preferences still route through
+  // this proposal → confirmation path rather than being written silently.
+  const assistantMessage = (messages ?? []).find((entry) => entry.role === "assistant") ?? null;
+  const draft = buildProposalDraft(revision.user_message, revision.revision_type, {
+    currentRenderPhotoId: currentRender?.source_photo_id ?? null,
+    hasLockedConcept: Boolean(selectedMoodBoard),
+    hasRenders: Boolean(renders?.length),
+    hasProducts: Boolean(products?.length)
+  });
 
-  return NextResponse.json({ revision: data, messages });
+  let proposal = null;
+  if (draft.persist) {
+    try {
+      proposal = await insertProposal({
+        roomId,
+        chatMessageId: assistantMessage?.id ?? null,
+        intentType: draft.intent_type,
+        scope: draft.scope,
+        scopePhotoIds: draft.scope_photo_ids,
+        summary: draft.summary,
+        normalizedInstructions: draft.normalized_instructions,
+        expectedInvalidations: draft.expected_invalidations,
+        confidence: draft.confidence,
+        clarifyingQuestion: draft.clarifying_question,
+        proposalVersion: PROPOSAL_VERSION,
+        testRunId: room?.test_run_id ?? null
+      });
+    } catch {
+      // A proposal-persistence hiccup must not fail the advisory reply; the owner
+      // still gets the designer's answer, just without a card this turn.
+      proposal = null;
+    }
+  }
+
+  return NextResponse.json({ revision: data, messages, proposal });
 }

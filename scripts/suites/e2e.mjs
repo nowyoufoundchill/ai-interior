@@ -184,15 +184,56 @@ async function main() {
     const chatCards = page.locator('[data-testid^="chat-message-card-"]');
     reporter.assert((await waitForCount(chatCards, 2)) === 2, "first chat turn renders owner and designer messages");
 
-    await page.getByTestId("chat-message-input").fill("Make it moodier — darker walls and richer wood tones.");
+    // P0.4: a revision-shaped turn surfaces a STRUCTURED proposal card (not a
+    // silent mutation and not just advisory text), the owner confirms it
+    // explicitly, and the result lands back in the same thread.
+    const rendersBeforeProposal = (await getRoomState(roomId)).renders.length;
+    await page.getByTestId("chat-message-input").fill("Make it moodier — darker walls and richer wood tones across all renders.");
     await page.getByTestId("chat-send-button").click();
     await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
     await page.waitForLoadState("networkidle");
     reporter.assert((await waitForCount(chatCards, 4)) === 4, "second chat turn renders in the visible thread");
-    reporter.assert(
-      (await waitForAtLeast(page.getByText("Proposal only"), 1)) >= 1,
-      "revision-shaped chat turn is tagged as a proposal, not a silent mutation"
-    );
+
+    const proposalCards = page.locator('[data-testid^="proposal-card-"]');
+    const hasProposal = (await waitForAtLeast(proposalCards, 1)) >= 1;
+    reporter.assert(hasProposal, "revision-shaped chat turn surfaces a structured proposal, not a silent mutation");
+
+    // The confirmation flow depends on migration 009 being applied (the proposal
+    // card only appears when the action_proposals table exists). Guard it so a
+    // pre-migration run reports the single presence failure without crashing.
+    if (hasProposal) {
+      const proposalId = await extractKey(proposalCards.first(), "proposal-card-");
+      reporter.assert(
+        (await page.getByTestId(`proposal-apply-${proposalId}`).count()) === 1,
+        "proposal offers an explicit Apply (owner confirmation) control"
+      );
+      // No mutation before confirmation.
+      reporter.assert(
+        (await getRoomState(roomId)).renders.length === rendersBeforeProposal,
+        "no render is created before the owner confirms the proposal"
+      );
+
+      await page.getByTestId(`proposal-apply-${proposalId}`).click();
+      await page.waitForResponse((res) => res.url().includes(`/proposals/${proposalId}/confirm`) && res.request().method() === "POST");
+      // The durable chat_action job runs past the request; poll persisted state
+      // until the proposal is applied (bounded), proving the confirmed change ran.
+      let appliedProposal = null;
+      for (let i = 0; i < 120; i += 1) {
+        const st = await getRoomState(roomId);
+        appliedProposal = (st.action_proposals ?? []).find((p) => p.id === proposalId && p.status === "applied") ?? null;
+        if (appliedProposal) break;
+        await page.waitForTimeout(1000);
+      }
+      reporter.assert(Boolean(appliedProposal), "confirming the proposal executes a durable chat action (proposal applied)");
+      reporter.assert(
+        Boolean(appliedProposal && appliedProposal.result_message_id),
+        "the applied result is linked back into the chat thread"
+      );
+      reporter.assert(
+        (await getRoomState(roomId)).renders.length > rendersBeforeProposal,
+        "the confirmed change produced new render(s)"
+      );
+    }
     // --- Phase 9 governance asserts (against the journeyed room state) ------
     const finalState = await getRoomState(roomId);
 

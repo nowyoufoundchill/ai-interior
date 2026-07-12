@@ -29,6 +29,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 // test_run_id. Explicit per-table deletes make "removes everything carrying
 // this id" true regardless of each table's FK behavior (PRD v3 §3).
 const TABLES_CHILD_TO_PARENT = [
+  "action_proposals",
   "generation_jobs",
   "ai_runs",
   "revisions",
@@ -57,6 +58,13 @@ async function main() {
   for (const table of TABLES_CHILD_TO_PARENT) {
     const { error, count } = await supabase.from(table).delete({ count: "exact" }).eq("test_run_id", testRunId);
     if (error) {
+      // An additive table whose migration hasn't been applied yet has nothing to
+      // clean — tolerate it (matches the app's graceful "table missing" fallback)
+      // so teardown stays a valid gate while new code lands ahead of its migration.
+      if (/could not find the table|schema cache|does not exist/i.test(error.message)) {
+        console.log(`[teardown-test] ${table}: skipped (table not present yet)`);
+        continue;
+      }
       console.error(`[teardown-test] ${table}: ERROR ${error.message}`);
       process.exitCode = 1;
       continue;

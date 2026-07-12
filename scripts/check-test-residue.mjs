@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
  * failing gate, not a cleanup chore.
  */
 const TABLES = [
+  "action_proposals",
   "generation_jobs",
   "ai_runs",
   "revisions",

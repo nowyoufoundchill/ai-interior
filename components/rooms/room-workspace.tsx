@@ -16,6 +16,7 @@ type Product = Database["public"]["Tables"]["products"]["Row"];
 type Render = Database["public"]["Tables"]["renders"]["Row"];
 type Revision = Database["public"]["Tables"]["revisions"]["Row"];
 type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
+type ActionProposal = Database["public"]["Tables"]["action_proposals"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type TabName = (typeof ROOM_TABS)[number];
 type OutputAction = "analyze" | "moodboards" | "products" | "render" | "chat";
@@ -52,6 +53,17 @@ type RenderJobUi = {
   instructions?: string;
 };
 
+// P0.4: the in-thread progress/failure state of a confirmed chat proposal.
+type ChatActionJobUi = {
+  proposalId: string;
+  jobId: string;
+  status: "queued" | "planning" | "validating" | "generating" | "persisting" | "completed" | "retryable_failed" | "terminal_failed" | "cancelled";
+  stage: string | null;
+  errorMessage: string | null;
+};
+
+const CHAT_ACTION_ACTIVE: ChatActionJobUi["status"][] = ["queued", "planning", "validating", "generating", "persisting"];
+
 const RENDER_JOB_ACTIVE: RenderJobUi["status"][] = ["requesting", "queued", "planning", "validating", "generating", "persisting"];
 
 const RENDER_STAGE_COPY: Record<string, string> = {
@@ -81,6 +93,7 @@ export function RoomWorkspace(props: {
   renders: Render[];
   revisions: Revision[];
   chatMessages: ChatMessage[];
+  actionProposals: ActionProposal[];
   memories: Memory[];
 }) {
   const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
@@ -105,6 +118,9 @@ export function RoomWorkspace(props: {
   const [chatMessage, setChatMessage] = useState("");
   const [renderJob, setRenderJob] = useState<RenderJobUi | null>(null);
   const [renderJobElapsed, setRenderJobElapsed] = useState(0);
+  // P0.4: the in-thread state of a confirmed chat proposal being executed.
+  const [chatActionJob, setChatActionJob] = useState<ChatActionJobUi | null>(null);
+  const [busyProposalId, setBusyProposalId] = useState<string | null>(null);
   const router = useRouter();
 
   const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
@@ -485,6 +501,92 @@ export function RoomWorkspace(props: {
     if (sent) setChatMessage("");
   }
 
+  // P0.4: confirm a proposal → create exactly one durable chat_action job, then
+  // observe it to completion and pull the result (a new assistant message +
+  // artifacts) back into the thread. Chat state is never mutated before this.
+  async function applyProposal(proposalId: string) {
+    if (busyProposalId) return;
+    setBusyProposalId(proposalId);
+    setChatActionJob({ proposalId, jobId: "", status: "queued", stage: "queued", errorMessage: null });
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/proposals/${proposalId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setChatActionJob({ proposalId, jobId: "", status: "terminal_failed", stage: null, errorMessage: payload.error ?? "This change couldn't be started." });
+        return;
+      }
+      const { job } = await response.json();
+      await settleChatActionJob(proposalId, job.id);
+    } catch (error) {
+      setChatActionJob({ proposalId, jobId: "", status: "terminal_failed", stage: null, errorMessage: error instanceof Error ? error.message : "This change couldn't be started." });
+    } finally {
+      setBusyProposalId(null);
+    }
+  }
+
+  async function settleChatActionJob(proposalId: string, jobId: string) {
+    setChatActionJob({ proposalId, jobId, status: "queued", stage: "queued", errorMessage: null });
+    const settled = await observeJob(props.room.id, jobId, {
+      onUpdate: (job) =>
+        setChatActionJob((current) =>
+          current ? { ...current, jobId, status: job.status as ChatActionJobUi["status"], stage: job.stage } : current
+        )
+    });
+    if (settled?.status === "completed") {
+      setChatActionJob(null);
+      router.refresh();
+      return;
+    }
+    setChatActionJob({
+      proposalId,
+      jobId,
+      status: (settled?.status as ChatActionJobUi["status"]) ?? "retryable_failed",
+      stage: settled?.stage ?? null,
+      errorMessage: settled?.error_message ?? "The change didn't finish. Your request is saved — try again."
+    });
+    router.refresh();
+  }
+
+  async function retryChatActionJob() {
+    if (!chatActionJob?.jobId) return;
+    const { proposalId, jobId } = chatActionJob;
+    setChatActionJob({ ...chatActionJob, status: "queued", stage: "queued", errorMessage: null });
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs/${jobId}/retry`, { method: "POST" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setChatActionJob({ proposalId, jobId, status: "terminal_failed", stage: null, errorMessage: payload.error ?? "This change can't be retried." });
+        return;
+      }
+      await settleChatActionJob(proposalId, jobId);
+    } catch (error) {
+      setChatActionJob({ proposalId, jobId, status: "terminal_failed", stage: null, errorMessage: error instanceof Error ? error.message : "The retry couldn't start." });
+    }
+  }
+
+  async function dismissProposal(proposalId: string) {
+    if (busyProposalId) return;
+    setBusyProposalId(proposalId);
+    try {
+      await fetch(`/api/rooms/${props.room.id}/proposals/${proposalId}/dismiss`, { method: "POST" });
+      if (chatActionJob?.proposalId === proposalId) setChatActionJob(null);
+      router.refresh();
+    } finally {
+      setBusyProposalId(null);
+    }
+  }
+
+  // "Adjust": lift the normalized instruction back into the composer so the owner
+  // can refine and re-send (which supersedes with a fresh proposal). No mutation.
+  function adjustProposal(proposal: ActionProposal) {
+    setActiveTab("Chat");
+    setChatMessage(proposal.normalized_instructions ?? proposal.summary ?? "");
+  }
+
   return (
     <div className="atelier-rise grid gap-12">
       <section className="grid gap-10 border-b border-hairline pb-10 lg:grid-cols-[1.4fr_0.8fr] lg:gap-16">
@@ -624,14 +726,20 @@ export function RoomWorkspace(props: {
       {activeTab === "Chat" && (
         <ChatPanel
           messages={props.chatMessages}
-          revisions={props.revisions}
+          proposals={props.actionProposals}
           conceptName={lockedMoodBoard?.concept_name ?? undefined}
           hasRender={Boolean(currentRender)}
           latestRenderInstructions={currentRender?.user_regeneration_instructions ?? undefined}
           message={chatMessage}
           isLoading={loadingAction === "chat"}
+          chatActionJob={chatActionJob}
+          busyProposalId={busyProposalId}
           onMessageChange={setChatMessage}
           onSend={sendChat}
+          onApply={applyProposal}
+          onAdjust={adjustProposal}
+          onDismiss={dismissProposal}
+          onRetryChatAction={retryChatActionJob}
         />
       )}
     </div>
@@ -1530,17 +1638,38 @@ function RenderJobCard(props: {
   );
 }
 
+const PROPOSAL_INTENT_LABEL: Record<string, string> = {
+  render_revision: "Proposed change to your renders",
+  concept_revision: "Proposed re-harmonized direction",
+  product_revision: "Proposed product-plan update",
+  preference_update: "Proposed standing preference",
+  clarification: "One question before I change anything"
+};
+
+const ACTIONABLE_INTENTS = ["render_revision", "concept_revision", "product_revision", "preference_update"];
+
 function ChatPanel(props: {
   messages: ChatMessage[];
-  revisions: Revision[];
+  proposals: ActionProposal[];
   conceptName?: string;
   hasRender: boolean;
   latestRenderInstructions?: string;
   message: string;
   isLoading: boolean;
+  chatActionJob: ChatActionJobUi | null;
+  busyProposalId: string | null;
   onMessageChange: (message: string) => void;
   onSend: () => void;
+  onApply: (proposalId: string) => void;
+  onAdjust: (proposal: ActionProposal) => void;
+  onDismiss: (proposalId: string) => void;
+  onRetryChatAction: () => void;
 }) {
+  const proposalsByMessageId = new Map<string, ActionProposal>();
+  for (const proposal of props.proposals) {
+    if (proposal.chat_message_id) proposalsByMessageId.set(proposal.chat_message_id, proposal);
+  }
+
   return (
     <section className="grid gap-8">
       <PanelHeader
@@ -1589,7 +1718,7 @@ function ChatPanel(props: {
       ) : (
         <div className="grid gap-6">
           {props.messages.map((message) => {
-            const proposal = message.role === "assistant" ? proposalHint(message.classified_intent ?? "") : null;
+            const proposal = message.role === "assistant" ? proposalsByMessageId.get(message.id) ?? null : null;
             return (
               <article
                 key={message.id}
@@ -1600,15 +1729,20 @@ function ChatPanel(props: {
               >
                 <p className={message.role === "assistant" ? "atelier-eyebrow" : "atelier-label"}>
                   {message.role === "assistant" ? "Designer" : "You"}
-                  {message.classified_intent ? ` — ${message.classified_intent.replaceAll("_", " ")}` : ""}
                 </p>
                 <p className={message.role === "assistant" ? "text-sm font-light leading-7 text-atelier-umber" : "font-serif text-lg leading-relaxed text-atelier-ink"}>
                   {message.content}
                 </p>
                 {proposal && (
-                  <p className="border-t border-hairline pt-3 text-xs font-light text-atelier-fawn">
-                    Proposal only — {proposal}
-                  </p>
+                  <ProposalCard
+                    proposal={proposal}
+                    chatActionJob={props.chatActionJob?.proposalId === proposal.id ? props.chatActionJob : null}
+                    busy={props.busyProposalId === proposal.id}
+                    onApply={props.onApply}
+                    onAdjust={props.onAdjust}
+                    onDismiss={props.onDismiss}
+                    onRetryChatAction={props.onRetryChatAction}
+                  />
                 )}
               </article>
             );
@@ -1619,22 +1753,133 @@ function ChatPanel(props: {
   );
 }
 
-function proposalHint(revisionType: string): string | null {
-  switch (revisionType) {
-    case "style_revision":
-    case "whole_home_check":
-      return "confirm by re-harmonizing or regenerating in the Concepts tab.";
-    case "product_revision":
-    case "budget_revision":
-      return "confirm by regenerating in the Products tab.";
-    case "render_revision":
-    case "layout_revision":
-      return "confirm by visualizing a room photo in the Renders tab.";
-    case "memory_update":
-      return "add it to your home Design preferences to make it stick.";
-    default:
-      return null;
-  }
+/**
+ * P0.4 proposal card. Renders the designer's structured interpretation with the
+ * exact instruction and invalidation preview the owner reviews, plus Apply /
+ * Adjust / Dismiss. A clarification shows the question with no Apply control (a
+ * question stays a question). Once confirmed, it shows durable job progress and
+ * links the result back into the same thread.
+ */
+function ProposalCard(props: {
+  proposal: ActionProposal;
+  chatActionJob: ChatActionJobUi | null;
+  busy: boolean;
+  onApply: (proposalId: string) => void;
+  onAdjust: (proposal: ActionProposal) => void;
+  onDismiss: (proposalId: string) => void;
+  onRetryChatAction: () => void;
+}) {
+  const { proposal, chatActionJob } = props;
+  const invalidations = Array.isArray(proposal.expected_invalidations)
+    ? (proposal.expected_invalidations as unknown[]).map(String)
+    : [];
+  const actionable = ACTIONABLE_INTENTS.includes(proposal.intent_type);
+  const jobActive = chatActionJob && CHAT_ACTION_ACTIVE.includes(chatActionJob.status);
+  const jobFailed = chatActionJob && (chatActionJob.status === "retryable_failed" || chatActionJob.status === "terminal_failed");
+  const terminalFailed = chatActionJob?.status === "terminal_failed";
+
+  return (
+    <div
+      data-testid={`proposal-card-${proposal.id}`}
+      data-intent={proposal.intent_type}
+      className="mt-2 grid gap-3 border-t border-hairline pt-4"
+    >
+      <p className="atelier-eyebrow text-atelier-brass">{PROPOSAL_INTENT_LABEL[proposal.intent_type] ?? "Proposed change"}</p>
+      <p className="font-serif text-base leading-relaxed text-atelier-ink">{proposal.summary}</p>
+
+      {proposal.intent_type === "clarification" && proposal.clarifying_question && (
+        <p data-testid={`proposal-clarify-${proposal.id}`} className="text-sm font-light leading-7 text-atelier-umber">
+          {proposal.clarifying_question}
+        </p>
+      )}
+
+      {proposal.normalized_instructions && (
+        <p className="text-sm font-light leading-7 text-atelier-umber">
+          <span className="atelier-label">The change I'll make — </span>
+          {proposal.normalized_instructions}
+        </p>
+      )}
+
+      {invalidations.length > 0 && (
+        <div data-testid={`proposal-invalidation-${proposal.id}`} className="grid gap-1 border-l border-atelier-brass/40 pl-3">
+          <span className="atelier-label text-atelier-fawn">Before you confirm</span>
+          {invalidations.map((line, index) => (
+            <p key={index} className="text-xs font-light leading-6 text-atelier-fawn">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Durable job progress / failure, in-thread. */}
+      {jobActive && (
+        <div data-testid={`chat-action-progress-${proposal.id}`} className="atelier-notice text-sm">
+          Applying your change — {chatActionJob?.stage ?? "working"}.
+        </div>
+      )}
+      {jobFailed && (
+        <div data-testid={`chat-action-error-${proposal.id}`} className="atelier-notice border-atelier-brass/60 text-sm">
+          {chatActionJob?.errorMessage ?? "The change didn't finish. Your request is saved."}
+        </div>
+      )}
+
+      <p data-testid={`proposal-status-${proposal.id}`} className="sr-only">
+        {proposal.status}
+      </p>
+
+      {/* Controls. Applied/rejected proposals show a resolved state, not actions. */}
+      {proposal.status === "applied" ? (
+        <p className="atelier-label text-atelier-brass">Applied — the result is in this conversation and the relevant tab.</p>
+      ) : proposal.status === "rejected" ? (
+        <p className="atelier-label text-atelier-fawn">Dismissed. Restate the change any time to propose it again.</p>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          {actionable && !jobActive && proposal.status === "proposed" && (
+            <button
+              type="button"
+              data-testid={`proposal-apply-${proposal.id}`}
+              onClick={() => props.onApply(proposal.id)}
+              disabled={props.busy}
+              className="atelier-btn w-fit"
+            >
+              {props.busy ? "Applying" : "Apply"}
+            </button>
+          )}
+          {jobFailed && !terminalFailed && (
+            <button
+              type="button"
+              data-testid={`proposal-retry-${proposal.id}`}
+              onClick={props.onRetryChatAction}
+              className="atelier-btn w-fit"
+            >
+              Try again
+            </button>
+          )}
+          {!jobActive && (
+            <>
+              <button
+                type="button"
+                data-testid={`proposal-adjust-${proposal.id}`}
+                onClick={() => props.onAdjust(proposal)}
+                className="atelier-btn-quiet w-fit"
+              >
+                Adjust
+              </button>
+              <button
+                type="button"
+                data-testid={`proposal-dismiss-${proposal.id}`}
+                onClick={() => props.onDismiss(proposal.id)}
+                disabled={props.busy}
+                className="atelier-btn-quiet w-fit"
+              >
+                Dismiss
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function getOutputAction(label: string): OutputAction | null {
