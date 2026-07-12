@@ -3,15 +3,108 @@ import { activeFailureFixture } from "@/lib/ai/failure-fixtures";
 import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
 import { isOpenAiConfigured } from "@/lib/ai/openai";
 import { renderPromptDirector } from "@/lib/ai/services";
+import { createOrGetActiveJob, getJob, JobsTableMissingError } from "@/lib/ai/jobs/service";
+import { runJobInline } from "@/lib/ai/jobs/runtime";
 import { currentCorrelationId, logStructured } from "@/lib/observability";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 
+/**
+ * P0.2 single-photo render — durable compatibility layer.
+ *
+ * The render now runs as a durable `generation_jobs` job (validate → plan+critic
+ * → generate/upload → INSERT-FIRST persist), so a failed persistence never
+ * leaves the room "current staled, nothing inserted", the paid image is never
+ * regenerated just because saving failed, and the work survives client
+ * disconnect. This route keeps the legacy synchronous contract — it runs the job
+ * inline and returns `{ render, job_id }` unchanged in shape — so existing API
+ * consumers (integrity/e2e suites) stay green while the browser uses the async
+ * `/jobs` path for live progress. The pre-migration-008 fallback below preserves
+ * the old direct-write behavior only when the jobs table is absent.
+ */
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await params;
-  const body = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({} as Record<string, unknown>));
+  const sourcePhotoId = typeof body.source_photo_id === "string" ? body.source_photo_id : null;
+  const instructions = typeof body.instructions === "string" ? body.instructions : undefined;
+
+  if (!sourcePhotoId) {
+    return NextResponse.json({ error: "Select a source photo before editing it." }, { status: 400 });
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data: room, error: roomError } = await supabase
+    .from("rooms")
+    .select("id, test_run_id")
+    .eq("id", roomId)
+    .maybeSingle();
+  if (roomError || !room) {
+    return NextResponse.json({ error: "Room not found." }, { status: 404 });
+  }
+
+  const correlationId = await currentCorrelationId();
+
+  try {
+    const { job } = await createOrGetActiveJob({
+      roomId,
+      jobType: "render",
+      requestPayload: { source_photo_id: sourcePhotoId, instructions: instructions ?? null },
+      requestedBy: "owner",
+      correlationId,
+      testRunId: room.test_run_id
+    });
+
+    // Run inline so this legacy route resolves with the artifact, exactly like
+    // before — but through the identical durable contract the async path uses.
+    await runJobInline(job.id);
+    const settled = await getJob(job.id, roomId);
+
+    if (settled?.status === "completed") {
+      const renderId = (settled.result_refs as Record<string, unknown>)?.render_id;
+      if (typeof renderId === "string") {
+        const { data: render } = await supabase.from("renders").select("*").eq("id", renderId).single();
+        return NextResponse.json({ render, job_id: job.id });
+      }
+    }
+
+    // Failed (or never completed): surface the job's owner-safe error + code.
+    return NextResponse.json(
+      { error: settled?.error_message ?? "The photo edit didn't finish.", error_code: settled?.error_code ?? null, job_id: job.id },
+      { status: statusForFailure(settled?.status, settled?.error_code) }
+    );
+  } catch (error) {
+    if (error instanceof JobsTableMissingError) {
+      // Degraded mode only (migration 008 not applied): old synchronous path.
+      return legacyGenerateRender(request, roomId, body);
+    }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "The photo edit didn't finish." }, { status: 500 });
+  }
+}
+
+/** Map a durable render failure to a legacy-compatible HTTP status. */
+function statusForFailure(status: string | undefined, errorCode: string | null | undefined): number {
+  switch (errorCode) {
+    case "missing_source_photo":
+    case "no_locked_concept":
+    case "source_photo_not_found":
+      return 400;
+    case "room_not_found":
+      return 404;
+    case "render_design_violation":
+      return 422;
+    default:
+      // Operational/recoverable failures (image/storage/persist/critic timeout).
+      return status === "terminal_failed" ? 500 : 502;
+  }
+}
+
+/**
+ * Pre-migration-008 fallback: the original synchronous render path. Retained so
+ * an environment without the `generation_jobs` table still renders (in a
+ * non-durable way). Once 008 is applied everywhere this is dead code.
+ */
+async function legacyGenerateRender(request: Request, roomId: string, body: Record<string, unknown>) {
   const supabase = createServerSupabaseClient();
   const { data: room, error: roomError } = await supabase.from("rooms").select("*").eq("id", roomId).single();
-
   if (roomError) return NextResponse.json({ error: roomError.message }, { status: 404 });
 
   const { data: selectedMoodBoard } = await supabase
@@ -20,7 +113,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .eq("room_id", roomId)
     .eq("status", "locked")
     .maybeSingle();
-
   if (!selectedMoodBoard) {
     return NextResponse.json({ error: "Lock a concept before editing a room photo." }, { status: 400 });
   }
@@ -30,7 +122,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   }
 
   const { data: sourcePhoto } = await supabase.from("photos").select("*").eq("id", body.source_photo_id).eq("room_id", roomId).maybeSingle();
-
   if (!sourcePhoto) {
     return NextResponse.json({ error: "The selected source photo was not found for this room." }, { status: 400 });
   }
@@ -67,51 +158,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // P0.0 failure fixtures at the boundaries this route owns. Each simulates
-  // its real failure exactly where it would occur, after the plan succeeded
-  // (so "provider work preserved, later stage failed" is what gets tested).
-  // Inert unless AI_MODE=mock and the request carries the fixture header.
   const fixture = await activeFailureFixture();
   const correlationId = await currentCorrelationId();
 
   if (fixture === "image_no_image") {
-    logStructured("render_failure", {
-      correlation_id: correlationId,
-      room_id: roomId,
-      error_code: "image_no_image",
-      stage: "generating"
-    });
+    logStructured("render_failure", { correlation_id: correlationId, room_id: roomId, error_code: "image_no_image", stage: "generating" });
     return NextResponse.json(
-      {
-        error: "The photo edit finished without producing an image. Your instructions and plan were saved — try again.",
-        error_code: "image_no_image"
-      },
+      { error: "The photo edit finished without producing an image. Your instructions and plan were saved — try again.", error_code: "image_no_image" },
       { status: 502 }
     );
   }
 
   let fileUrl: string | null = null;
-  // A null image is expected whenever AI_MODE=mock (the gateway short-circuits
-  // to a mocked plan with no image) — that must fall through to the "edit plan
-  // saved" placeholder, not be treated as a live OpenAI failure. Only a live
-  // call that returns no image is a real, user-facing error.
   const isLiveImageEdit = isOpenAiConfigured() && resolveAiMode() !== "mock";
   if (resolveAiMode() === "mock") {
     fileUrl = sourcePhoto.file_url;
   }
 
   if (fixture === "storage_upload_failure") {
-    logStructured("render_failure", {
-      correlation_id: correlationId,
-      room_id: roomId,
-      error_code: "storage_upload_failure",
-      stage: "persisting"
-    });
+    logStructured("render_failure", { correlation_id: correlationId, room_id: roomId, error_code: "storage_upload_failure", stage: "persisting" });
     return NextResponse.json(
-      {
-        error: "The edited image could not be stored. The generated work is recoverable — try again.",
-        error_code: "storage_upload_failure"
-      },
+      { error: "The edited image could not be stored. The generated work is recoverable — try again.", error_code: "storage_upload_failure" },
       { status: 502 }
     );
   }
@@ -141,9 +208,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
         cacheControl: "3600",
         upsert: false
       });
-
       if (uploadError) throw uploadError;
-
       const { data: publicUrlData } = serviceSupabase.storage.from("room-photos").getPublicUrl(storagePath);
       fileUrl = publicUrlData.publicUrl;
     }
@@ -161,22 +226,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
     .eq("source_photo_id", body.source_photo_id)
     .eq("status", "current");
 
-  // db_persist_failure simulates the insert below failing AFTER provider
-  // success and after the stale-marking above — faithfully reproducing
-  // today's non-atomic ordering (the state this leaves behind is the exact
-  // defect class P0.2's atomic mark-current/stale stage exists to fix).
   if (fixture === "db_persist_failure") {
-    logStructured("render_failure", {
-      correlation_id: correlationId,
-      room_id: roomId,
-      error_code: "db_persist_failure",
-      stage: "persisting"
-    });
+    logStructured("render_failure", { correlation_id: correlationId, room_id: roomId, error_code: "db_persist_failure", stage: "persisting" });
     return NextResponse.json(
-      {
-        error: "The finished edit could not be saved. The generated work is recoverable — try again.",
-        error_code: "db_persist_failure"
-      },
+      { error: "The finished edit could not be saved. The generated work is recoverable — try again.", error_code: "db_persist_failure" },
       { status: 500 }
     );
   }

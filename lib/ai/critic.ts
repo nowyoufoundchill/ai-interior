@@ -20,7 +20,7 @@ import {
 } from "@/lib/schemas/json";
 import { runStructuredTask, type GatewayProvider } from "@/lib/ai/gateway";
 import { SCALE_ANCHORS, CRITIC_DIMENSION_GUIDANCE } from "@/lib/ai/critic-rubric";
-import { activeFailureFixture } from "@/lib/ai/failure-fixtures";
+import { activeFailureFixture, FixtureFailureError } from "@/lib/ai/failure-fixtures";
 import {
   buildConceptCritiqueFixture,
   buildDiagnosisCritiqueFixture,
@@ -126,7 +126,15 @@ export async function critiqueRender(input: {
   provider?: GatewayProvider;
 }): Promise<RenderCritique> {
   // P0.0 critic_rejection fixture — see critiqueConcepts.
-  const rejecting = (await activeFailureFixture()) === "critic_rejection";
+  const fixture = await activeFailureFixture();
+  const rejecting = fixture === "critic_rejection";
+  // P0.2 critic_timeout fixture: the render critic itself fails to respond in
+  // time. This is an OPERATIONAL failure (transport/timeout), NOT a design
+  // rejection — the caller must treat it as recoverable and must never silently
+  // record it as a passed critic. Mock-only (activeFailureFixture is inert live).
+  if (fixture === "critic_timeout") {
+    throw new FixtureFailureError("critic_timeout", "Simulated Render Critic timeout: review exceeded its time budget (fixture).");
+  }
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Render Critic",

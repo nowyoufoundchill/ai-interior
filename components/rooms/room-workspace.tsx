@@ -35,6 +35,33 @@ type PendingOutput = {
   };
 };
 
+// P0.2: the inline render-job state the owner sees — what is happening (stage),
+// how long it has run (elapsed), which attempt, whether work was saved, and the
+// owner-safe error + recovery actions after a failure.
+type RenderJobUi = {
+  jobId: string | null;
+  status: "requesting" | "queued" | "planning" | "validating" | "generating" | "persisting" | "completed" | "retryable_failed" | "terminal_failed" | "cancelled";
+  stage: string | null;
+  attempt: number;
+  maxAttempts: number;
+  startedAt: number;
+  errorMessage: string | null;
+  errorCode: string | null;
+  sourcePhotoId?: string;
+  instructions?: string;
+};
+
+const RENDER_JOB_ACTIVE: RenderJobUi["status"][] = ["requesting", "queued", "planning", "validating", "generating", "persisting"];
+
+const RENDER_STAGE_COPY: Record<string, string> = {
+  requesting: "Starting the edit",
+  queued: "Queued",
+  validating: "Checking the direction and photo",
+  planning: "Composing the edit plan",
+  generating: "Creating the edited photo",
+  persisting: "Saving the edited photo"
+};
+
 const TAB_TESTID: Record<TabName, string> = {
   "Photos & Brief": "photos-brief",
   Concepts: "concepts",
@@ -75,6 +102,8 @@ export function RoomWorkspace(props: {
   const [pendingOutput, setPendingOutput] = useState<PendingOutput | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [chatMessage, setChatMessage] = useState("");
+  const [renderJob, setRenderJob] = useState<RenderJobUi | null>(null);
+  const [renderJobElapsed, setRenderJobElapsed] = useState(0);
   const router = useRouter();
 
   const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
@@ -114,6 +143,157 @@ export function RoomWorkspace(props: {
       setElapsedSeconds(0);
     }
   }, [currentRender?.id, latestDiagnosis?.id, pendingOutput, props.chatMessages.length, props.moodBoards.length, props.products.length, props.renders.length]);
+
+  // Elapsed-time ticker for an in-flight render job (P0.2 "how long it has run").
+  useEffect(() => {
+    if (!renderJob || !RENDER_JOB_ACTIVE.includes(renderJob.status)) return;
+    const timer = window.setInterval(() => {
+      setRenderJobElapsed(Math.max(0, Math.floor((Date.now() - renderJob.startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [renderJob]);
+
+  // Drive a render through the durable job path (P0.2): the job survives a
+  // closed tab; the observer reflects each stage; a failure lands in a
+  // recoverable inline card with Retry / Edit / Return actions (no alert()).
+  async function runDurableRender(sourcePhotoId?: string, instructions?: string) {
+    if (!sourcePhotoId) return;
+    setLoadingAction("render");
+    setActiveTab("Renders");
+    setRenderJobElapsed(0);
+    setRenderJob({
+      jobId: null,
+      status: "requesting",
+      stage: "requesting",
+      attempt: 0,
+      maxAttempts: 3,
+      startedAt: Date.now(),
+      errorMessage: null,
+      errorCode: null,
+      sourcePhotoId,
+      instructions
+    });
+
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_type: "render", payload: { source_photo_id: sourcePhotoId, instructions: instructions ?? null } })
+      });
+
+      if (response.status === 503) {
+        // Jobs table not migrated — use the synchronous compatibility route.
+        setRenderJob(null);
+        return runAction("render", `/api/rooms/${props.room.id}/generate-render`, { source_photo_id: sourcePhotoId, instructions });
+      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        failRenderJob(null, payload.error ?? "The photo edit couldn't start.", payload.error_code ?? null, sourcePhotoId, instructions);
+        return false;
+      }
+
+      const { job } = await response.json();
+      return settleRenderJob(job.id, sourcePhotoId, instructions);
+    } catch (error) {
+      failRenderJob(null, error instanceof Error ? error.message : "The photo edit couldn't start.", null, sourcePhotoId, instructions);
+      return false;
+    }
+  }
+
+  async function settleRenderJob(jobId: string, sourcePhotoId?: string, instructions?: string) {
+    const settled = await observeJob(props.room.id, jobId, {
+      onUpdate: (job) => {
+        setRenderJob((current) =>
+          current
+            ? {
+                ...current,
+                jobId,
+                status: job.status as RenderJobUi["status"],
+                stage: job.stage,
+                attempt: job.attempt_count ?? current.attempt,
+                maxAttempts: job.max_attempts ?? current.maxAttempts
+              }
+            : current
+        );
+      }
+    });
+
+    if (settled?.status === "completed") {
+      setRenderJob(null);
+      setLoadingAction(null);
+      setRenderJobElapsed(0);
+      router.refresh();
+      return true;
+    }
+
+    failRenderJob(
+      jobId,
+      settled?.error_message ?? "The photo edit didn't finish. Your instructions are saved — try again.",
+      settled?.error_code ?? null,
+      sourcePhotoId,
+      instructions,
+      settled?.status === "terminal_failed" || settled?.status === "cancelled" ? "terminal_failed" : "retryable_failed"
+    );
+    return false;
+  }
+
+  function failRenderJob(
+    jobId: string | null,
+    message: string,
+    code: string | null,
+    sourcePhotoId?: string,
+    instructions?: string,
+    status: RenderJobUi["status"] = "retryable_failed"
+  ) {
+    setLoadingAction(null);
+    setRenderJobElapsed(0);
+    setRenderJob((current) => ({
+      jobId,
+      status,
+      stage: current?.stage ?? null,
+      attempt: current?.attempt ?? 0,
+      maxAttempts: current?.maxAttempts ?? 3,
+      startedAt: current?.startedAt ?? Date.now(),
+      errorMessage: message,
+      errorCode: code,
+      sourcePhotoId,
+      instructions
+    }));
+  }
+
+  async function retryRenderJob() {
+    if (!renderJob) return;
+    // A design violation (blocking) won't clear on a plain retry — steer the
+    // owner to adjust the direction or instructions instead.
+    if (renderJob.errorCode === "render_design_violation") {
+      setActiveTab("Concepts");
+      return;
+    }
+    if (!renderJob.jobId) {
+      // Never got a job id (start failed) — resubmit from scratch.
+      return runDurableRender(renderJob.sourcePhotoId, renderJob.instructions);
+    }
+    setLoadingAction("render");
+    setRenderJobElapsed(0);
+    setRenderJob({ ...renderJob, status: "queued", stage: "queued", errorMessage: null, errorCode: null, startedAt: Date.now() });
+    try {
+      const response = await fetch(`/api/rooms/${props.room.id}/jobs/${renderJob.jobId}/retry`, { method: "POST" });
+      if (response.status === 409) {
+        const payload = await response.json().catch(() => ({}));
+        failRenderJob(renderJob.jobId, payload.error ?? "This edit can't be retried — no attempts remain.", "attempts_exhausted", renderJob.sourcePhotoId, renderJob.instructions, "terminal_failed");
+        return false;
+      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        failRenderJob(renderJob.jobId, payload.error ?? "The retry couldn't start.", null, renderJob.sourcePhotoId, renderJob.instructions);
+        return false;
+      }
+      return settleRenderJob(renderJob.jobId, renderJob.sourcePhotoId, renderJob.instructions);
+    } catch (error) {
+      failRenderJob(renderJob.jobId, error instanceof Error ? error.message : "The retry couldn't start.", null, renderJob.sourcePhotoId, renderJob.instructions);
+      return false;
+    }
+  }
 
   async function runAction(label: string, url: string, body?: Record<string, unknown>) {
     const outputAction = getOutputAction(label);
@@ -422,7 +602,19 @@ export function RoomWorkspace(props: {
           hasLockedConcept={Boolean(lockedMoodBoard)}
           isStale={rendersStale}
           isLoading={loadingAction === "render"}
-          onGenerate={(photoId, instructions) => runAction("render", `/api/rooms/${props.room.id}/generate-render`, { source_photo_id: photoId, instructions })}
+          onGenerate={(photoId, instructions) => runDurableRender(photoId, instructions)}
+          renderJob={renderJob}
+          renderJobElapsed={renderJobElapsed}
+          onRetryRenderJob={retryRenderJob}
+          onDismissRenderJob={() => {
+            setRenderJob(null);
+            setLoadingAction(null);
+          }}
+          onReturnToDirection={() => {
+            setRenderJob(null);
+            setLoadingAction(null);
+            setActiveTab("Concepts");
+          }}
         />
       )}
 
@@ -1080,6 +1272,11 @@ function RendersPanel(props: {
   isStale: boolean;
   isLoading: boolean;
   onGenerate: (photoId?: string, instructions?: string) => void;
+  renderJob: RenderJobUi | null;
+  renderJobElapsed: number;
+  onRetryRenderJob: () => void;
+  onDismissRenderJob: () => void;
+  onReturnToDirection: () => void;
 }) {
   const [sourcePhotoId, setSourcePhotoId] = useState(props.photos[0]?.id ?? "");
   const [instructions, setInstructions] = useState("");
@@ -1138,6 +1335,15 @@ function RendersPanel(props: {
           <p className="text-xs font-light leading-6 text-atelier-fawn">
             Every edit preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the approved direction plus your instructions.
           </p>
+          {props.renderJob && (
+            <RenderJobCard
+              job={props.renderJob}
+              elapsedSeconds={props.renderJobElapsed}
+              onRetry={props.onRetryRenderJob}
+              onEdit={props.onDismissRenderJob}
+              onReturn={props.onReturnToDirection}
+            />
+          )}
           {props.renders.length === 0 ? (
             <EmptyState text="One photograph, restyled in place — the before and after of the approved direction." />
           ) : (
@@ -1225,6 +1431,94 @@ function RendersPanel(props: {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * P0.2 inline render-job card. Tells a nontechnical owner, at a glance: what is
+ * happening (stage), how long it has run (elapsed), which attempt, that their
+ * instructions were saved, and — after a failure — one primary recovery action
+ * plus at most two secondary ones (never an alert()).
+ */
+function RenderJobCard(props: {
+  job: RenderJobUi;
+  elapsedSeconds: number;
+  onRetry: () => void;
+  onEdit: () => void;
+  onReturn: () => void;
+}) {
+  const { job } = props;
+  const active = RENDER_JOB_ACTIVE.includes(job.status);
+  const designViolation = job.errorCode === "render_design_violation";
+  const canRetry = job.status === "retryable_failed" && !designViolation;
+  const stageCopy = RENDER_STAGE_COPY[job.status] ?? RENDER_STAGE_COPY[job.stage ?? ""] ?? "Working on the edit";
+  const elapsedLabel = props.elapsedSeconds >= 60 ? `${Math.floor(props.elapsedSeconds / 60)}m ${props.elapsedSeconds % 60}s` : `${props.elapsedSeconds}s`;
+
+  if (active) {
+    return (
+      <div data-testid="render-job-status" data-status={job.status} className="atelier-card grid gap-3 border border-hairline bg-atelier-paper p-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className="atelier-eyebrow" data-testid="render-job-stage">
+            {stageCopy}
+          </p>
+          <span className="text-[10px] font-medium uppercase tracking-label text-atelier-fawn" data-testid="render-job-elapsed">
+            {elapsedLabel}
+          </span>
+        </div>
+        <div className="h-px w-full overflow-hidden bg-hairline">
+          <div className="h-px w-1/3 animate-pulse bg-atelier-brass" />
+        </div>
+        <p className="text-xs font-light leading-6 text-atelier-umber">
+          Your instructions are saved. This continues even if you leave this page — reopen the room to check on it.
+        </p>
+        {job.attempt > 1 && (
+          <p className="text-[10px] font-medium uppercase tracking-label text-atelier-fawn" data-testid="render-job-attempt">
+            Attempt {job.attempt} of {job.maxAttempts}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="render-job-status" data-status={job.status} className="atelier-card grid gap-4 border border-atelier-brass/40 bg-atelier-paper p-6">
+      <div className="flex items-center justify-between gap-3">
+        <p className="atelier-eyebrow text-atelier-brass">Edit didn&rsquo;t finish</p>
+        {job.attempt > 0 && (
+          <span className="text-[10px] font-medium uppercase tracking-label text-atelier-fawn" data-testid="render-job-attempt">
+            Attempt {job.attempt} of {job.maxAttempts}
+          </span>
+        )}
+      </div>
+      <p data-testid="render-job-error" className="text-sm font-light leading-7 text-atelier-umber">
+        {job.errorMessage ?? "The photo edit didn't finish. Your instructions are saved — try again."}
+      </p>
+      <p className="text-xs font-light leading-6 text-atelier-fawn">
+        {designViolation
+          ? "No image was generated, so nothing was changed. Adjust the direction or your instructions and try again."
+          : "Your instructions and any completed work were saved — a retry won't repeat what already succeeded."}
+      </p>
+      <div className="flex flex-wrap gap-3 pt-1">
+        {canRetry && (
+          <button type="button" data-testid="render-job-retry" onClick={props.onRetry} className="atelier-btn">
+            Retry
+          </button>
+        )}
+        {designViolation && (
+          <button type="button" data-testid="render-job-adjust" onClick={props.onReturn} className="atelier-btn">
+            Adjust the direction
+          </button>
+        )}
+        <button type="button" data-testid="render-job-edit" onClick={props.onEdit} className="atelier-btn-quiet">
+          Edit instructions
+        </button>
+        {!designViolation && (
+          <button type="button" data-testid="render-job-return" onClick={props.onReturn} className="atelier-btn-quiet">
+            Return to direction
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
