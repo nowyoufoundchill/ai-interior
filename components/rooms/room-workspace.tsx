@@ -6,6 +6,7 @@ import { ROOM_STATUSES, ROOM_TABS } from "@/lib/constants";
 import type { Database, Json, Photo } from "@/types/database";
 import { PhotoUploader } from "@/components/rooms/photo-uploader";
 import { observeJob } from "@/components/jobs/job-observer";
+import { BatchRenderPanel } from "@/components/rooms/batch-render-panel";
 
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
 type Home = Database["public"]["Tables"]["homes"]["Row"];
@@ -54,12 +55,12 @@ type RenderJobUi = {
 const RENDER_JOB_ACTIVE: RenderJobUi["status"][] = ["requesting", "queued", "planning", "validating", "generating", "persisting"];
 
 const RENDER_STAGE_COPY: Record<string, string> = {
-  requesting: "Starting the edit",
+  requesting: "Starting the visualization",
   queued: "Queued",
   validating: "Checking the direction and photo",
-  planning: "Composing the edit plan",
-  generating: "Creating the edited photo",
-  persisting: "Saving the edited photo"
+  planning: "Composing the render plan",
+  generating: "Creating your render",
+  persisting: "Saving your render"
 };
 
 const TAB_TESTID: Record<TabName, string> = {
@@ -188,14 +189,14 @@ export function RoomWorkspace(props: {
       }
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        failRenderJob(null, payload.error ?? "The photo edit couldn't start.", payload.error_code ?? null, sourcePhotoId, instructions);
+        failRenderJob(null, payload.error ?? "The visualization couldn't start.", payload.error_code ?? null, sourcePhotoId, instructions);
         return false;
       }
 
       const { job } = await response.json();
       return settleRenderJob(job.id, sourcePhotoId, instructions);
     } catch (error) {
-      failRenderJob(null, error instanceof Error ? error.message : "The photo edit couldn't start.", null, sourcePhotoId, instructions);
+      failRenderJob(null, error instanceof Error ? error.message : "The visualization couldn't start.", null, sourcePhotoId, instructions);
       return false;
     }
   }
@@ -228,7 +229,7 @@ export function RoomWorkspace(props: {
 
     failRenderJob(
       jobId,
-      settled?.error_message ?? "The photo edit didn't finish. Your instructions are saved — try again.",
+      settled?.error_message ?? "The visualization didn't finish. Your instructions are saved — try again.",
       settled?.error_code ?? null,
       sourcePhotoId,
       instructions,
@@ -280,7 +281,7 @@ export function RoomWorkspace(props: {
       const response = await fetch(`/api/rooms/${props.room.id}/jobs/${renderJob.jobId}/retry`, { method: "POST" });
       if (response.status === 409) {
         const payload = await response.json().catch(() => ({}));
-        failRenderJob(renderJob.jobId, payload.error ?? "This edit can't be retried — no attempts remain.", "attempts_exhausted", renderJob.sourcePhotoId, renderJob.instructions, "terminal_failed");
+        failRenderJob(renderJob.jobId, payload.error ?? "This visualization can't be retried — no attempts remain.", "attempts_exhausted", renderJob.sourcePhotoId, renderJob.instructions, "terminal_failed");
         return false;
       }
       if (!response.ok) {
@@ -596,12 +597,14 @@ export function RoomWorkspace(props: {
 
       {activeTab === "Renders" && (
         <RendersPanel
+          roomId={props.room.id}
           renders={props.renders}
           photos={props.photos}
           conceptName={lockedMoodBoard?.concept_name ?? undefined}
           hasLockedConcept={Boolean(lockedMoodBoard)}
           isStale={rendersStale}
           isLoading={loadingAction === "render"}
+          onBatchSettled={() => router.refresh()}
           onGenerate={(photoId, instructions) => runDurableRender(photoId, instructions)}
           renderJob={renderJob}
           renderJobElapsed={renderJobElapsed}
@@ -1265,12 +1268,14 @@ function ProductsPanel(props: {
 }
 
 function RendersPanel(props: {
+  roomId: string;
   renders: Render[];
   photos: Photo[];
   conceptName?: string;
   hasLockedConcept: boolean;
   isStale: boolean;
   isLoading: boolean;
+  onBatchSettled: () => void;
   onGenerate: (photoId?: string, instructions?: string) => void;
   renderJob: RenderJobUi | null;
   renderJobElapsed: number;
@@ -1290,18 +1295,21 @@ function RendersPanel(props: {
             Your room, <em className="italic">reimagined</em>
           </>
         }
-        actionLabel={props.isLoading ? "Composing the edit" : "Edit this photo"}
+        actionLabel={props.isLoading ? "Visualizing your room" : "Visualize this room"}
         actionTestId="render-generate-button"
         disabled={!props.hasLockedConcept || props.photos.length === 0 || props.isLoading}
         onAction={() => props.onGenerate(sourcePhotoId || undefined, instructions || undefined)}
       />
       {props.isStale && (
-        <StaleNotice text="The approved direction changed, so these photo edits are stale. Re-edit from the current direction and a source photo." />
+        <StaleNotice text="The approved direction changed, so these visualizations are stale. Re-run from the current direction and a source photo." />
+      )}
+      {props.hasLockedConcept && props.photos.length > 0 && (
+        <BatchRenderPanel roomId={props.roomId} hasLockedConcept={props.hasLockedConcept} onSettled={props.onBatchSettled} />
       )}
       {!props.hasLockedConcept ? (
         <EmptyState text="Approve a direction first. The picture follows." />
       ) : props.photos.length === 0 ? (
-        <EmptyState text="Add a source photo before editing it." />
+        <EmptyState text="Add a source photo before visualizing it." />
       ) : (
         <div className="grid gap-8">
           <div className="grid gap-6 border-y border-hairline py-6 md:grid-cols-2">
@@ -1321,7 +1329,7 @@ function RendersPanel(props: {
               </select>
             </label>
             <label className="grid gap-2">
-              <span className="atelier-label">Edit instructions (optional)</span>
+              <span className="atelier-label">Instructions (optional)</span>
               <textarea
                 data-testid="render-instructions-input"
                 className="atelier-field"
@@ -1333,7 +1341,7 @@ function RendersPanel(props: {
             </label>
           </div>
           <p className="text-xs font-light leading-6 text-atelier-fawn">
-            Every edit preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the approved direction plus your instructions.
+            Every visualization preserves the room architecture, camera angle, windows, doors, and floor plane, and applies only the approved direction plus your instructions.
           </p>
           {props.renderJob && (
             <RenderJobCard
@@ -1361,14 +1369,14 @@ function RendersPanel(props: {
                         After · {props.conceptName ?? "Approved direction"}
                       </figcaption>
                       {render.file_url ? (
-                        <img src={render.file_url} alt="Edited room photo" className="aspect-[16/10] w-full object-cover" />
+                        <img src={render.file_url} alt="Room visualization" className="aspect-[16/10] w-full object-cover" />
                       ) : (
                         <div className="flex aspect-[16/10] items-center justify-center bg-atelier-charcoal">
                           {/* Principle VIII — type as image for the imageless state. */}
                           <span className="font-serif text-4xl text-atelier-ivory/80">
                             A<em className="italic text-atelier-brass">i</em>D
                             <span className="ml-4 align-middle font-sans text-[10px] font-medium uppercase tracking-wide2 text-atelier-ivory/40">
-                              Image pending — edit plan saved
+                              Image pending — render plan saved
                             </span>
                           </span>
                         </div>
@@ -1408,7 +1416,7 @@ function RendersPanel(props: {
                         </p>
                       )}
                       <details className="border-t border-hairline pt-4 text-sm text-atelier-umber">
-                        <summary className="atelier-label cursor-pointer">Preservation &amp; edit details</summary>
+                        <summary className="atelier-label cursor-pointer">Preservation &amp; render details</summary>
                         <div className="mt-4 grid gap-4">
                           <ListBlock title="Preserved" items={toStringArray(render.preservation_constraints)} compact />
                           <ListBlock title="Applied changes" items={toStringArray(render.transformation_instructions)} compact />
@@ -1416,7 +1424,7 @@ function RendersPanel(props: {
                           <ListBlock title="Critic notes" items={toStringArray(critique.notes)} compact />
                           {(render.render_prompt || render.prompt) && (
                             <div>
-                              <p className="atelier-label">Full edit brief</p>
+                              <p className="atelier-label">Full render brief</p>
                               <p className="mt-2 text-xs font-light leading-6 text-atelier-fawn">{render.render_prompt ?? render.prompt}</p>
                             </div>
                           )}
@@ -1451,7 +1459,7 @@ function RenderJobCard(props: {
   const active = RENDER_JOB_ACTIVE.includes(job.status);
   const designViolation = job.errorCode === "render_design_violation";
   const canRetry = job.status === "retryable_failed" && !designViolation;
-  const stageCopy = RENDER_STAGE_COPY[job.status] ?? RENDER_STAGE_COPY[job.stage ?? ""] ?? "Working on the edit";
+  const stageCopy = RENDER_STAGE_COPY[job.status] ?? RENDER_STAGE_COPY[job.stage ?? ""] ?? "Working on the visualization";
   const elapsedLabel = props.elapsedSeconds >= 60 ? `${Math.floor(props.elapsedSeconds / 60)}m ${props.elapsedSeconds % 60}s` : `${props.elapsedSeconds}s`;
 
   if (active) {
@@ -1483,7 +1491,7 @@ function RenderJobCard(props: {
   return (
     <div data-testid="render-job-status" data-status={job.status} className="atelier-card grid gap-4 border border-atelier-brass/40 bg-atelier-paper p-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="atelier-eyebrow text-atelier-brass">Edit didn&rsquo;t finish</p>
+        <p className="atelier-eyebrow text-atelier-brass">Visualization didn&rsquo;t finish</p>
         {job.attempt > 0 && (
           <span className="text-[10px] font-medium uppercase tracking-label text-atelier-fawn" data-testid="render-job-attempt">
             Attempt {job.attempt} of {job.maxAttempts}
@@ -1491,7 +1499,7 @@ function RenderJobCard(props: {
         )}
       </div>
       <p data-testid="render-job-error" className="text-sm font-light leading-7 text-atelier-umber">
-        {job.errorMessage ?? "The photo edit didn't finish. Your instructions are saved — try again."}
+        {job.errorMessage ?? "The visualization didn't finish. Your instructions are saved — try again."}
       </p>
       <p className="text-xs font-light leading-6 text-atelier-fawn">
         {designViolation
@@ -1621,7 +1629,7 @@ function proposalHint(revisionType: string): string | null {
       return "confirm by regenerating in the Products tab.";
     case "render_revision":
     case "layout_revision":
-      return "confirm by editing a photo in the Renders tab.";
+      return "confirm by visualizing a room photo in the Renders tab.";
     case "memory_update":
       return "add it to your home Design preferences to make it stick.";
     default:
@@ -1662,7 +1670,7 @@ function outputLabel(action: OutputAction) {
     case "products":
       return "Sourcing the product plan";
     case "render":
-      return "Composing the photo edit";
+      return "Composing the visualization";
     case "chat":
       return "Writing the reply";
   }

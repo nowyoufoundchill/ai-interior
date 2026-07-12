@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const instructions = typeof body.instructions === "string" ? body.instructions : undefined;
 
   if (!sourcePhotoId) {
-    return NextResponse.json({ error: "Select a source photo before editing it." }, { status: 400 });
+    return NextResponse.json({ error: "Select a source photo before visualizing it." }, { status: 400 });
   }
 
   const supabase = createServerSupabaseClient();
@@ -68,7 +68,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
 
     // Failed (or never completed): surface the job's owner-safe error + code.
     return NextResponse.json(
-      { error: settled?.error_message ?? "The photo edit didn't finish.", error_code: settled?.error_code ?? null, job_id: job.id },
+      { error: settled?.error_message ?? "The visualization didn't finish.", error_code: settled?.error_code ?? null, job_id: job.id },
       { status: statusForFailure(settled?.status, settled?.error_code) }
     );
   } catch (error) {
@@ -76,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       // Degraded mode only (migration 008 not applied): old synchronous path.
       return legacyGenerateRender(request, roomId, body);
     }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "The photo edit didn't finish." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "The visualization didn't finish." }, { status: 500 });
   }
 }
 
@@ -118,7 +118,7 @@ async function legacyGenerateRender(request: Request, roomId: string, body: Reco
   }
 
   if (typeof body.source_photo_id !== "string") {
-    return NextResponse.json({ error: "Select a source photo before editing it." }, { status: 400 });
+    return NextResponse.json({ error: "Select a source photo before visualizing it." }, { status: 400 });
   }
 
   const { data: sourcePhoto } = await supabase.from("photos").select("*").eq("id", body.source_photo_id).eq("room_id", roomId).maybeSingle();
@@ -154,7 +154,7 @@ async function legacyGenerateRender(request: Request, roomId: string, body: Reco
       userInstructions: typeof body.instructions === "string" ? body.instructions : undefined
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Photo edit planning failed.";
+    const message = error instanceof Error ? error.message : "Render planning failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -164,7 +164,7 @@ async function legacyGenerateRender(request: Request, roomId: string, body: Reco
   if (fixture === "image_no_image") {
     logStructured("render_failure", { correlation_id: correlationId, room_id: roomId, error_code: "image_no_image", stage: "generating" });
     return NextResponse.json(
-      { error: "The photo edit finished without producing an image. Your instructions and plan were saved — try again.", error_code: "image_no_image" },
+      { error: "The visualization finished without producing an image. Your instructions and plan were saved — try again.", error_code: "image_no_image" },
       { status: 502 }
     );
   }
@@ -178,7 +178,7 @@ async function legacyGenerateRender(request: Request, roomId: string, body: Reco
   if (fixture === "storage_upload_failure") {
     logStructured("render_failure", { correlation_id: correlationId, room_id: roomId, error_code: "storage_upload_failure", stage: "persisting" });
     return NextResponse.json(
-      { error: "The edited image could not be stored. The generated work is recoverable — try again.", error_code: "storage_upload_failure" },
+      { error: "The render could not be stored. The generated work is recoverable — try again.", error_code: "storage_upload_failure" },
       { status: 502 }
     );
   }

@@ -4,8 +4,35 @@ import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
 import { isOpenAiConfigured } from "@/lib/ai/openai";
 import { logStructured } from "@/lib/observability";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
-import { advanceStage, checkpointResult, claimJob, completeJob, failJob, getJob } from "./service";
+import { classifyPhotos } from "@/lib/ai/photo-eligibility";
+import { evaluateBatchConsistency, type RenderForConsistency } from "@/lib/ai/batch-consistency";
+import {
+  advanceStage,
+  checkpointResult,
+  claimJob,
+  completeJob,
+  createOrGetActiveJob,
+  failJob,
+  getJob,
+  isStale,
+  reclaimIfStale,
+  TERMINAL_STATUSES,
+  type JobStatus
+} from "./service";
 import type { GenerationJob, Json } from "@/types/database";
+
+/** Bounded concurrency for a render batch (§P0.3 task 5 — respect rate limits). */
+const DEFAULT_BATCH_CONCURRENCY = 2;
+export function batchConcurrency(): number {
+  const raw = Number(process.env.RENDER_BATCH_CONCURRENCY);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_BATCH_CONCURRENCY;
+}
+
+/** Per-photo item recorded on the parent batch job for resume + the batch view. */
+export interface BatchItem {
+  photo_id: string;
+  child_job_id: string;
+}
 
 /**
  * P0.1 job runners (docs/P0_P1_EXECUTION_PLAN_2026-07-10.md §P0.1 task 4).
@@ -42,6 +69,10 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
       }
       case "render": {
         const job = await executeRender(claimed);
+        return { ran: true, job };
+      }
+      case "batch_render": {
+        const job = await executeBatchRender(claimed);
         return { ran: true, job };
       }
       default: {
@@ -228,7 +259,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
   if (!sourcePhotoId) {
     return failJob(job.id, {
       errorCode: "missing_source_photo",
-      ownerMessage: "Select a source photo before editing it.",
+      ownerMessage: "Select a source photo before visualizing it.",
       detail: "request_payload.source_photo_id is required",
       retryable: false
     });
@@ -243,7 +274,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
   if (!selectedMoodBoard) {
     return failJob(job.id, {
       errorCode: "no_locked_concept",
-      ownerMessage: "Lock a concept before editing a room photo.",
+      ownerMessage: "Lock a concept before visualizing a room photo.",
       detail: "no locked mood_board for room",
       retryable: false
     });
@@ -261,6 +292,21 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
       ownerMessage: "The selected source photo was not found for this room.",
       detail: `photo ${sourcePhotoId} not in room`,
       retryable: false
+    });
+  }
+
+  // Test-only, mock-only durable failure hook (P0.3). A batch child rendered
+  // through the async `after()` path never carries the request-scoped fixture
+  // header, so the batch gate injects a forced first-attempt failure via the
+  // child payload instead. It fails ONLY the first attempt so a retry recovers
+  // (exactly the partial-batch → retry scenario). Inert in live/production.
+  const forcedFailure = typeof payload.test_force_failure === "string" ? payload.test_force_failure : null;
+  if (forcedFailure && resolveAiMode() === "mock" && job.attempt_count <= 1) {
+    return failJob(job.id, {
+      errorCode: forcedFailure,
+      ownerMessage: "This perspective couldn't be visualized. Your direction is saved — try again.",
+      detail: `test_force_failure=${forcedFailure} (attempt ${job.attempt_count})`,
+      retryable: true
     });
   }
 
@@ -284,7 +330,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
       ? await supabase.from("design_preferences").select("preference_type, label").eq("home_id", home.id)
       : { data: null };
 
-    await advanceStage(job.id, "planning", "composing the edit plan");
+    await advanceStage(job.id, "planning", "composing the render plan");
 
     // The render critic runs inside renderPromptDirector; capture its outcome so
     // we can make the blocking-vs-operational distinction the matrix requires.
@@ -308,7 +354,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
     } catch (error) {
       return failJob(job.id, {
         errorCode: "render_plan_failed",
-        ownerMessage: "The edit plan didn't finish. Your instructions are saved — try again.",
+        ownerMessage: "The render plan didn't finish. Your instructions are saved — try again.",
         detail: error instanceof Error ? error.message : String(error)
       });
     }
@@ -323,7 +369,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
         return failJob(job.id, {
           errorCode: "render_design_violation",
           ownerMessage:
-            "This edit would block a doorway or walkway in the room. Adjust the direction or your instructions and try again.",
+            "This visualization would block a doorway or walkway in the room. Adjust the direction or your instructions and try again.",
           detail: outcome.blockingViolations.join(" | "),
           retryable: false
         });
@@ -334,20 +380,20 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
         await checkpointResult(job.id, { plan });
         return failJob(job.id, {
           errorCode: "render_critic_unavailable",
-          ownerMessage: "We couldn't finish reviewing this edit. Your instructions are saved — try again.",
+          ownerMessage: "We couldn't finish reviewing this visualization. Your instructions are saved — try again.",
           detail: outcome.detail ?? "render critic operational failure"
         });
       }
     }
 
     // --- generating: produce the image (the paid step in live mode) ---------
-    await advanceStage(job.id, "generating", "creating the edited photo");
+    await advanceStage(job.id, "generating", "creating your render");
 
     const fixture = await activeFailureFixture();
     if (fixture === "image_no_image") {
       return failJob(job.id, {
         errorCode: "image_no_image",
-        ownerMessage: "The photo edit finished without producing an image. Your instructions and plan were saved — try again.",
+        ownerMessage: "The visualization finished without producing an image. Your instructions and plan were saved — try again.",
         detail: "image_no_image fixture"
       });
     }
@@ -363,7 +409,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
     if (fixture === "storage_upload_failure") {
       return failJob(job.id, {
         errorCode: "storage_upload_failure",
-        ownerMessage: "The edited image couldn't be stored. The generated work is recoverable — try again.",
+        ownerMessage: "The render couldn't be stored. The generated work is recoverable — try again.",
         detail: "storage_upload_failure fixture"
       });
     }
@@ -385,7 +431,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
         if (!imageBase64) {
           return failJob(job.id, {
             errorCode: "image_no_image",
-            ownerMessage: "The photo edit finished without producing an image. Your instructions and plan were saved — try again.",
+            ownerMessage: "The visualization finished without producing an image. Your instructions and plan were saved — try again.",
             detail: "live image edit returned no image"
           });
         }
@@ -398,7 +444,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
         if (uploadError) {
           return failJob(job.id, {
             errorCode: "storage_upload_failure",
-            ownerMessage: "The edited image couldn't be stored. The generated work is recoverable — try again.",
+            ownerMessage: "The render couldn't be stored. The generated work is recoverable — try again.",
             detail: uploadError.message
           });
         }
@@ -425,13 +471,13 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
   if (!plan) {
     return failJob(job.id, {
       errorCode: "render_plan_missing",
-      ownerMessage: "The edit plan was lost. Your instructions are saved — try again.",
+      ownerMessage: "The render plan was lost. Your instructions are saved — try again.",
       detail: "no plan available at persistence stage"
     });
   }
 
   // --- persisting: INSERT-FIRST atomicity ---------------------------------
-  await advanceStage(job.id, "persisting", "saving the edited photo");
+  await advanceStage(job.id, "persisting", "saving your render");
 
   const fixture = await activeFailureFixture();
   if (fixture === "db_persist_failure") {
@@ -448,7 +494,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
     });
     return failJob(job.id, {
       errorCode: "db_persist_failure",
-      ownerMessage: "The finished edit couldn't be saved. The generated work is recoverable — try again.",
+      ownerMessage: "The finished render couldn't be saved. The generated work is recoverable — try again.",
       detail: "db_persist_failure fixture"
     });
   }
@@ -485,7 +531,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
       // prior current is intact. The image is checkpointed → retry persists it.
       return failJob(job.id, {
         errorCode: "render_persist_failed",
-        ownerMessage: "The finished edit couldn't be saved. The generated work is recoverable — try again.",
+        ownerMessage: "The finished render couldn't be saved. The generated work is recoverable — try again.",
         detail: insertError?.message ?? "insert returned no row"
       });
     }
@@ -506,7 +552,7 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
   if (staleError) {
     return failJob(job.id, {
       errorCode: "render_stale_failed",
-      ownerMessage: "The edit was saved but tidying up the previous version didn't finish. Try again.",
+      ownerMessage: "The render was saved but tidying up the previous version didn't finish. Try again.",
       detail: staleError.message
     });
   }
@@ -514,6 +560,215 @@ async function executeRender(job: GenerationJob): Promise<GenerationJob> {
   await supabase.from("rooms").update({ status: "renders", current_stage: "executing" }).eq("id", roomId);
 
   return completeJob(job.id, { render_id: renderId });
+}
+
+/**
+ * P0.3 batch render executor (docs/P0_P1_EXECUTION_PLAN_2026-07-10.md §P0.3).
+ *
+ * Delivers one approved direction across all eligible room photos as a single
+ * understandable, durable, partially-recoverable operation. The parent
+ * `batch_render` job ORCHESTRATES one child `render` job per selected photo,
+ * reusing the entire P0.2 render pipeline (idempotency, checkpointing,
+ * insert-first atomicity, the critic gate). It owns three things the children
+ * cannot: photo selection, bounded concurrency, and cross-photo consistency.
+ *
+ * Resilience properties:
+ *  - each photo is its OWN durable child row, so a failure on one photo leaves
+ *    the others' completed renders intact and makes only that photo retryable
+ *    (retry is the existing per-child endpoint — siblings never regenerate);
+ *  - the child list is checkpointed to the parent BEFORE any child runs, so a
+ *    stale-reclaim of the parent resumes: completed children are skipped and
+ *    only unfinished ones run again (no duplicate paid calls);
+ *  - children are created UNSCHEDULED and driven only here, so the batch never
+ *    exceeds its concurrency and rapid double-clicks dedupe to one batch (the
+ *    parent's own idempotency key is `batch_render|room`).
+ */
+async function executeBatchRender(job: GenerationJob): Promise<GenerationJob> {
+  const supabase = createServerSupabaseClient();
+  const roomId = job.room_id;
+  const payload = (job.request_payload as Record<string, unknown>) ?? {};
+  const checkpoint = (job.result_refs as Record<string, unknown>) ?? {};
+
+  await advanceStage(job.id, "validating", "checking the direction and photos");
+
+  const { data: room, error: roomError } = await supabase.from("rooms").select("*").eq("id", roomId).single();
+  if (roomError || !room) {
+    return failJob(job.id, {
+      errorCode: "room_not_found",
+      ownerMessage: "We couldn't find this room.",
+      detail: roomError?.message ?? "room missing",
+      retryable: false
+    });
+  }
+
+  const { data: locked } = await supabase
+    .from("mood_boards")
+    .select("id, version")
+    .eq("room_id", roomId)
+    .eq("status", "locked")
+    .maybeSingle();
+  if (!locked) {
+    return failJob(job.id, {
+      errorCode: "no_locked_concept",
+      ownerMessage: "Approve a direction before visualizing the whole room.",
+      detail: "no locked mood_board for room",
+      retryable: false
+    });
+  }
+
+  // Resume-safe: reuse the child list checkpointed on a prior attempt; otherwise
+  // resolve the selection and create the children (once).
+  let items: BatchItem[] = Array.isArray(checkpoint.items) ? (checkpoint.items as BatchItem[]) : [];
+  let selectedPhotoIds: string[] = Array.isArray(checkpoint.selected_photo_ids)
+    ? (checkpoint.selected_photo_ids as string[])
+    : [];
+
+  if (!items.length) {
+    const { data: photos } = await supabase
+      .from("photos")
+      .select("id, label, angle_type, file_url")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true });
+    const roomPhotos = photos ?? [];
+
+    // Explicit owner selection wins (they may have opted a normally-excluded
+    // photo in or a perspective out); otherwise default to eligible perspectives.
+    const requested = Array.isArray(payload.photo_ids) ? (payload.photo_ids as unknown[]).map(String) : null;
+    selectedPhotoIds =
+      requested && requested.length
+        ? requested.filter((id) => roomPhotos.some((p) => p.id === id))
+        : classifyPhotos(roomPhotos)
+            .filter((p) => p.eligible)
+            .map((p) => p.photo_id);
+
+    if (!selectedPhotoIds.length) {
+      return failJob(job.id, {
+        errorCode: "no_eligible_photos",
+        ownerMessage: "There are no room perspectives to visualize yet. Add a room photo and try again.",
+        detail: "no eligible/selected photos for batch",
+        retryable: false
+      });
+    }
+
+    // Test-only, mock-only: force specific photos to fail their first attempt so
+    // the partial-batch + retry gate is deterministic through the async path.
+    const forceFail = new Set(
+      Array.isArray(payload.test_force_failure_photo_ids)
+        ? (payload.test_force_failure_photo_ids as unknown[]).map(String)
+        : []
+    );
+
+    for (const photoId of selectedPhotoIds) {
+      const childPayload: Record<string, unknown> = { source_photo_id: photoId, batch_id: job.id };
+      if (forceFail.has(photoId)) childPayload.test_force_failure = "batch_perspective_failed";
+      const { job: child } = await createOrGetActiveJob({
+        roomId,
+        jobType: "render",
+        requestPayload: childPayload,
+        requestedBy: "batch",
+        correlationId: job.correlation_id,
+        testRunId: job.test_run_id
+      });
+      items.push({ photo_id: photoId, child_job_id: child.id });
+    }
+    await checkpointResult(job.id, { batch_id: job.id, selected_photo_ids: selectedPhotoIds, items });
+  }
+
+  const total = items.length;
+  const completedNow = async () => {
+    const children = await Promise.all(items.map((i) => getJob(i.child_job_id, roomId)));
+    return children.filter((c) => c?.status === "completed").length;
+  };
+
+  await advanceStage(job.id, "generating", `0 of ${total} complete`, { current: await completedNow(), total });
+
+  // --- Drive children with bounded concurrency ------------------------------
+  const queue = [...items];
+  const drive = async () => {
+    while (queue.length) {
+      const item = queue.shift();
+      if (!item) break;
+      await driveChild(item.child_job_id, roomId);
+      const done = await completedNow();
+      await advanceStage(job.id, "generating", `${done} of ${total} complete`, { current: done, total });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(batchConcurrency(), total) }, () => drive()));
+
+  // --- Consistency across the completed perspectives ------------------------
+  await advanceStage(job.id, "persisting", "checking the set holds together");
+
+  const finalChildren = await Promise.all(items.map((i) => getJob(i.child_job_id, roomId)));
+  const completedChildren = finalChildren.filter((c) => c?.status === "completed");
+  const failedChildren = finalChildren.filter(
+    (c) => c && (c.status === "retryable_failed" || c.status === "terminal_failed")
+  );
+
+  const renderIds = completedChildren
+    .map((c) => (c?.result_refs as Record<string, unknown> | undefined)?.render_id)
+    .filter((id): id is string => typeof id === "string");
+
+  let consistency = evaluateBatchConsistency([], { lockedVersion: locked.version });
+  if (renderIds.length) {
+    const { data: renders } = await supabase
+      .from("renders")
+      .select("id, source_photo_id, mood_board_version, preservation_constraints, transformation_instructions, negative_instructions, render_prompt")
+      .in("id", renderIds);
+    consistency = evaluateBatchConsistency((renders ?? []) as RenderForConsistency[], { lockedVersion: locked.version });
+  }
+
+  const summary = {
+    batch_id: job.id,
+    selected_photo_ids: selectedPhotoIds,
+    items,
+    consistency,
+    completed: completedChildren.length,
+    failed: failedChildren.length,
+    total
+  };
+
+  logStructured("batch_render_settled", {
+    correlation_id: job.correlation_id,
+    room_id: roomId,
+    job_id: job.id,
+    completed: completedChildren.length,
+    failed: failedChildren.length,
+    total,
+    consistency_passed: consistency.passed
+  });
+
+  // Partial success is success: as long as one perspective landed, the batch
+  // completed and the failed photos stay individually retryable via their child
+  // jobs (surfaced by the batch view). Only an all-failed batch is a failure.
+  if (completedChildren.length >= 1) {
+    return completeJob(job.id, summary);
+  }
+  await checkpointResult(job.id, summary);
+  return failJob(job.id, {
+    errorCode: "batch_all_failed",
+    ownerMessage: "None of the perspectives could be visualized. Your direction is saved — try again.",
+    detail: `0/${total} perspectives completed`
+  });
+}
+
+/**
+ * Advance one child render job by exactly one execution. Completed/terminal
+ * children are left untouched (so siblings never regenerate); a crashed
+ * (stale-heartbeat) child is reclaimed first; a retryable child is left for the
+ * owner's explicit retry. Only a queued child is actually run here.
+ */
+async function driveChild(childId: string, roomId: string): Promise<void> {
+  let child = await getJob(childId, roomId);
+  if (!child) return;
+  if (TERMINAL_STATUSES.includes(child.status as JobStatus)) return;
+  if (child.status === "retryable_failed") return;
+  if (isStale(child)) {
+    const reclaimed = await reclaimIfStale(child);
+    child = reclaimed ?? (await getJob(childId, roomId));
+  }
+  if (child && child.status === "queued") {
+    await runJobNow(childId);
+  }
 }
 
 /** Minimal shape of the render plan consumed at persistence (see services.RenderPlan). */
