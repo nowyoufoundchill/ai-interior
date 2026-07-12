@@ -50,15 +50,26 @@ async function main() {
   reporter.assert(Boolean(currentRender), "precondition: a current render exists (locked-concept state)", state.renders);
 
   // --- Provider failure classes on a real generation route ---------------
+  // /analyze is now the durable diagnosis compat layer (P0.1): a provider
+  // failure fails the job recoverably and returns an owner-safe error (no
+  // internal "simulated"/provider detail) with a job_id — not the old raw 500.
+  // The fixture firing is proven by the failed ai_runs assertion below and by
+  // "no diagnosis row created".
   for (const fixture of ["provider_timeout", "provider_rate_limit", "provider_server_error"]) {
     const response = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/analyze`, {
       method: "POST",
       ...fixtureHeaders(fixture)
     });
-    reporter.assert(!response.ok && response.status === 500, `${fixture}: analyze fails with 500`, response);
     reporter.assert(
-      typeof response.body?.error === "string" && response.body.error.toLowerCase().includes("simulated"),
-      `${fixture}: error message reflects the simulated failure`,
+      !response.ok && (response.status === 502 || response.status === 500),
+      `${fixture}: analyze fails recoverably (durable owner-safe failure)`,
+      response
+    );
+    reporter.assert(
+      typeof response.body?.error === "string" &&
+        response.body.error.length > 0 &&
+        !response.body.error.toLowerCase().includes("simulated"),
+      `${fixture}: owner-safe error surfaced without leaking internal provider detail`,
       response.body
     );
     state = await getRoomState(roomId);
@@ -147,15 +158,15 @@ async function main() {
     ...fixtureHeaders("db_persist_failure")
   });
   reporter.assert(
-    dbFail.status === 500 && dbFail.body?.error_code === "db_persist_failure",
-    "db_persist_failure: render fails 500 with error_code after provider success",
+    (dbFail.status === 502 || dbFail.status === 500) && dbFail.body?.error_code === "db_persist_failure",
+    "db_persist_failure: render fails with error_code and a recoverable job",
     dbFail
   );
   state = await getRoomState(roomId);
   reporter.assert(
     state.renders.length === baseRenders &&
-      state.renders.find((render) => render.id === currentRender.id)?.status === "stale",
-    "db_persist_failure: faithfully reproduces today's non-atomic defect (current staled, nothing inserted) — the P0.2 target",
+      state.renders.find((render) => render.id === currentRender.id)?.status === "current",
+    "db_persist_failure: P0.2 FIX — prior current render is untouched (no 'current staled, nothing inserted' defect)",
     state.renders
   );
 

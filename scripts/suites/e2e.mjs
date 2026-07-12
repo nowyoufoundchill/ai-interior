@@ -128,20 +128,19 @@ async function main() {
     );
 
     // --- Renders: generate, regenerate with instructions ---------------------
+    // P0.2: the render runs as a durable job (POST /jobs -> observe -> refresh),
+    // so the render card appears when the job completes, not on a synchronous
+    // /generate-render response. Wait for the card itself.
     await page.getByTestId("tab-renders").click();
     await page.getByTestId("render-instructions-input").fill("Keep the leather chair, make the walls darker.");
     await page.getByTestId("render-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
     const renderCards = page.locator('[data-testid^="render-card-"]');
-    const firstRenderCount = await waitForCount(renderCards, 1);
-    reporter.assert(firstRenderCount === 1, "first render card appears after edit", firstRenderCount);
+    const firstRenderCount = await waitForCount(renderCards, 1, { timeoutMs: 60000 });
+    reporter.assert(firstRenderCount === 1, "first render card appears after the durable edit completes", firstRenderCount);
 
     await page.getByTestId("render-instructions-input").fill("Regenerate with a larger rug.");
     await page.getByTestId("render-generate-button").click();
-    await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
-    await page.waitForLoadState("networkidle");
-    const secondRenderCount = await waitForCount(renderCards, 2);
+    const secondRenderCount = await waitForCount(renderCards, 2, { timeoutMs: 60000 });
     reporter.assert(secondRenderCount === 2, "regeneration adds a second render card (history kept)", secondRenderCount);
 
     // --- Products: generate after render, approve, reject ---------------------

@@ -219,6 +219,28 @@ export async function heartbeat(jobId: string, client?: Supabase): Promise<void>
 }
 
 /**
+ * Merge partial intermediate work into `result_refs` WITHOUT completing the job
+ * (P0.2). Lets a multi-stage runner checkpoint expensive, recoverable output —
+ * a composed render plan, an already-uploaded image — so a later-stage failure
+ * and bounded retry never repeat a paid step (§P0.2: "No paid image call is
+ * repeated solely because persistence failed"). The merged refs are readable by
+ * the runner on its next attempt and are owner-safe (never provider secrets).
+ */
+export async function checkpointResult(
+  jobId: string,
+  partial: Record<string, unknown>,
+  client?: Supabase
+): Promise<void> {
+  const supabase = client ?? createServerSupabaseClient();
+  const current = await getJob(jobId, undefined, supabase);
+  const merged = { ...((current?.result_refs as Record<string, unknown>) ?? {}), ...partial };
+  await supabase
+    .from("generation_jobs")
+    .update({ result_refs: merged as Json, heartbeat_at: new Date().toISOString() })
+    .eq("id", jobId);
+}
+
+/**
  * Complete a job. Persisted-artifact reference is REQUIRED (§4): a job cannot
  * report "completed" without a valid artifact ref, so the UI can never show
  * complete without real output.

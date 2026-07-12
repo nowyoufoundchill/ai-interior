@@ -1276,6 +1276,17 @@ function computeObjectBudget(input: {
   };
 }
 
+export interface RenderCriticOutcome {
+  /** The critic was attempted. */
+  ran: boolean;
+  /** The critic itself failed to respond (timeout/transport) — recoverable, not a design verdict. */
+  operationalFailure: boolean;
+  /** Blocking design violations surviving the one bounded regeneration. Non-empty ⇒ no image. */
+  blockingViolations: string[];
+  /** Internal-only detail for logs; never shown to the owner. */
+  detail?: string;
+}
+
 export async function renderPromptDirector(input: {
   roomId: string;
   sourcePhotoId?: string;
@@ -1289,6 +1300,15 @@ export async function renderPromptDirector(input: {
   skipCritic?: boolean;
   designPreferences?: { preference_type: string; label: string }[];
   provider?: GatewayProvider;
+  /**
+   * P0.2: report the render critic's outcome so a durable runner can make the
+   * blocking-vs-operational distinction the failure matrix requires. Fires
+   * exactly once (before this function returns) whenever the critic is run.
+   *  - `blockingViolations` non-empty  → design failure: do NOT generate an image.
+   *  - `operationalFailure` true       → critic timed out / errored: recoverable,
+   *                                       never treat as a passed critic.
+   */
+  onCriticOutcome?: (outcome: RenderCriticOutcome) => void;
 }): Promise<RenderPlan> {
   const provider = input.provider ?? "anthropic";
   const userInstructions = input.userInstructions?.trim() || null;
@@ -1399,8 +1419,19 @@ export async function renderPromptDirector(input: {
         },
         quality_score: residual.length ? Math.min(plan.quality_score, 45) : plan.quality_score
       });
-    } catch {
-      // A critic failure must never block a completed render plan.
+      input.onCriticOutcome?.({ ran: true, operationalFailure: false, blockingViolations: residual });
+    } catch (error) {
+      // P0.2: an operational critic failure (timeout/transport) must never be
+      // silently treated as a passed critic. Report it so the runner can put
+      // the render into a recoverable state rather than shipping an unreviewed
+      // plan as "current". The plan itself is retained (returned below), so a
+      // retry does not lose composed work.
+      input.onCriticOutcome?.({
+        ran: true,
+        operationalFailure: true,
+        blockingViolations: [],
+        detail: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
