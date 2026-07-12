@@ -98,7 +98,9 @@ export default async function DashboardPage() {
                             className="flex items-baseline justify-between border-t border-hairline py-3 text-sm"
                           >
                             <span className="font-light text-atelier-ink">{room.name}</span>
-                            <span className="atelier-label">{statusLabel(room.current_stage || room.status)}</span>
+                            <span className={`atelier-label ${room.job_status ? "text-atelier-brass" : ""}`}>
+                              {room.job_status ? jobLabel(room.job_status, room.job_type) : statusLabel(room.current_stage || room.status)}
+                            </span>
                           </div>
                         ))
                       )}
@@ -116,4 +118,9 @@ export default async function DashboardPage() {
 
 function statusLabel(status: string) {
   return ROOM_STATUSES[status as keyof typeof ROOM_STATUSES] ?? status;
+}
+
+function jobLabel(status: string, type: string | null | undefined) {
+  const noun = type === "batch_render" ? "room perspectives" : type === "chat_action" ? "requested change" : type === "diagnosis" ? "room reading" : type === "render" ? "visualization" : "design step";
+  return status === "retryable_failed" || status === "terminal_failed" ? `${noun} needs attention` : `${noun} in progress`;
 }

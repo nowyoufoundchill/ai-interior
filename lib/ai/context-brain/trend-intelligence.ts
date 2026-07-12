@@ -267,7 +267,7 @@ export function resolveRegionalTrendBrief(
   // Refresh ritual: multiple briefs may match a region across years. Always
   // resolve to the NEWEST matching brief by `authored` date, so appending a new
   // annual brief (never overwriting the old one) automatically supersedes it
-  // while the prior brief is retained for audit/provenance. See docs/TREND_REFRESH.md.
+  // while the prior brief is retained for audit/provenance. See docs/runbooks/TREND_REFRESH.md.
   const brief = TREND_BRIEFS.filter((entry) =>
     entry.region_match.split("|").some((pattern) => haystack.includes(pattern))
   ).sort((a, b) => b.authored.localeCompare(a.authored))[0];

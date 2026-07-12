@@ -14,13 +14,20 @@ type Revision = Database["public"]["Tables"]["revisions"]["Row"];
 type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type AiRun = Database["public"]["Tables"]["ai_runs"]["Row"];
+type GenerationJob = Database["public"]["Tables"]["generation_jobs"]["Row"];
 
 export type HomeSummary = Home & {
-  rooms: Pick<Room, "id" | "name" | "room_type" | "status" | "current_stage" | "created_at">[];
+  rooms: HomeRoom[];
+};
+
+export type HomeRoom = Pick<Room, "id" | "name" | "room_type" | "status" | "current_stage" | "created_at"> & {
+  job_status?: string | null;
+  job_type?: string | null;
+  job_error_message?: string | null;
 };
 
 export type HomeDetail = Home & {
-  rooms: Room[];
+  rooms: (Room & Pick<HomeRoom, "job_status" | "job_type" | "job_error_message">)[];
 };
 
 export type RoomWorkspaceData = {
@@ -36,6 +43,7 @@ export type RoomWorkspaceData = {
   actionProposals: ActionProposal[];
   memories: Memory[];
   aiRuns: AiRun[];
+  generationJobs: GenerationJob[];
 };
 
 export async function getHomes() {
@@ -48,7 +56,27 @@ export async function getHomes() {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []) as HomeSummary[];
+  const homes = (data ?? []) as HomeSummary[];
+  const roomIds = homes.flatMap((home) => home.rooms.map((room) => room.id));
+  if (!roomIds.length) return homes;
+
+  // Keep navigation cards useful after a refresh. Only owner-actionable jobs
+  // belong here; completed history would make a room look busy forever.
+  const { data: jobs } = await supabase
+    .from("generation_jobs")
+    .select("room_id, job_type, status, error_message, created_at")
+    .in("room_id", roomIds)
+    .in("status", ["queued", "planning", "validating", "generating", "persisting", "retryable_failed", "terminal_failed"])
+    .order("created_at", { ascending: false });
+  const latest = new Map<string, { room_id: string; job_type: string; status: string; error_message: string | null }>();
+  for (const job of jobs ?? []) if (!latest.has(job.room_id)) latest.set(job.room_id, job);
+  return homes.map((home) => ({
+    ...home,
+    rooms: home.rooms.map((room) => {
+      const job = latest.get(room.id);
+      return { ...room, job_status: job?.status ?? null, job_type: job?.job_type ?? null, job_error_message: job?.error_message ?? null };
+    })
+  }));
 }
 
 export async function getHome(homeId: string) {
@@ -60,7 +88,24 @@ export async function getHome(homeId: string) {
     .single();
 
   if (error) throw new Error(error.message);
-  return data as HomeDetail;
+  const home = data as HomeDetail;
+  const roomIds = home.rooms.map((room) => room.id);
+  if (!roomIds.length) return home;
+  const { data: jobs } = await supabase
+    .from("generation_jobs")
+    .select("room_id, job_type, status, error_message, created_at")
+    .in("room_id", roomIds)
+    .in("status", ["queued", "planning", "validating", "generating", "persisting", "retryable_failed", "terminal_failed"])
+    .order("created_at", { ascending: false });
+  const latest = new Map<string, { job_type: string; status: string; error_message: string | null }>();
+  for (const job of jobs ?? []) if (!latest.has(job.room_id)) latest.set(job.room_id, job);
+  return {
+    ...home,
+    rooms: home.rooms.map((room) => {
+      const job = latest.get(room.id);
+      return { ...room, job_status: job?.status ?? null, job_type: job?.job_type ?? null, job_error_message: job?.error_message ?? null };
+    })
+  } as HomeDetail;
 }
 
 export type DesignPreference = Database["public"]["Tables"]["design_preferences"]["Row"];
@@ -122,6 +167,13 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
   // Proposals are loaded via the tolerant helper so a room still renders before
   // migration 009 is applied (returns [] when the table is absent).
   const actionProposals = await listProposals(roomId, supabase).catch(() => [] as ActionProposal[]);
+  const generationJobs = await supabase
+    .from("generation_jobs")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: false })
+    .limit(100)
+    .then((result) => (result.error ? [] : ((result.data ?? []) as GenerationJob[])));
 
   return {
     room: roomWithHome,
@@ -135,6 +187,7 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     chatMessages: (chatMessages.data ?? []) as ChatMessage[],
     actionProposals,
     memories: (memories.data ?? []) as Memory[],
-    aiRuns: (aiRuns.data ?? []) as AiRun[]
+    aiRuns: (aiRuns.data ?? []) as AiRun[],
+    generationJobs
   };
 }

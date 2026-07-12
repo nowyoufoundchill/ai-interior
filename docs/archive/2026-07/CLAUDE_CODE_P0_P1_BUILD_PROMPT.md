@@ -281,4 +281,3 @@ Begin now with **Phase P0.0**.
 First establish whether a truly separate `.env.test` Supabase project exists without printing any secrets. Inspect the current mutation suites for fallback-to-production behavior. Baseline the current test safety and observability. Then implement the smallest vertical slice that makes mutation suites fail closed when test and production point to the same project.
 
 Remain in P0.0 until every P0.0 strict success criterion in `docs/P0_P1_EXECUTION_PLAN_2026-07-10.md` is proven green or until a genuine external test-project provisioning action is the only remaining blocker.
-

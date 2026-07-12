@@ -1,107 +1,68 @@
-# AI Interior Atelier
+# AI Interior Designer
 
-A private virtual interior design studio for designing a home room by room. The foundation app exists, and Phase 0 now has a dedicated spike harness for validating prompts and provider behavior before treating any AI output as production-quality.
+A private, premium interior-design application for one household. It turns room briefs, typed dimensions, and real photographs into a designer diagnosis, approved concept direction, multi-perspective room visualizations, confirmed refinements, and a sourced product plan.
 
-## Current Mode
+The application is currently entering **P0.5 — guided workflow and recovery**. See [docs/ACTIVE_BUILD.md](docs/ACTIVE_BUILD.md) for the next implementation slice.
 
-This build is intentionally private single-household mode. There is no login wall because the app is for one household. The schema still includes `users` and `user_id` so Supabase Auth can be added later without redesigning the product.
+## Start the application
 
-## Setup
+1. Use Node.js 22 or newer and install the locked dependencies:
 
-1. Create `.env.local` from `.env.example`.
-2. Add your env values:
+   ```powershell
+   npm.cmd ci
+   ```
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://ztakhixowbjhfoggwtll.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-OPENAI_API_KEY=your-openai-key
-ANTHROPIC_API_KEY=your-anthropic-key
-TAVILY_API_KEY=your-tavily-key
+2. Copy `.env.example` to `.env.local` and provide the three required Supabase values. Provider keys are needed only for live AI calls.
+
+3. Install Chromium once if you will run browser suites:
+
+   ```powershell
+   npx.cmd playwright install chromium
+   ```
+
+4. Start the development server:
+
+   ```powershell
+   npm.cmd run dev
+   ```
+
+The app uses private single-household mode and intentionally has no login wall.
+
+## Core commands
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run dev:test
+npm.cmd run seed:test
+npm.cmd run suite:e2e
+npm.cmd run teardown:test
+npm.cmd run check:residue
 ```
 
-3. Run `supabase/migrations/001_initial_schema.sql` in the Supabase SQL editor for project `ztakhixowbjhfoggwtll`.
-4. Install dependencies and start the app:
+`npm.cmd run dev:test` defaults to `AI_MODE=mock` and is the safe implementation/regression server. A normal `npm.cmd run dev` uses the mode in the environment; when `AI_MODE=mock` is absent, provider paths are live. Live calls are reserved for gates that judge provider integration or output quality.
 
-```bash
-npm install
-npm run dev
-```
+The repository currently permits tagged automated suites against the production Supabase project under the explicit controls in `test-isolation.config.json`. Read [docs/OPERATIONS.md](docs/OPERATIONS.md) before running mutation-capable suites.
 
-## GitHub + Supabase
+## Documentation
 
-This repo is wired for GitHub Actions based Supabase migration checks and deploys:
+- [CLAUDE.md](CLAUDE.md) — Claude Code working agreement
+- [docs/PRODUCT.md](docs/PRODUCT.md) — stable product and architecture contract
+- [docs/ACTIVE_BUILD.md](docs/ACTIVE_BUILD.md) — current phase and next slice
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — environment, tests, migrations, and deployment
+- [docs/README.md](docs/README.md) — complete authority map
+- [brand-guidelines.html](brand-guidelines.html) — owner-facing visual and verbal system
 
-- Pull requests touching `supabase/**` run `.github/workflows/supabase-db-check.yml`
-- Pushes to `main` touching `supabase/**` run `.github/workflows/supabase-db-deploy.yml`
+Superseded plans and historical session evidence live under `docs/archive/` and are not active implementation context.
 
-Configure the GitHub repository secret:
+## Stack
 
-```text
-SUPABASE_DB_URL=postgres://...your-session-pooler-or-direct-connection-string...
-```
+- Next.js App Router, React, TypeScript, and Tailwind CSS
+- Supabase Postgres and Storage
+- Anthropic for reasoning
+- OpenAI for image editing
+- Tavily for sourcing support
+- Zod for structured AI/domain contracts
+- Playwright for browser verification
 
-Get this from Supabase Dashboard -> Connect -> Session pooler connection string, or use the direct connection string if your network supports it.
-
-If you also want Supabase's native GitHub integration:
-
-1. In Supabase Dashboard, go to `Project Settings -> Integrations`.
-2. Under GitHub Integration, authorize GitHub and choose `nowyoufoundchill/ai-interior`.
-3. Set `Working directory` to `.` because the `supabase/` folder is at the repository root.
-4. Enable `Deploy to production`.
-
-This matches Supabase's documented GitHub integration flow and lets Supabase watch branch and PR changes in the repo.
-
-## Exact Workflow
-
-The intended deployment flow is:
-
-1. Make changes locally in `C:\Users\darre\Documents\AI Interior Designer`.
-2. Run local verification such as `npm run build` and any feature-specific checks.
-3. Commit and push to GitHub (`nowyoufoundchill/ai-interior`).
-4. Vercel sees the GitHub change and redeploys the Next.js application.
-5. GitHub Actions sees changes under `supabase/**` and runs the Supabase migration workflow.
-6. The deployed Vercel app then talks to the live Supabase project at runtime.
-
-Important distinctions:
-
-- Vercel deploys app code from GitHub. It does not copy or own the database.
-- Supabase remains the live database and storage backend.
-- Database schema changes belong in `supabase/migrations/`, not in ad hoc dashboard-only edits.
-- The GitHub secret `SUPABASE_DB_URL` should use the **Transaction pooler** connection string so GitHub-hosted runners can connect over IPv4.
-
-For future AI agents working in this repo:
-
-- treat GitHub as the shared deployment hub
-- treat Vercel as app hosting only
-- treat Supabase as the runtime backend and schema owner
-- keep untracked planning docs local unless explicitly requested for commit
-
-## Phase 0 Spike
-
-- Hidden workbench route: `/spike`
-- Full-chain spike API route: `POST /api/spike/run`
-- Saved artifacts: `spike/runs/*.json`
-- Current use: paste a payload with real photo URLs, typed dimensions, and design brief, then validate diagnosis, concepts, products, render planning, and image edit behavior in one run.
-
-Notes:
-
-- Anthropic powers the spike reasoning flow when `ANTHROPIC_API_KEY` is configured.
-- OpenAI powers the image-edit validation when `OPENAI_API_KEY` is configured.
-- Tavily enrichment is attempted only when `TAVILY_API_KEY` is configured.
-- The spike is the prompt workbench, not the production room workflow.
-
-## Foundation Includes
-
-- Next.js App Router, TypeScript, Tailwind CSS.
-- Supabase Postgres schema and Supabase Storage bucket setup.
-- Dashboard, home creation, home detail, room creation, room detail workspace.
-- Room tabs: Photos, Diagnosis, Mood Boards, Products, Renders, Chat, Memory.
-- Photo upload, labels, checklist, relabel, delete.
-- Mock routes for diagnosis, mood boards, product plan, render prompt, and room-aware chat.
-- Modular AI service files with TypeScript types, Zod schemas, mock implementations, and `ai_runs` logging.
-
-## Next Recommended Step
-
-Run `/spike` against the owner's real room photos and typed dimensions, add `TAVILY_API_KEY`, and use the saved artifacts plus `/debug` logs to decide whether the current prompt files are good enough to graduate as approved v1 prompts.
+Database changes are ordered additive migrations under `supabase/migrations/`. Application database types live in `types/database.ts`.

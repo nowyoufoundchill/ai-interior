@@ -1,32 +1,32 @@
 ---
 name: atelier-e2e
-description: Run PRD v3 Suite 2 (Functional E2E) — drives a real browser through the full room journey (diagnosis, concepts, edit/re-harmonize/lock, products, renders, chat) using only data-testid selectors, AI_MODE=mock.
+description: Run the current functional E2E suite through the room journey in a real browser using stable selectors and AI_MODE=mock.
 ---
 
 # atelier-e2e
 
-Runs against a **fresh `npm run seed:test` state**.
+Runs against a **fresh `npm.cmd run seed:test` state** under `docs/OPERATIONS.md`.
 
 ## Preconditions
 
-1. Dev server running with `AI_MODE=mock`:
+1. Test-bound dev server running in mock mode:
    ```
-   AI_MODE=mock npm run dev
+   npm.cmd run dev:test
    ```
-2. `npm run seed:test` has just been run.
-3. Playwright's Chromium browser is installed (`npx playwright install chromium` if not).
+2. `npm.cmd run seed:test` has just been run.
+3. Playwright's Chromium browser is installed (`npx.cmd playwright install chromium` if not).
 
 ## Run
 
 ```
-npm run suite:e2e
+npm.cmd run suite:e2e
 ```
 
 Equivalent to `node scripts/suites/e2e.mjs`.
 
 ## Driver choice
 
-The script uses Playwright, not chrome-devtools MCP: this suite must be re-runnable unattended as part of `npm run suite:e2e` / the verification cycle, and MCP browser tools are only callable from an agent's own tool-calling loop, not from a standalone Node script. When a human agent is doing ad hoc, one-off browser verification in-session (not running this script), prefer chrome-devtools MCP per `BUILD_PLAN.md`.
+The script uses Playwright so it can run unattended and repeatably. Use an interactive browser for focused in-session verification that is not becoming a reusable suite.
 
 ## What it checks
 
@@ -37,7 +37,7 @@ Full journey via `data-testid` only, on the seeded room (home/room/photos alread
 - Locked concept no longer shows a direct Edit control (must unlock first — mirrors the Suite 1 integrity rule at the UI layer).
 - Product generation, approve, reject.
 - Render generation and regenerate-with-instructions (history kept — two render cards).
-- Chat: a "why" question, then a revision-request turn tagged "Proposal only" (chat never silently mutates state).
+- Chat: a "why" question, then a structured revision proposal with explicit Apply and a durable result linked back into the thread.
 - **Zero new console errors and zero failed network requests across the entire journey** — this is a hard pass/fail gate, checked in a `finally` block regardless of where an earlier assertion failed.
 
 ## Output

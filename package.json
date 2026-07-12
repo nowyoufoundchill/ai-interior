@@ -29,7 +29,10 @@
     "suite:render-batches": "node scripts/suites/render-batches.mjs",
     "verify:p0-3": "node scripts/verify-p0-3.mjs",
     "suite:chat-actions": "node scripts/suites/chat-actions.mjs",
-    "verify:p0-4": "node scripts/verify-p0-4.mjs"
+    "suite:recommended-next-action": "node --experimental-strip-types scripts/suites/recommended-next-action.mjs",
+    "suite:p05-browser": "node scripts/suites/p05-browser.mjs",
+    "verify:p0-4": "node scripts/verify-p0-4.mjs",
+    "verify:p0-6": "node scripts/verify-p0-6.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

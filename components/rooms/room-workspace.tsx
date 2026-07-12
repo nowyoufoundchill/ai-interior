@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ROOM_STATUSES, ROOM_TABS } from "@/lib/constants";
 import type { Database, Json, Photo } from "@/types/database";
 import { PhotoUploader } from "@/components/rooms/photo-uploader";
 import { observeJob } from "@/components/jobs/job-observer";
 import { BatchRenderPanel } from "@/components/rooms/batch-render-panel";
+import { PersistedJobNotice } from "@/components/jobs/persisted-job-notice";
+import { recommendedNextAction, type RoomActionState, type RoomJobState } from "@/lib/room/recommended-next-action";
 
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
 type Home = Database["public"]["Tables"]["homes"]["Row"];
@@ -18,6 +20,7 @@ type Revision = Database["public"]["Tables"]["revisions"]["Row"];
 type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 type ActionProposal = Database["public"]["Tables"]["action_proposals"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
+type GenerationJob = Database["public"]["Tables"]["generation_jobs"]["Row"];
 type TabName = (typeof ROOM_TABS)[number];
 type OutputAction = "analyze" | "moodboards" | "products" | "render" | "chat";
 type FlowStepId = "intake" | "concept" | "render" | "refine";
@@ -95,21 +98,32 @@ export function RoomWorkspace(props: {
   chatMessages: ChatMessage[];
   actionProposals: ActionProposal[];
   memories: Memory[];
+  generationJobs?: GenerationJob[];
 }) {
   const lockedMoodBoard = props.moodBoards.find((board) => board.status === "locked") ?? props.moodBoards.find((board) => board.selected);
   const latestDiagnosis = props.diagnoses[0];
   const hasCurrentDiagnosis = latestDiagnosis?.status === "current";
   const currentRender = props.renders.find((render) => render.status !== "stale") ?? props.renders[0];
 
-  // Land on the owner's most valuable artifact, not the intake screen: a
-  // finished room opens on its render, not on photo upload.
-  const initialTab: TabName = props.renders.length
-    ? "Renders"
-    : lockedMoodBoard
-      ? "Renders"
-      : props.moodBoards.length
-        ? "Concepts"
-        : "Photos & Brief";
+  const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
+  const conceptsStale = props.moodBoards.length > 0 && activeConcepts.length === 0;
+  const productsStale = props.products.length > 0 && props.products.every((product) => product.status === "stale");
+  const rendersStale = props.renders.length > 0 && props.renders.every((render) => render.status === "stale");
+  const actionState: RoomActionState = {
+    photoCount: props.photos.length,
+    hasCurrentDiagnosis,
+    activeConceptCount: activeConcepts.length,
+    hasApprovedConcept: Boolean(lockedMoodBoard),
+    currentRenderCount: props.renders.filter((render) => render.status !== "stale").length,
+    staleConceptCount: conceptsStale ? props.moodBoards.length : 0,
+    staleProductCount: productsStale ? props.products.length : 0,
+    staleRenderCount: rendersStale ? props.renders.length : 0,
+    hasProducts: props.products.length > 0,
+    jobs: roomJobStates(props.generationJobs ?? [])
+  };
+  const nextAction = recommendedNextAction(actionState);
+  const initialTab: TabName = nextAction.targetTab;
+  const persistedJob = selectOwnerJob(props.generationJobs ?? []);
 
   const [activeTab, setActiveTab] = useState<TabName>(initialTab);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -121,14 +135,54 @@ export function RoomWorkspace(props: {
   // P0.4: the in-thread state of a confirmed chat proposal being executed.
   const [chatActionJob, setChatActionJob] = useState<ChatActionJobUi | null>(null);
   const [busyProposalId, setBusyProposalId] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
-  // A diagnosis rerun marks every prior concept stale. If concepts exist but
-  // none are active, the concept set is stale relative to the current diagnosis.
-  const conceptsStale = props.moodBoards.length > 0 && activeConcepts.length === 0;
-  const productsStale = props.products.length > 0 && props.products.every((product) => product.status === "stale");
-  const rendersStale = props.renders.length > 0 && props.renders.every((render) => render.status === "stale");
+  useEffect(() => {
+    if (workflowError || statusMessage) statusRef.current?.focus();
+  }, [workflowError, statusMessage]);
+
+  // Rehydrate client-only progress from the durable row after a refresh or a
+  // navigation back into this room. The server snapshot remains authoritative.
+  useEffect(() => {
+    if (!persistedJob) return;
+    const payload = asRecord(persistedJob.request_payload);
+    if (persistedJob.job_type === "render" && !renderJob) {
+      setRenderJob({
+        jobId: persistedJob.id,
+        status: persistedJob.status as RenderJobUi["status"],
+        stage: persistedJob.stage,
+        attempt: persistedJob.attempt_count,
+        maxAttempts: persistedJob.max_attempts,
+        startedAt: new Date(persistedJob.created_at).getTime(),
+        errorMessage: persistedJob.error_message,
+        errorCode: persistedJob.error_code,
+        sourcePhotoId: typeof payload.source_photo_id === "string" ? payload.source_photo_id : undefined,
+        instructions: typeof payload.instructions === "string" ? payload.instructions : undefined
+      });
+    }
+    if (persistedJob.job_type === "chat_action" && !chatActionJob) {
+      setChatActionJob({
+        proposalId: typeof payload.proposal_id === "string" ? payload.proposal_id : "",
+        jobId: persistedJob.id,
+        status: persistedJob.status as ChatActionJobUi["status"],
+        stage: persistedJob.stage,
+        errorMessage: persistedJob.error_message
+      });
+    }
+    if (["diagnosis", "moodboards", "products"].includes(persistedJob.job_type) && !pendingOutput) {
+      const action = persistedJob.job_type as OutputAction;
+      setPendingOutput({
+        action,
+        phase: "refresh",
+        targetTab: outputTargetTab(action),
+        startedAt: new Date(persistedJob.created_at).getTime(),
+        baseline: { diagnosisId: latestDiagnosis?.id, moodBoardCount: props.moodBoards.length, productCount: props.products.length, renderCount: props.renders.length, chatCount: props.chatMessages.length }
+      });
+    }
+  }, [persistedJob?.id]);
 
   useEffect(() => {
     if (!pendingOutput) return;
@@ -158,6 +212,7 @@ export function RoomWorkspace(props: {
       setLoadingAction(null);
       setPendingOutput(null);
       setElapsedSeconds(0);
+      setStatusMessage(`${outputLabel(pendingOutput.action)} complete. Your saved room work is ready to review.`);
     }
   }, [currentRender?.id, latestDiagnosis?.id, pendingOutput, props.chatMessages.length, props.moodBoards.length, props.products.length, props.renders.length]);
 
@@ -239,6 +294,7 @@ export function RoomWorkspace(props: {
       setRenderJob(null);
       setLoadingAction(null);
       setRenderJobElapsed(0);
+      setStatusMessage("Visualization complete. Your saved render is ready to review.");
       router.refresh();
       return true;
     }
@@ -313,6 +369,8 @@ export function RoomWorkspace(props: {
   }
 
   async function runAction(label: string, url: string, body?: Record<string, unknown>) {
+    setWorkflowError(null);
+    setStatusMessage(null);
     const outputAction = getOutputAction(label);
     const targetTab = outputAction ? outputTargetTab(outputAction) : null;
     if (targetTab) setActiveTab(targetTab);
@@ -345,7 +403,7 @@ export function RoomWorkspace(props: {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        alert(payload.error ?? "The request failed.");
+        setWorkflowError(payload.error ?? "The request failed. Your saved room work is unchanged.");
         return false;
       }
 
@@ -355,9 +413,10 @@ export function RoomWorkspace(props: {
         setPendingOutput((current) => current && current.action === outputAction ? { ...current, phase: "refresh" } : current);
       }
       router.refresh();
+      setStatusMessage(outputAction ? `${outputLabel(outputAction)} started. Your request is saved.` : "Your room update is saved.");
       return true;
     } catch (error) {
-      alert(error instanceof Error ? error.message : "The request failed.");
+      setWorkflowError(error instanceof Error ? error.message : "The request failed. Your saved room work is unchanged.");
       return false;
     } finally {
       if (!keepWaitingForOutput) {
@@ -373,6 +432,8 @@ export function RoomWorkspace(props: {
   // refreshes when the artifact lands. Falls back to the synchronous route if
   // the jobs table isn't migrated yet.
   async function runDurableDiagnosis() {
+    setWorkflowError(null);
+    setStatusMessage(null);
     setLoadingAction("analyze");
     setElapsedSeconds(0);
     setPendingOutput({
@@ -405,7 +466,7 @@ export function RoomWorkspace(props: {
       }
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        alert(payload.error ?? "The diagnosis request failed.");
+        setWorkflowError(payload.error ?? "The diagnosis request failed. Your photos and prior reading are saved.");
         setLoadingAction(null);
         setPendingOutput(null);
         return false;
@@ -416,17 +477,18 @@ export function RoomWorkspace(props: {
 
       const settled = await observeJob(props.room.id, job.id);
       if (settled?.status === "completed") {
+        setStatusMessage("Room reading complete. Your diagnosis and next step are ready.");
         router.refresh();
         return true;
       }
 
-      alert(settled?.error_message ?? "The room reading didn't finish. You can try again.");
+      setWorkflowError(settled?.error_message ?? "The room reading didn't finish. Your photos and prior reading are saved; try the diagnosis again.");
       setLoadingAction(null);
       setPendingOutput(null);
       setElapsedSeconds(0);
       return false;
     } catch (error) {
-      alert(error instanceof Error ? error.message : "The diagnosis request failed.");
+      setWorkflowError(error instanceof Error ? error.message : "The diagnosis request failed. Your photos and prior reading are saved.");
       setLoadingAction(null);
       setPendingOutput(null);
       setElapsedSeconds(0);
@@ -435,6 +497,8 @@ export function RoomWorkspace(props: {
   }
 
   async function generateConceptPackage() {
+    setWorkflowError(null);
+    setStatusMessage(null);
     if (hasCurrentDiagnosis) {
       await runAction("moodboards", `/api/rooms/${props.room.id}/generate-moodboards`);
       return;
@@ -466,7 +530,7 @@ export function RoomWorkspace(props: {
 
       if (!diagnosisResponse.ok) {
         const payload = await diagnosisResponse.json().catch(() => ({}));
-        alert(payload.error ?? "The diagnosis request failed.");
+        setWorkflowError(payload.error ?? "The diagnosis request failed. Your photos and prior concepts are saved.");
         setLoadingAction(null);
         setPendingOutput(null);
         return;
@@ -481,7 +545,7 @@ export function RoomWorkspace(props: {
 
       if (!conceptsResponse.ok) {
         const payload = await conceptsResponse.json().catch(() => ({}));
-        alert(payload.error ?? "The concept request failed.");
+        setWorkflowError(payload.error ?? "The concept request failed. Your diagnosis and prior concepts are saved.");
         setLoadingAction(null);
         setPendingOutput(null);
         return;
@@ -489,7 +553,7 @@ export function RoomWorkspace(props: {
 
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "The request failed.");
+      setWorkflowError(error instanceof Error ? error.message : "The request failed. Your saved room work is unchanged.");
       setLoadingAction(null);
       setPendingOutput(null);
     }
@@ -610,14 +674,47 @@ export function RoomWorkspace(props: {
               Approved direction —{" "}
               <span className="font-serif italic text-atelier-ivory">{lockedMoodBoard?.concept_name ?? "not chosen yet"}</span>
             </p>
-            <p className="mt-2">{nextHint(props.photos.length, props.moodBoards.length > 0, Boolean(lockedMoodBoard), props.renders.length > 0)}</p>
+            <p className="mt-2">{nextAction.reason}</p>
             <p className="mt-2">Saved photos — {props.photos.length}</p>
           </div>
         </div>
       </section>
 
+      <PersistedJobNotice
+        roomId={props.room.id}
+        job={persistedJob}
+        onOpen={(tab) => setActiveTab(tab as TabName)}
+        onRefresh={() => router.refresh()}
+      />
+
+      {(workflowError || statusMessage) && (
+        <div
+          ref={statusRef}
+          tabIndex={-1}
+          data-testid="room-workflow-notice"
+          role={workflowError ? "alert" : "status"}
+          aria-live="assertive"
+          className="atelier-notice grid gap-3 border-atelier-brass/60"
+        >
+          <p className="atelier-eyebrow text-atelier-brass">{workflowError ? "Something needs attention" : "Saved"}</p>
+          <p className="text-sm font-light leading-7 text-atelier-umber">{workflowError ?? statusMessage}</p>
+          {workflowError && (
+            <p className="text-xs font-light leading-6 text-atelier-fawn">
+              Nothing was deleted. Review the room and use the highlighted next action to try again.
+            </p>
+          )}
+          <button
+            type="button"
+            className="atelier-btn-quiet justify-self-start"
+            onClick={() => { setWorkflowError(null); setStatusMessage(null); }}
+          >
+            Dismiss notice
+          </button>
+        </div>
+      )}
+
       <PathGuide
-        activeStep={currentFlowStep(props.photos.length, activeConcepts.length, Boolean(lockedMoodBoard), props.renders.length)}
+        activeStep={flowStepForTab(nextAction.targetTab)}
         photoCount={props.photos.length}
         hasDiagnosis={hasCurrentDiagnosis}
         hasConcepts={activeConcepts.length > 0}
@@ -659,6 +756,7 @@ export function RoomWorkspace(props: {
             isLoading={loadingAction === "analyze"}
             canGenerate={props.photos.length > 0}
             onGenerate={runDurableDiagnosis}
+            actionLabel={nextAction.primary.id === "generate-diagnosis" ? nextAction.primary.label : undefined}
           />
         </section>
       )}
@@ -671,6 +769,7 @@ export function RoomWorkspace(props: {
           conceptsStale={conceptsStale}
           loadingAction={loadingAction}
           onGenerate={generateConceptPackage}
+          primaryActionId={nextAction.primary.id}
           onLock={(id) => runAction("select", `/api/rooms/${props.room.id}/select-moodboard`, { mood_board_id: id })}
           onUnlock={(id) => runAction(`concept-${id}`, `/api/rooms/${props.room.id}/moodboards/${id}`, { action: "unlock" })}
           onReharmonize={(id, instructions) =>
@@ -690,6 +789,7 @@ export function RoomWorkspace(props: {
           isStale={productsStale}
           isLoading={loadingAction === "products"}
           loadingAction={loadingAction}
+          primaryActionId={nextAction.primary.id}
           onGenerate={() => runAction("products", `/api/rooms/${props.room.id}/source-products`)}
           onSetStatus={(productId, action) =>
             runAction(`product-${productId}`, `/api/rooms/${props.room.id}/products/${productId}`, { action })
@@ -708,6 +808,7 @@ export function RoomWorkspace(props: {
           isLoading={loadingAction === "render"}
           onBatchSettled={() => router.refresh()}
           onGenerate={(photoId, instructions) => runDurableRender(photoId, instructions)}
+          primaryActionId={nextAction.primary.id}
           renderJob={renderJob}
           renderJobElapsed={renderJobElapsed}
           onRetryRenderJob={retryRenderJob}
@@ -751,6 +852,7 @@ function DiagnosisPanel(props: {
   isLoading: boolean;
   canGenerate: boolean;
   onGenerate: () => void;
+  actionLabel?: string;
 }) {
   const diagnosis = asRecord(props.diagnosis?.analysis);
 
@@ -763,7 +865,7 @@ function DiagnosisPanel(props: {
             The room, <em className="italic">read</em> closely
           </>
         }
-        actionLabel={props.isLoading ? "Reading the room" : "Generate diagnosis"}
+        actionLabel={props.isLoading ? "Reading the room" : props.actionLabel ?? "Generate diagnosis"}
         actionTestId="diagnosis-generate-button"
         disabled={!props.canGenerate || props.isLoading}
         onAction={props.onGenerate}
@@ -904,6 +1006,7 @@ function ConceptPanel(props: {
   onUnlock: (id: string) => void;
   onReharmonize: (id: string, instructions: string) => void;
   onEdit: (id: string, updates: Record<string, unknown>) => void;
+  primaryActionId?: string;
 }) {
   const activeConcepts = props.moodBoards.filter((board) => board.status !== "stale");
   const staleConcepts = props.moodBoards.filter((board) => board.status === "stale");
@@ -920,6 +1023,8 @@ function ConceptPanel(props: {
         actionLabel={
           props.loadingAction === "concept-package" || props.loadingAction === "moodboards"
             ? "Composing directions"
+            : props.primaryActionId === "refresh-concepts"
+              ? "Refresh concepts"
             : props.moodBoards.length
               ? "Regenerate concepts"
               : props.hasDiagnosis
@@ -931,7 +1036,7 @@ function ConceptPanel(props: {
         onAction={props.onGenerate}
       />
       {props.conceptsStale && (
-        <StaleNotice text="Your diagnosis changed since these concepts were generated. Regenerate concepts so directions reflect the current room diagnosis." />
+        <StaleNotice text="Your diagnosis changed since these concepts were generated. Regenerate concepts so directions reflect the current room diagnosis." actionLabel="Regenerate concepts" onAction={props.onGenerate} />
       )}
       {!props.canGenerate ? (
         <EmptyState text="Add at least one room photo first. Then this creates the diagnosis-backed mood boards." />
@@ -1176,6 +1281,7 @@ function ProductsPanel(props: {
   loadingAction: string | null;
   onGenerate: () => void;
   onSetStatus: (productId: string, action: string) => void;
+  primaryActionId?: string;
 }) {
   const [category, setCategory] = useState("All");
   const [maxPrice, setMaxPrice] = useState("");
@@ -1203,13 +1309,13 @@ function ProductsPanel(props: {
             The pieces that make it <em className="italic">real</em>
           </>
         }
-        actionLabel={props.isLoading ? "Sourcing the plan" : "Generate products"}
+        actionLabel={props.isLoading ? "Sourcing the plan" : props.primaryActionId === "refresh-products" ? "Refresh products" : "Generate products"}
         actionTestId="products-generate-button"
         disabled={!props.hasLockedConcept || !props.hasRender || props.isLoading}
         onAction={props.onGenerate}
       />
       {props.isStale && (
-        <StaleNotice text="The approved direction changed, so this product plan is stale. Regenerate products to match the current direction." />
+        <StaleNotice text="The approved direction changed, so this product plan is stale. Regenerate products to match the current direction." actionLabel="Regenerate products" onAction={props.onGenerate} />
       )}
       {!props.hasLockedConcept ? (
         <EmptyState text="Products follow an approved direction." />
@@ -1390,6 +1496,7 @@ function RendersPanel(props: {
   onRetryRenderJob: () => void;
   onDismissRenderJob: () => void;
   onReturnToDirection: () => void;
+  primaryActionId?: string;
 }) {
   const [sourcePhotoId, setSourcePhotoId] = useState(props.photos[0]?.id ?? "");
   const [instructions, setInstructions] = useState("");
@@ -1403,13 +1510,13 @@ function RendersPanel(props: {
             Your room, <em className="italic">reimagined</em>
           </>
         }
-        actionLabel={props.isLoading ? "Visualizing your room" : "Visualize this room"}
+        actionLabel={props.isLoading ? "Visualizing your room" : props.primaryActionId === "refresh-renders" ? "Refresh renders" : "Visualize this room"}
         actionTestId="render-generate-button"
         disabled={!props.hasLockedConcept || props.photos.length === 0 || props.isLoading}
         onAction={() => props.onGenerate(sourcePhotoId || undefined, instructions || undefined)}
       />
       {props.isStale && (
-        <StaleNotice text="The approved direction changed, so these visualizations are stale. Re-run from the current direction and a source photo." />
+        <StaleNotice text="The approved direction changed, so these visualizations are stale. Re-run from the current direction and a source photo." actionLabel="Refresh renders" onAction={() => props.onGenerate(props.photos[0]?.id)} />
       )}
       {props.hasLockedConcept && props.photos.length > 0 && (
         <BatchRenderPanel roomId={props.roomId} hasLockedConcept={props.hasLockedConcept} onSettled={props.onBatchSettled} />
@@ -2050,8 +2157,17 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={tone}>{label}</span>;
 }
 
-function StaleNotice({ text }: { text: string }) {
-  return <div className="atelier-notice-stale">{text}</div>;
+function StaleNotice(props: { text: string; actionLabel?: string; onAction?: () => void }) {
+  return (
+    <div className="atelier-notice-stale grid gap-3" role="status" aria-live="polite">
+      <p>{props.text}</p>
+      {props.actionLabel && props.onAction && (
+        <button type="button" className="atelier-btn-quiet justify-self-start" onClick={props.onAction}>
+          {props.actionLabel}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function EmptyState({ text }: { text: string }) {
@@ -2062,19 +2178,40 @@ function statusLabel(status: string) {
   return ROOM_STATUSES[status as keyof typeof ROOM_STATUSES] ?? status.replaceAll("_", " ");
 }
 
-function nextHint(photoCount: number, hasConcepts: boolean, hasApproved: boolean, hasRenders: boolean) {
-  if (!photoCount) return "Add photos, dimensions, and a design brief.";
-  if (!hasConcepts) return "Generate the diagnosis-backed concept directions.";
-  if (!hasApproved) return "Approve the direction that feels right.";
-  if (!hasRenders) return "See the approved direction on your real room photo.";
-  return "Refine it in chat, or source the products to make it real.";
+function flowStepForTab(tab: TabName): FlowStepId {
+  if (tab === "Photos & Brief") return "intake";
+  if (tab === "Concepts") return "concept";
+  if (tab === "Renders") return "render";
+  return "refine";
 }
 
-function currentFlowStep(photoCount: number, conceptCount: number, hasApproved: boolean, renderCount: number): FlowStepId {
-  if (!photoCount) return "intake";
-  if (!conceptCount || !hasApproved) return "concept";
-  if (!renderCount) return "render";
-  return "refine";
+function roomJobStates(jobs: GenerationJob[]): RoomJobState[] {
+  const byId = new Map(jobs.map((job) => [job.id, job]));
+  return jobs.map((job) => {
+    if (job.job_type !== "batch_render") return { jobType: job.job_type as RoomJobState["jobType"], status: job.status };
+    const refs = asRecord(job.result_refs);
+    const items = Array.isArray(refs.items) ? refs.items : [];
+    const children = items
+      .map((item) => asRecord(item).child_job_id)
+      .map((id) => (typeof id === "string" ? byId.get(id) : undefined))
+      .filter((child): child is GenerationJob => Boolean(child));
+    return {
+      jobType: "batch_render",
+      status: job.status,
+      failedChildren: children.filter((child) => child.status === "retryable_failed" || child.status === "terminal_failed").length,
+      activeChildren: children.filter((child) => RENDER_JOB_ACTIVE.includes(child.status as RenderJobUi["status"])).length
+    };
+  });
+}
+
+function selectOwnerJob(jobs: GenerationJob[]): GenerationJob | null {
+  const actionable = jobs.filter((job) =>
+    ["queued", "planning", "validating", "generating", "persisting", "retryable_failed", "terminal_failed"].includes(job.status)
+  );
+  // Prefer the parent batch row over its child rows; the batch panel owns the
+  // per-perspective detail and the shared notice should describe the whole set.
+  const parent = actionable.filter((job) => job.job_type !== "render" || !asRecord(job.request_payload).parent_job_id);
+  return parent[0] ?? actionable[0] ?? null;
 }
 
 function formatDimensions(value: Json | unknown) {

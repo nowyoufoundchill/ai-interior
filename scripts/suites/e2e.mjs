@@ -23,7 +23,7 @@ const REJECT_NOW_SIGNALS = [
  * (every verification cycle, §12.4), and only an agent's own tool-calling
  * loop can invoke chrome-devtools MCP tools — a standalone script cannot.
  * When a human agent is driving ad hoc verification in-session, prefer
- * chrome-devtools MCP per BUILD_PLAN.md; this script is the reusable,
+ * an interactive browser per docs/OPERATIONS.md; this script is the reusable,
  * script-callable equivalent for `npm run suite:e2e` and cycle automation.
  *
  * Auth is intentionally skipped: this is a single-household private tool

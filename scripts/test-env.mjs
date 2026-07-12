@@ -70,7 +70,7 @@ export class TestIsolationError extends Error {
 }
 
 const PROVISIONING_HINT =
-  "Either provision a dedicated test Supabase project (docs/TEST_PROJECT_SETUP.md) or record the " +
+  "Either provision a dedicated test Supabase project (docs/OPERATIONS.md#optional-isolated-test-project) or record the " +
   "owner's explicit run-against-production decision in test-isolation.config.json ({\"mode\": \"production\", ...}).";
 
 export function readIsolationConfig() {

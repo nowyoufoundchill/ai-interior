@@ -1,11 +1,11 @@
 ---
 name: atelier-assets-responsive
-description: Run PRD v3 Suite 4 (Assets & responsive) — checks every image loads with real pixel dimensions, then re-walks the room tabs at 390/768/1440px checking for horizontal scroll, clipped controls, and tap target size.
+description: Run the current asset and responsive suite at 390, 768, and 1440 pixels, checking images, overflow, clipping, and tap targets.
 ---
 
 # atelier-assets-responsive
 
-Runs against a **fresh `npm run seed:test` state**. Builds its own diagnosis/concepts/locked-concept/products/render state first (via `scripts/suites/_journey.mjs`), then checks assets and layout.
+Runs against a **fresh `npm.cmd run seed:test` state**. Builds its own diagnosis/concepts/locked-concept/products/render state first (via `scripts/suites/_journey.mjs`), then checks assets and layout.
 
 ## Preconditions
 
@@ -14,7 +14,7 @@ Same as `atelier-e2e`: dev server on `AI_MODE=mock`, fresh seed, Playwright Chro
 ## Run
 
 ```
-npm run suite:assets-responsive
+npm.cmd run suite:assets-responsive
 ```
 
 ## What it checks
@@ -25,7 +25,7 @@ npm run suite:assets-responsive
 
 ## Known, documented deviation
 
-PRD v3 §8 specifies a draggable before/after slider on the Renders tab; the shipped UI is a static side-by-side Before/After comparison instead (see `components/rooms/room-workspace.tsx` `RendersPanel`). This suite checks both images render with a non-zero bounding box at every width instead of simulating a touch drag. This is flagged as an open item for owner judgment in the release report, not silently passed as equivalent.
+The shipped render comparison is a static Before/After presentation rather than a draggable slider. This suite checks both images render with non-zero bounds at every width. The product contract does not require a slider unless a future active phase adds one.
 
 ## Output
 

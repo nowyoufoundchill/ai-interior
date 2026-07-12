@@ -3,12 +3,9 @@
  *
  * Structured representation of the owner's taste, with confidence levels and
  * provenance, so preference data can shape generation without being treated
- * as infallible. This is bootstrapped from the room/home brief fields today
- * (style_preferences, color_preferences, style_notes) since the persistent
- * `design_preferences` table exists in the schema but has no UI yet (see
- * BUILD_PLAN Phase 5). When that table is wired up, entries sourced from it
- * should carry higher confidence than brief-derived entries, since they
- * reflect confirmed reactions to real artifacts rather than a first brief.
+ * as infallible. Confirmed home-level `design_preferences` are the primary
+ * source; room/home brief fields remain lower-confidence fallback context.
+ * See docs/PRODUCT.md for the current decision hierarchy.
  */
 
 export type TastePreference = {

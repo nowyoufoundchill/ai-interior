@@ -17,3 +17,4 @@ test-runs/
 .batch-start*.log
 .render-*.log
 .spike-*.log
+CLAUDE.local.md

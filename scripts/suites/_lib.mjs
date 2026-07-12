@@ -24,7 +24,7 @@ export async function requireServerIsolation() {
   if (env.mode === "blocked") {
     throw new Error(
       "FAIL CLOSED: no isolated test project and no owner-acknowledged production mode " +
-        "(test-isolation.config.json). Mutation suites refuse to run — see docs/TEST_PROJECT_SETUP.md."
+        "(test-isolation.config.json). Mutation suites refuse to run — see docs/OPERATIONS.md#test-environment-policy."
     );
   }
 

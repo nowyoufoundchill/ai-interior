@@ -106,7 +106,7 @@ async function main() {
 
     writeFileSync(path.join(SCREENSHOT_DIR, "manifest.json"), JSON.stringify(manifest, null, 2));
     console.log(`[design-review] captured ${manifest.length} screenshots to ${SCREENSHOT_DIR}`);
-    console.log("[design-review] Next: spawn a fresh-context reviewer agent to score manifest.json entries against PRD v3 §3/§11.");
+    console.log("[design-review] Next: use a fresh-context reviewer to score manifest.json against docs/PRODUCT.md and brand-guidelines.html.");
   } finally {
     await browser.close();
   }

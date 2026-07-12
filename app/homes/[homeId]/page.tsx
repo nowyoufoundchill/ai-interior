@@ -77,7 +77,9 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
                   <p className="text-sm font-light leading-7 text-atelier-umber">
                     {room.purpose || "Add a purpose and design brief."}
                   </p>
-                  <span className="atelier-status w-fit">{statusLabel(room.current_stage || room.status)}</span>
+                  <span className={`atelier-status w-fit ${room.job_status ? "border-atelier-brass/50 text-atelier-brass" : ""}`}>
+                    {room.job_status ? jobLabel(room.job_status, room.job_type) : statusLabel(room.current_stage || room.status)}
+                  </span>
                 </Link>
               ))}
             </div>
@@ -94,4 +96,9 @@ function jsonList(value: unknown) {
 
 function statusLabel(status: string) {
   return ROOM_STATUSES[status as keyof typeof ROOM_STATUSES] ?? status;
+}
+
+function jobLabel(status: string, type: string | null | undefined) {
+  const noun = type === "batch_render" ? "Perspectives" : type === "chat_action" ? "Requested change" : type === "diagnosis" ? "Room reading" : type === "render" ? "Visualization" : "Design step";
+  return status === "retryable_failed" || status === "terminal_failed" ? `${noun} needs attention` : `${noun} in progress`;
 }

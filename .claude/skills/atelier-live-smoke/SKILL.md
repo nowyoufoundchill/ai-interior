@@ -1,25 +1,25 @@
 ---
 name: atelier-live-smoke
-description: Run PRD v3 Suite 3 (Live API smoke) — the one paid suite. One real call per provider (Anthropic, OpenAI image edit, Tavily), run once per cycle only, plus a graceful-failure check.
+description: Run the bounded paid live-provider smoke once at a release milestone, plus a graceful-failure check.
 ---
 
 # atelier-live-smoke
 
-**Costs real money. Run at most once per verification cycle.** Runs against a fresh `npm run seed:test` state, but against a dev server that is NOT in mock mode.
+**Costs real money. Run at most once per verification cycle.** Runs against a fresh `npm.cmd run seed:test` state, but against a dev server that is NOT in mock mode.
 
 ## Preconditions
 
 1. Dev server running WITHOUT `AI_MODE=mock` (unset it, or `AI_MODE=live`):
    ```
-   npm run dev
+   npm.cmd run dev
    ```
 2. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TAVILY_API_KEY` are all set in whichever env file `scripts/test-env.mjs` loads (`.env.test` if it exists, else `.env.local`).
-3. `npm run seed:test` has just been run.
+3. `npm.cmd run seed:test` has just been run.
 
 ## Run
 
 ```
-npm run suite:live-smoke
+npm.cmd run suite:live-smoke
 ```
 
 Equivalent to `node scripts/suites/live-smoke.mjs`.
@@ -38,4 +38,4 @@ Equivalent to `node scripts/suites/live-smoke.mjs`.
 
 ## After running
 
-Run `npm run teardown:test` and `npm run check:residue` immediately — this suite's real API responses (renders, ai_runs) are real Storage/DB writes like any other test cycle and must not be left in production.
+Run `npm.cmd run teardown:test` and `npm.cmd run check:residue` immediately — this suite's real API responses (renders, ai_runs) are real Storage/DB writes like any other test cycle and must not be left in production.

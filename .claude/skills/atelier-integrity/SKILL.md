@@ -1,31 +1,31 @@
 ---
 name: atelier-integrity
-description: Run PRD v3 Suite 1 (Integrity) — asserts the §4 invalidation table via the app's own API routes and the debug state endpoint, against a fresh seeded test room.
+description: Run the current artifact integrity and invalidation suite through the app's API routes and read-only debug state endpoint.
 ---
 
 # atelier-integrity
 
-Runs against a **fresh `npm run seed:test` state** (never dirty state — reseed before this suite per PRD v3 §12.4 cycle discipline).
+Runs against a **fresh `npm.cmd run seed:test` state** under `docs/OPERATIONS.md`; never verify against dirty seeded state.
 
 ## Preconditions
 
-1. A dev server is running with `AI_MODE=mock` (this suite must never spend real provider money):
+1. The test-bound dev server is running in mock mode (this suite must never spend real provider money):
    ```
-   AI_MODE=mock npm run dev
+   npm.cmd run dev:test
    ```
-2. `npm run seed:test` has just been run (writes `test-runs/current.json`).
+2. `npm.cmd run seed:test` has just been run (writes `test-runs/current.json`).
 
 ## Run
 
 ```
-npm run suite:integrity
+npm.cmd run suite:integrity
 ```
 
 Equivalent to `node scripts/suites/integrity.mjs`.
 
 ## What it checks
 
-Every row of the PRD v3 §4 invalidation table, driven through real API calls (not raw SQL) against the seeded room, then asserted via `GET /api/debug/room-state/[roomId]`:
+The artifact rules in `docs/PRODUCT.md`, driven through real API calls (not raw SQL) against the seeded room, then asserted via `GET /api/debug/room-state/[roomId]`:
 
 - New photo → current diagnosis marked `stale`, kept (not deleted), nothing else touched.
 - Diagnosis re-run → existing mood boards marked `stale`, kept.

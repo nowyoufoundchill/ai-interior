@@ -1,18 +1,18 @@
 ---
 name: atelier-design-review
-description: Run PRD v3 Suite 5 (Design brain & feel) — screenshot every screen/state at three widths, then have a fresh-context reviewer agent score each against the §3/§11 rubric. Two-phase; the second phase requires spawning a subagent.
+description: Capture owner-facing states at three widths, then use a fresh-context reviewer to score them against docs/PRODUCT.md and the brand guidelines.
 ---
 
 # atelier-design-review
 
-Runs against a **fresh `npm run seed:test` state**. Two phases: mechanical capture (scriptable), then judgment (requires a fresh-context agent — a script cannot do this part).
+Runs against a **fresh `npm.cmd run seed:test` state**. Two phases: mechanical capture (scriptable), then judgment (requires a fresh-context agent — a script cannot do this part).
 
 ## Phase 1 — Capture (scriptable)
 
 Preconditions: dev server on `AI_MODE=mock`, fresh seed, Playwright Chromium installed.
 
 ```
-npm run suite:design-review
+npm.cmd run suite:design-review
 ```
 
 Equivalent to `node scripts/suites/design-review.mjs`. Captures, at 390/768/1440px:
@@ -33,13 +33,13 @@ The orchestrating agent must:
 1. Read `test-runs/screenshots/design-review/manifest.json`.
 2. Spawn a **fresh-context** subagent (it must not be the agent that wrote the room-workspace UI code — that agent's read of its own work is not independent) with:
    - The list of screenshot file paths from the manifest.
-   - The rubric: PRD v3 §3 UI register ("calm, editorial, premium... no dashboard-y clutter") and §11 quality bar ("specific to this room... banned: generic 'rug and plants' advice, vague design language, furniture that ignores typed dimensions, three concepts that feel the same, products without a why").
+   - The rubric in `docs/PRODUCT.md` plus `brand-guidelines.html`: calm/editorial presentation, room specificity, typed-dimension fidelity, meaningful concept differentiation, and rationale for products and design moves.
    - Instructions to score each screen 1–10 and flag any rubric violation by name.
 3. Take the subagent's per-screenshot scores and violations, and write them to `test-runs/suite-results/design-review.json` in the same shape the other suites use (`{ suite, ranAt, total, passed, failed, checks: [{description, passed, detail}] }`) — one `check` per screenshot, `passed = score >= 8 with zero violations`.
 
 ## Pass condition
 
-Every screen scores ≥8/10 with zero rubric violations (PRD v3 §12.1 Suite 5). Reviewer findings that recur across cycles must be encoded back into this rubric description, not just fixed once — the system should stop reproducing the same class of finding.
+Every screen scores ≥8/10 with zero named product or brand violations. Reviewer findings that recur across cycles must be encoded into an active product/brand rule or executable check rather than fixed once.
 
 ## On failure
 
