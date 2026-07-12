@@ -60,6 +60,13 @@ export function deriveIdempotencyKey(jobType: JobType, roomId: string, payload?:
     if (payload.mood_board_id) parts.push(`board:${String(payload.mood_board_id)}`);
     if (payload.instructions) parts.push(`instr:${hashString(String(payload.instructions))}`);
   }
+  // A confirmed chat proposal keys its durable job on the PROPOSAL id (§P0.4:
+  // "Confirming a proposal starts exactly one durable job" and "Prevent replay of
+  // an already confirmed proposal"). Re-confirming — or a refresh that re-POSTs —
+  // resolves to the same active job instead of launching a second one.
+  if (jobType === "chat_action" && payload?.proposal_id) {
+    parts.push(`proposal:${String(payload.proposal_id)}`);
+  }
   return parts.join("|");
 }
 

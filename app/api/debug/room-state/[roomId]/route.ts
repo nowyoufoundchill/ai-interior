@@ -47,6 +47,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
       .order("created_at", { ascending: true })
   ]);
 
+  // P0.4 action proposals (tolerant of the table being absent pre-migration 009).
+  const proposals = await supabase
+    .from("action_proposals")
+    .select(
+      "id, chat_message_id, result_message_id, intent_type, status, scope, scope_photo_ids, normalized_instructions, expected_invalidations, confidence, job_id, proposal_version, created_at"
+    )
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: true });
+
   if (room.error) {
     return NextResponse.json({ error: room.error.message }, { status: 500 });
   }
@@ -69,6 +78,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
     renders: renders.data ?? [],
     chat_messages: chatMessages.data ?? [],
     generation_jobs: jobs.error ? [] : (jobs.data ?? []),
+    action_proposals: proposals.error ? [] : (proposals.data ?? []),
     derived: {
       current_diagnosis_version: (diagnoses.data ?? []).find((d) => d.status === "current")?.version ?? null,
       stale_diagnosis_count: (diagnoses.data ?? []).filter((d) => d.status === "stale").length,

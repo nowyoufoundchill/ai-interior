@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Database } from "@/types/database";
+import { listProposals } from "@/lib/data/proposals";
+import type { ActionProposal, Database } from "@/types/database";
 
 type Home = Database["public"]["Tables"]["homes"]["Row"];
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
@@ -32,6 +33,7 @@ export type RoomWorkspaceData = {
   renders: Render[];
   revisions: Revision[];
   chatMessages: ChatMessage[];
+  actionProposals: ActionProposal[];
   memories: Memory[];
   aiRuns: AiRun[];
 };
@@ -117,6 +119,10 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
 
   if (errors[0]) throw new Error(errors[0].message);
 
+  // Proposals are loaded via the tolerant helper so a room still renders before
+  // migration 009 is applied (returns [] when the table is absent).
+  const actionProposals = await listProposals(roomId, supabase).catch(() => [] as ActionProposal[]);
+
   return {
     room: roomWithHome,
     home: roomWithHome.homes,
@@ -127,6 +133,7 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     renders: (renders.data ?? []) as Render[],
     revisions: (revisions.data ?? []) as Revision[],
     chatMessages: (chatMessages.data ?? []) as ChatMessage[],
+    actionProposals,
     memories: (memories.data ?? []) as Memory[],
     aiRuns: (aiRuns.data ?? []) as AiRun[]
   };
