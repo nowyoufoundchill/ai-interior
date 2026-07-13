@@ -160,5 +160,5 @@ Run the P0.6 two-room household gate before selecting P1 work. Use the observed 
 - Outcome delivered: one configurable mock release runner now owns typecheck/build, fresh seeding, focused suites, teardown, and residue checks.
 - Files or migration changed: added `scripts/verify-p0-6.mjs` and the `verify:p0-6` package script; no migration required.
 - Focused verification: `node --check scripts/verify-p0-6.mjs`; `npm.cmd run typecheck`; `npm.cmd run build`; fail-closed preflight without `.env.test`.
-- Known limitation or blocker: the complete gate cannot run until an isolated `.env.test` project is available.
-- Next unchecked slice: run the complete automated P0.6 gate from a fresh isolated test project.
+- Known limitation or blocker: the gate uses the owner-acknowledged production test mode when `.env.test` is absent; teardown and residue remain mandatory.
+- Next unchecked slice: run the complete automated P0.6 gate through the configured isolation mode.

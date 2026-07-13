@@ -1,11 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { loadTestEnv } from "./test-env.mjs";
 
 /** P0.6 automated release gate: fresh seed -> suite -> teardown -> residue. */
 const PORT = process.env.VERIFY_PORT || "3136";
-const BASE_URL = `http://localhost:${PORT}`;
+const BASE_URL = `http://127.0.0.1:${PORT}`;
 const cwd = process.cwd();
 const SUITES = {
   integrity: "scripts/suites/integrity.mjs",
@@ -26,7 +24,7 @@ function selectedSuites() {
 
 function run(command, args, env = {}) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, { cwd, stdio: "inherit", env: { ...process.env, ...env }, shell: process.platform === "win32" });
+    const child = spawn(command, args, { cwd, stdio: "inherit", env: { ...process.env, ...env }, shell: false });
     child.on("error", () => resolve(1));
     child.on("exit", (code) => resolve(code ?? 1));
   });
@@ -45,14 +43,20 @@ async function waitForServer(timeoutMs = 90000) {
 }
 
 async function main() {
-  if (!existsSync(path.join(cwd, ".env.test"))) throw new Error("P0.6 requires .env.test and fails closed without an isolated test project.");
   loadTestEnv();
-  const server = spawn(process.execPath, ["scripts/dev-test.mjs"], { cwd, stdio: "inherit", env: { ...process.env, AI_MODE: "mock", BASE_URL, PORT }, shell: process.platform === "win32" });
   const results = {};
+  results.typecheck = await run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npm.cmd run typecheck"]);
+  results.build = await run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npm.cmd run build"]);
+  if (results.typecheck !== 0 || results.build !== 0) {
+    console.error("[verify:p0-6] FAIL CLOSED: build prerequisites failed; no mutation-capable suites were started.");
+    process.exitCode = 1;
+    return;
+  }
+
+  const serverCommand = process.platform === "win32" ? "npx.cmd" : "npx";
+  const server = spawn(serverCommand, ["next", "start", "-p", PORT], { cwd, stdio: "inherit", env: { ...process.env, AI_MODE: "mock", BASE_URL, PORT }, shell: true });
   try {
     if (!(await waitForServer())) throw new Error(`test server at ${BASE_URL} did not become ready`);
-    results.typecheck = await run(process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"]);
-    results.build = await run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npm.cmd run build"]);
     for (const name of selectedSuites()) {
       results[`${name}:seed`] = await run(process.execPath, ["scripts/seed-test.mjs"], { BASE_URL, AI_MODE: "mock" });
       results[name] = results[`${name}:seed`] === 0
