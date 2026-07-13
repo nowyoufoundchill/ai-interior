@@ -1,164 +1,105 @@
-# Active Build — P0.5 Guided Workflow and Recovery
+# Active Build — P0.6 Reliability Foundation Close
 
 **Updated:** 2026-07-12
 
-**Application baseline:** P0.4 merge `21409999ecc9d321ce03b74d570d7ea83f07817e`; this documentation reset is the handoff to P0.5
+**Application baseline:** `9c3599358e44a7cc16c1e5eb5403b32c40e42b47`
 
-**Accepted complete:** P0.0 through P0.4
+**Accepted complete:** P0.0 through P0.5
 
 **Current phase:** P0.6
 
+**Next committed phase:** P1.1 — Three-Room Benchmark and Outcome Contract
+
 **External blocker:** None
 
-## P0.6 Objective
+`PRODUCT.md` owns the replacement P1.1–P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
-Prove the minimum homeowner workflow is reliable across fresh seeded runs before selecting P1 work. Automated checks must be repeatable and leave no test residue; live and owner-scored checks remain explicit release activities.
+## P0.6 objective
 
-## Slice 1 - One configurable automated release runner
+Close the already-built durability, recovery, and verification foundation before changing the homeowner journey. P0.6 proves that the existing system can run repeatably from a fresh configured seed and clean up after itself.
 
-- [x] Run typecheck and production build once, then run the selected focused suites against mock mode.
-- [x] Fresh-seed every suite so state never leaks between lifecycle boundaries.
-- [x] Always run teardown and residue checks after each seeded suite.
-- [x] Allow a comma-separated `P06_SUITES` subset for focused development while keeping a complete default gate.
-- [ ] Run the complete automated P0.6 gate from a fresh isolated test project.
+P0.6 is a reliability baseline. It does not certify the current diagnosis → concepts → render interface as the future product or as household-ready.
 
-**Slice outcome:** one command owns the automated P0.6 lifecycle and fails closed when test isolation is unavailable.
+## Current slice — Run the complete automated gate
 
-Run `npm.cmd run verify:p0-6` for the complete gate, or set `P06_SUITES=integrity,p05Browser` for a focused subset.
+- [x] Provide one configurable release runner that performs typecheck and production build once.
+- [x] Fresh-seed every selected suite so state does not leak across lifecycle boundaries.
+- [x] Always run teardown and residue checks, including after failure.
+- [x] Support focused `P06_SUITES` subsets while keeping the complete default gate.
+- [x] Fail closed unless the configured test environment is isolated or the repository contains the explicit owner-approved production-test acknowledgment.
+- [x] Run the complete default gate through the configured approved test mode.
+- [x] Fix only failures that cross the P0 durability, recovery, accessibility, or test-isolation boundary.
+- [x] Write one concise immutable gate report under `reports/` with commit, environment mode, suites, failures/retries, residue result, and final status.
 
-## P0.5 Objective (completed)
+Run:
 
-Make the correct next step obvious from every persisted room state, restore durable work after refresh or navigation, and replace dead-end or alert-only failures with useful inline recovery.
+```powershell
+npm.cmd run verify:p0-6
+```
 
-This phase should produce visible homeowner clarity. It is not a general refactor or another infrastructure program.
+For focused development only:
 
-## Slice 1 — One next-action resolver
+```powershell
+$env:P06_SUITES="integrity,p05Browser"
+npm.cmd run verify:p0-6
+```
 
-- [x] Add a pure room-level `recommendedNextAction(state)` resolver.
-- [x] Return one primary action, no more than two secondary actions, the target tab, and a short reason.
-- [x] Cover at least these persisted states: no photos, ready for diagnosis, ready for concepts, concepts need approval, ready to render, batch active, partial batch failure, renders ready for review, stale downstream work, and terminal failure.
-- [x] Add fast table-driven tests for the resolver without requiring a database, browser, or seeded environment.
-- [x] Replace the independently computed room header hint, path step, initial tab, and panel-level primary action with this shared result.
+## P0.6 gate
 
-**Slice outcome:** the same persisted room state recommends the same action everywhere.
+P0.6 completes only when:
 
-## Slice 2 — Persisted progress across navigation
-
-- [x] Load the latest active, retryable, or owner-actionable terminal room job with workspace data, including failed children of a partial batch.
-- [x] Render one shared owner-facing progress/recovery treatment for diagnosis, render, batch, and confirmed chat work.
-- [x] Restore progress automatically after refresh or reopen and poll only while work is active.
-- [x] Surface a concise active/failing status on home and dashboard room cards.
-- [x] Ensure duplicate clicks continue to resolve to the same logical job.
-
-**Slice outcome:** navigation never makes running or failed work disappear.
-
-## Slice 3 — Inline recovery and accessibility
-
-- [x] Replace remaining alert-only generation failures in the room workflow with inline notices that preserve owner input.
-- [x] Explain what failed, what was saved, and the next available action.
-- [x] Explain stale artifacts and provide the correct rerun path.
-- [x] Announce progress, completion, and failure through appropriate live regions.
-- [x] Preserve or intentionally restore keyboard focus after completion and failure.
-- [x] Browser-test success, retryable failure, terminal failure, duplicate click, refresh/reopen, and partial batch recovery.
-
-**Slice outcome:** a homeowner can recover without refreshing, retyping, or interpreting internal terminology.
-
-## Non-goals
-
-- Analytics or telemetry instrumentation.
-- First-render celebration or new motion treatments.
-- Five concept directions or concept-editor expansion.
-- Full six-room command-center redesign.
-- Broad extraction of `room-workspace.tsx` or job runners without a slice-driven need.
-- Re-running P0.0–P0.4 gates unless a changed dependency causes a focused regression.
-
-## Phase gate
-
-P0.5 is complete only when:
-
-- every named lifecycle fixture resolves to the intended primary action;
-- no room-generation failure is presented only through `alert()`;
-- refresh at each active stage restores meaningful persisted progress;
-- no successful action requires manual refresh;
-- partial batch failure prioritizes retrying failed perspectives without touching successful siblings;
-- stale work explains its cause and offers the correct next action;
-- keyboard and screen-reader users receive progress and completion feedback without losing their place;
-- the affected journey has zero new console errors and zero unexpected failed requests;
 - typecheck and production build pass;
-- the focused P0.5 browser/state suite passes from a fresh seed;
-- teardown and residue checks pass.
+- the complete configured mock suite set passes from fresh tagged state;
+- when the approved production project is used, every mutation carries the current `test_run_id`, teardown runs after every suite, and verified residue is zero;
+- duplicate actions resolve to one logical durable job;
+- refresh and reopen restore active and recoverable work;
+- partial batch failure preserves successful perspectives and retries only failed work;
+- failure and stale states provide plain-language recovery without losing owner input;
+- required progress, completion, and failure announcements remain accessible;
+- teardown completes and the residue check is zero;
+- the immutable gate report exists.
 
-Create fast focused tests with Slice 1. For the integrated gate, prefer one configurable verification runner; do not copy another phase-specific server/seed wrapper.
+Do not add legacy workflow UI, extra concepts, or new product behavior merely to make this gate larger. A failure outside the P0 boundary is recorded for the relevant P1 phase.
 
-## Verification cadence
+## Preserved foundation for P1
 
-Per slice:
+- Append-only artifact and version history.
+- Durable, bounded, idempotent long-running work.
+- Checkpointed paid output where supported.
+- Refresh, reopen, retry, and duplicate-submit recovery.
+- Successful batch siblings survive partial failure.
+- Typed homeowner facts outrank inference.
+- Service credentials and provider access remain server-side.
+- Accessible progress and recovery are part of every future slice.
 
-1. `npm.cmd run typecheck`
-2. fast focused tests for changed logic
-3. one affected browser path when UI changed
+## Current non-goals
 
-At phase close:
+- Improving the legacy diagnosis, concept, product, or tabbed workspace.
+- Adding five concepts or a full concept editor.
+- Running the paid three-room comparison matrix.
+- Building the brief compiler, image critic, implementation package, or multi-room view.
+- Broad refactors, analytics, authentication, billing, deployment, or provider changes.
 
-1. `npm.cmd run build`
-2. focused P0.5 browser/API/persisted-state suite from a fresh seed
-3. one functional E2E regression journey
-4. teardown and `npm.cmd run check:residue`
+## Next phase preview — P1.1
 
-The full responsive, accessibility, live-provider, and two-homeowner matrix belongs to P0.6.
+After the P0.6 report is green, replace this file with the P1.1 active slices. P1.1 will:
+
+1. place raw benchmark assets for `OPENPLAN-01`, `CHILDROOM-01`, and `GARAGE-01` under ignored `benchmarks/private/`, and commit only redacted manifests/checksums under `reports/`;
+2. record original minimal homeowner inputs when available and mark missing input unknown rather than inventing it;
+3. freeze the source-preservation and design-quality rubric from `PRODUCT.md`;
+4. preserve the supplied ChatGPT images as fixed manual references with unknown historical settings where necessary, then capture controlled full-prompt, compact-brief, and current-pipeline candidates with the same source and current image model/settings;
+5. record provider calls, tokens, elapsed time, and estimated cost;
+6. select the shortest P1.2 pipeline that preserves or improves the delivered result.
+
+Paid benchmark calls require a bounded plan and owner authorization. P1.1 measures before it optimizes; it does not improve prompts or rebuild the UI while establishing the baseline.
 
 ## Handoff format
 
-Replace this section at the end of each slice with five concise bullets:
+Replace the handoff below; do not append another log.
 
-- Outcome delivered
-- Files or migration changed
-- Focused verification
-- Known limitation or blocker
-- Next unchecked slice
-
-Do not append a second narrative log.
-
-## Slice 1 handoff
-
-- Outcome delivered: one pure resolver now drives room reason, initial tab, path step, and panel action labels across the named persisted states.
-- Files or migration changed: added `lib/room/recommended-next-action.ts` and its focused suite; room workspace queries now load recent durable jobs and batch child status.
-- Focused verification: `npm.cmd run typecheck`; `npm.cmd run suite:recommended-next-action` (11 cases); `npm.cmd run build`.
-- Known limitation or blocker: no blocker; the focused suite uses Node's experimental TypeScript stripping warning.
-- Next unchecked slice: Slice 2 - Persisted progress across navigation.
-
-## After P0.5
-
-Run the P0.6 two-room household gate before selecting P1 work. Use the observed homeowner failures to choose the next investment among concept quality, editing, diagnosis, sourcing, six-room navigation, or polish; do not automatically execute every P1 phase in the historical order.
-
-## Slice 2 handoff
-
-- Outcome delivered: persisted active and recoverable room jobs remain visible across dashboard, home, room refresh, and reopen; active work polls and failed work offers inline retry/open recovery.
-- Files or migration changed: extended `lib/data/queries.ts`, added `components/jobs/persisted-job-notice.tsx`, and updated dashboard, home, and room workspace surfaces.
-- Focused verification: `npm.cmd run typecheck`; `npm.cmd run suite:recommended-next-action`; `npm.cmd run build`; `git diff --check`.
-- Known limitation or blocker: no blocker; a browser-level persisted-state suite still belongs to the phase gate.
-- Next unchecked slice: Slice 3 - Inline recovery and accessibility.
-
-## Slice 3 progress handoff
-
-- Outcome delivered: room-generation failures are inline and input-safe; stale artifacts expose rerun controls; progress, completion, and failure use live regions with focus restoration.
-- Files or migration changed: updated `components/rooms/room-workspace.tsx`; no migration required.
-- Focused verification: `npm.cmd run typecheck`; `npm.cmd run build`; `git diff --check`; local production server responds with HTTP 200.
-- Known limitation or blocker: with `AI_MODE=mock`, `suite:jobs` ran 19/22; three stale-job checks race the background executor, and residue cleanup reports 65 pre-existing production test rows/objects from older runs. Browser coverage remains unchecked.
-- Next unchecked slice: none in P0.5; run the phase gate and then select P0.6.
-
-## Slice 3 browser-test handoff
-
-- Outcome delivered: one focused browser/state suite covers success, retryable and terminal failure, duplicate submission, refresh/reopen, and partial-batch retry through owner-facing UI.
-- Files or migration changed: added `scripts/suites/p05-browser.mjs` and the `suite:p05-browser` package script; no migration required.
-- Focused verification: `npm.cmd run typecheck`; `npm.cmd run suite:p05-browser`; `npm.cmd run build`; `git diff --check`.
-- Known limitation or blocker: the suite requires a fresh seeded mock run and the existing test-environment isolation policy.
-- Next unchecked slice: none in P0.5; run the phase gate and then select P0.6.
-
-## P0.6 Slice 1 handoff
-
-- Outcome delivered: one configurable mock release runner now owns typecheck/build, fresh seeding, focused suites, teardown, and residue checks.
-- Files or migration changed: added `scripts/verify-p0-6.mjs` and the `verify:p0-6` package script; no migration required.
-- Focused verification: `node --check scripts/verify-p0-6.mjs`; `npm.cmd run typecheck`; `npm.cmd run build`; fail-closed preflight without `.env.test`.
-- Known limitation or blocker: the gate uses the owner-acknowledged production test mode when `.env.test` is absent; teardown and residue remain mandatory.
-- Next unchecked slice: run the complete automated P0.6 gate through the configured isolation mode.
+- **Outcome delivered:** complete P0.6 reliability gate is green in the owner-approved production test mode; the runner now records an immutable report, avoids wildcard-port collisions, tears down the exact seeded run, and supports fresh failure-fixture/browser journeys.
+- **Files or migrations changed:** `scripts/verify-p0-6.mjs`, `scripts/suites/failure-fixtures.mjs`, `scripts/suites/_journey.mjs`, `scripts/suites/p05-browser.mjs`; no migration.
+- **Focused verification:** `node --check` for changed suites; focused `failureFixtures` gate green (29/29); focused browser gates green (`p05Browser` 22/22, `assetsResponsive` 57/57); complete `npm.cmd run verify:p0-6` green with typecheck/build, all seven suites, teardown, and zero residue.
+- **Gate report:** [`reports/p0-6-gate-1783913623123-9c35993.md`](/C:/Users/darre/Documents/AI%20Interior%20Designer/reports/p0-6-gate-1783913623123-9c35993.md)
+- **Known limitation or blocker:** none for P0.6. P1.1 remains the next committed phase.
+- **Next unchecked slice:** replace this handoff with the P1.1 active slices after the green P0.6 report.

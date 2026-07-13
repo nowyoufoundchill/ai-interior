@@ -22,25 +22,29 @@ export async function buildFullJourney(page, roomId) {
   const firstCard = page.locator('[data-testid^="concept-card-"]').first();
   const testId = await firstCard.getAttribute("data-testid");
   const key = testId.slice("concept-card-".length);
+  const lockResponse = page.waitForResponse((res) => res.url().includes("/select-moodboard") && res.request().method() === "POST");
   await firstCard.getByTestId(`concept-lock-button-${key}`).click();
-  await page.waitForResponse((res) => res.url().includes("/select-moodboard") && res.request().method() === "POST");
+  await lockResponse;
   await page.waitForLoadState("networkidle");
 
   await page.getByTestId("tab-renders").click();
   await page.getByTestId("render-instructions-input").fill("Warm the space, add texture.");
+  const renderResponse = page.waitForResponse((res) => res.url().includes("/jobs") && res.request().method() === "POST");
   await page.getByTestId("render-generate-button").click();
-  await page.waitForResponse((res) => res.url().includes("/generate-render") && res.request().method() === "POST");
+  await renderResponse;
   await page.waitForLoadState("networkidle");
 
   await page.getByTestId("tab-products").click();
+  const productsResponse = page.waitForResponse((res) => res.url().includes("/source-products") && res.request().method() === "POST");
   await page.getByTestId("products-generate-button").click();
-  await page.waitForResponse((res) => res.url().includes("/source-products") && res.request().method() === "POST");
+  await productsResponse;
   await page.waitForLoadState("networkidle");
 
   await page.getByTestId("tab-chat").click();
   await page.getByTestId("chat-message-input").fill("Why did you choose this palette for this room?");
+  const chatResponse = page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
   await page.getByTestId("chat-send-button").click();
-  await page.waitForResponse((res) => res.url().includes("/chat") && res.request().method() === "POST");
+  await chatResponse;
   await page.waitForLoadState("networkidle");
 
   return { lockedConceptKey: key };

@@ -34,6 +34,18 @@ function fixtureHeaders(fixture, extra = {}) {
   return { headers: { "x-test-failure-fixture": fixture, ...extra } };
 }
 
+async function pollJob(roomId, jobId, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    const response = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs/${jobId}`);
+    last = response.body?.job ?? last;
+    if (last && ["completed", "retryable_failed", "terminal_failed", "cancelled"].includes(last.status)) return last;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return last;
+}
+
 async function main() {
   await waitForServer();
   const { serverAiMode } = await requireServerIsolation();
@@ -42,6 +54,28 @@ async function main() {
   }
   const { roomId, testRunId } = readCurrentTestRun();
   console.log(`[failure-fixtures] room=${roomId}`);
+
+  // Every suite is freshly seeded. Build the locked-render state this suite's
+  // render-boundary fixtures require instead of relying on another suite's
+  // prior mutations.
+  const diagnosis = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/analyze`, { method: "POST" });
+  reporter.assert(diagnosis.ok, "precondition: diagnosis is available", diagnosis.body);
+  const concepts = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/generate-moodboards`, { method: "POST" });
+  reporter.assert(concepts.ok && concepts.body?.mood_boards?.length > 0, "precondition: a concept is available", concepts.body);
+  const lock = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/select-moodboard`, {
+    method: "POST",
+    body: JSON.stringify({ mood_board_id: concepts.body.mood_boards[0].id })
+  });
+  reporter.assert(lock.ok, "precondition: a concept is locked", lock.body);
+  const photos = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/photos`);
+  const sourcePhotoId = photos.body?.photos?.[0]?.id;
+  const renderStart = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/jobs`, {
+    method: "POST",
+    body: JSON.stringify({ job_type: "render", payload: { source_photo_id: sourcePhotoId } })
+  });
+  reporter.assert(renderStart.ok && renderStart.body?.job?.id, "precondition: render job starts", renderStart.body);
+  const renderDone = await pollJob(roomId, renderStart.body.job.id);
+  reporter.assert(renderDone?.status === "completed", "precondition: current render completes", renderDone);
 
   let state = await getRoomState(roomId);
   const baseDiagnoses = state.diagnoses.length;
@@ -116,11 +150,11 @@ async function main() {
   );
 
   // --- Image/storage/persistence boundaries on the real render route ------
-  const sourcePhotoId = currentRender?.source_photo_id;
+  const fixtureSourcePhotoId = currentRender?.source_photo_id;
 
   const noImage = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/generate-render`, {
     method: "POST",
-    body: JSON.stringify({ source_photo_id: sourcePhotoId }),
+    body: JSON.stringify({ source_photo_id: fixtureSourcePhotoId }),
     ...fixtureHeaders("image_no_image")
   });
   reporter.assert(
@@ -131,7 +165,7 @@ async function main() {
 
   const storageFail = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/generate-render`, {
     method: "POST",
-    body: JSON.stringify({ source_photo_id: sourcePhotoId }),
+    body: JSON.stringify({ source_photo_id: fixtureSourcePhotoId }),
     ...fixtureHeaders("storage_upload_failure")
   });
   reporter.assert(
@@ -154,7 +188,7 @@ async function main() {
 
   const dbFail = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/generate-render`, {
     method: "POST",
-    body: JSON.stringify({ source_photo_id: sourcePhotoId }),
+    body: JSON.stringify({ source_photo_id: fixtureSourcePhotoId }),
     ...fixtureHeaders("db_persist_failure")
   });
   reporter.assert(
@@ -178,7 +212,7 @@ async function main() {
   reporter.assert(restore.ok, "recovery: a normal regeneration restores a current render", restore.body);
   state = await getRoomState(roomId);
   reporter.assert(
-    state.renders.some((render) => render.status === "current" && render.source_photo_id === sourcePhotoId),
+    state.renders.some((render) => render.status === "current" && render.source_photo_id === fixtureSourcePhotoId),
     "recovery: exactly one current render exists again for the photo",
     state.renders
   );

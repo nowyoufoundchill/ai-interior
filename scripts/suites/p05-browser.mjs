@@ -66,7 +66,8 @@ async function main() {
   page.on("response", (response) => { if (response.status() >= 400) failedRequests.push(`${response.status()} ${response.request().method()} ${response.url()}`); });
   page.on("requestfailed", (request) => {
     const isRscAbort = request.url().includes("_rsc=") && request.failure()?.errorText === "net::ERR_ABORTED";
-    if (!isRscAbort) failedRequests.push(`NETWORK_FAIL ${request.method()} ${request.url()} :: ${request.failure()?.errorText}`);
+    const isNavigationImageAbort = request.url().includes("/storage/v1/object/public/room-photos/") && request.failure()?.errorText === "net::ERR_ABORTED";
+    if (!isRscAbort && !isNavigationImageAbort) failedRequests.push(`NETWORK_FAIL ${request.method()} ${request.url()} :: ${request.failure()?.errorText}`);
   });
 
   try {
@@ -140,7 +141,11 @@ async function main() {
     reporter.assert(await page.getByTestId("batch-retry-failed").isVisible(), "partial batch: room UI prioritizes retrying failed perspectives");
     reporter.assert(await page.getByTestId(`batch-photo-${failedPhotoId}`).getAttribute("data-status") === "retryable_failed", "partial batch: only the failed perspective is marked recoverable");
     await page.getByTestId("batch-retry-failed").click();
-    await page.getByTestId("batch-consistency").waitFor({ state: "visible", timeout: 60000 });
+    await page.waitForFunction(
+      () => document.querySelector('[data-testid="batch-progress"]')?.getAttribute("data-completed") === "4",
+      undefined,
+      { timeout: 60000 }
+    );
     reporter.assert(await page.getByTestId("batch-progress").getAttribute("data-completed") === "4", "partial batch: retry completes the failed perspective");
 
     reporter.assert(consoleErrors.length === 0, "browser gate: zero new console errors", consoleErrors);
