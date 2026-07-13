@@ -5,6 +5,8 @@ description: Run the current functional E2E suite through the room journey in a 
 
 # atelier-e2e
 
+> **Legacy P0 verification:** this asserts the currently implemented workflow for the P0.6 close. It does not authorize diagnosis, three concepts, manual lock, or double-confirmed revisions as future product requirements. Replace its journey when the corresponding P1 slice changes behavior.
+
 Runs against a **fresh `npm.cmd run seed:test` state** under `docs/OPERATIONS.md`.
 
 ## Preconditions

@@ -10,32 +10,36 @@
 
 ## Execution rule
 
-Implement only the next unchecked slice in `docs/ACTIVE_BUILD.md`. P0.0 through P0.4 are accepted as complete. Do not reopen a completed phase unless a focused regression in the code you changed fails.
+Implement only the next unchecked slice in `docs/ACTIVE_BUILD.md`. P0.0 through P0.5 are accepted as complete. Do not reopen a completed phase unless a focused regression in the code you changed fails.
 
 This is an implementation repository. Do not rewrite the roadmap, reproduce old audits, or create a second plan before beginning ordinary scoped work.
 
 ## Product bar
 
-The application must let two homeowners design six real rooms without developer supervision. The flagship outcome is a trustworthy transformation of the owners' real room photographs, followed by understandable refinement and sourcing.
+The application must let a homeowner move from a few plain-language facts and real room photographs to one useful designer recommendation, refine it naturally, implement it honestly, and continue coherently across rooms without understanding the AI pipeline.
 
 For every owner-facing change, optimize for:
 
 - one obvious next action;
+- the source photograph or latest design in the first usable viewport;
 - durable progress that survives refresh and navigation;
 - specific, room-aware design judgment;
 - clear recovery when work fails;
+- the minimum owner input and provider work that preserve outcome quality;
 - calm, editorial presentation consistent with `brand-guidelines.html`.
 
 ## Invariants
 
-- The approved concept version is the downstream design contract.
+- Every first design or revision appends a candidate version. One current candidate may exist per source photo; a room has zero or one current accepted design version. Room plans and products bind only to that accepted version. Transitional diagnosis or mood-board rows may support it internally but are not required owner destinations.
 - Artifacts are append-only. Superseded work becomes stale; it is not deleted.
-- One current render is allowed per source photo and approved concept version.
 - Successful batch perspectives survive sibling failure and remain independently retryable.
 - Long-running work is persisted, bounded, idempotent, and recoverable after refresh or browser close.
 - A completed job must reference a persisted artifact.
-- Chat never mutates design state before explicit owner confirmation; confirmed proposals cannot be replayed accidentally.
+- Sending an unambiguous, reversible one-room visual revision is explicit authorization for one append-only revision job; do not add a second confirmation ceremony. Ambiguous, standing-preference, cross-room, or implementation-invalidating changes must explain scope before execution. No confirmed action can be replayed accidentally.
 - Typed dimensions and explicit owner constraints outrank inferred room facts, preferences, and trend intelligence.
+- One recommendation is the default. Do not introduce a required concept count, prompt editor, or visible diagnosis workflow.
+- Finished-image quality is judged from the actual source/result pair. A plan-only critic cannot certify architectural retention.
+- Visual inference is not measurement; exact placement, fit, product, construction, or safety claims require provenance and visible caveats.
 - Service-role credentials and provider secrets remain server-only.
 - The product remains private, single-household, and without authentication unless the owner changes that decision.
 - Provider roles remain Anthropic for reasoning, OpenAI for image editing, and Tavily for sourcing support. Do not add another provider without approval.

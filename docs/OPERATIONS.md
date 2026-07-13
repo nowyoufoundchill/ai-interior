@@ -86,7 +86,7 @@ Do not run the full historical matrix after every edit.
 
 Run additional integrity or failure suites only when the phase changed their boundary.
 
-### Release gate — P0.6 and P1 release milestones
+### Release gate — product milestones
 
 - full integrity and functional journeys
 - deterministic failure matrix
@@ -94,6 +94,16 @@ Run additional integrity or failure suites only when the phase changed their bou
 - accessibility and design review
 - minimum bounded live-provider smoke
 - owner-scored real-room journeys
+
+### Visual-quality benchmark — Designer Autopilot phases
+
+- use the same source photograph and image model/settings for every compared path;
+- freeze the preservation/program checklist and scoring rubric before generating candidates;
+- score finished source/result pairs blindly rather than scoring written plans or prompts;
+- record calls, tokens, elapsed time, and estimated cost separately from design quality;
+- treat moved fixed openings, structural members, required access, and named keep items as hard failures;
+- keep raw room images, generated references, and original conversations only under ignored `benchmarks/private/` or equivalent owner-approved private storage; commit only redacted manifests, checksums, scores, and consumption summaries;
+- require owner authorization before a paid multi-path comparison matrix.
 
 ## Commands
 
@@ -115,11 +125,11 @@ Run additional integrity or failure suites only when the phase changed their bou
 | Render batches | `npm.cmd run suite:render-batches` |
 | Confirmed chat actions | `npm.cmd run suite:chat-actions` |
 | Assets and responsive behavior | `npm.cmd run suite:assets-responsive` |
-| Design review capture | `npm.cmd run suite:design-review` |
+| Legacy P0 design-review capture | `npm.cmd run suite:design-review` |
 | Paid live smoke | `npm.cmd run suite:live-smoke` |
 | Legacy environment/schema check | `npm.cmd run verify:live` |
 
-The existing `verify:p0-*` commands are historical production-mode phase runners. They start a raw Next.js server from `.env.local` and are incompatible with isolated `.env.test` mode. Use them only when deliberately reopening that exact historical boundary in the supported environment. New phases should use one configurable runner rather than copy another wrapper.
+`verify:p0-1` through `verify:p0-4` are historical production-mode phase runners. They start from `.env.local` and are incompatible with isolated `.env.test` mode; use them only when deliberately reopening that historical boundary. `verify:p0-6` is the supported current configurable gate: it loads the approved test environment, runs mock AI, fresh-seeds each selected suite, and always tears down and checks residue. New phases should extend or replace one configurable runner rather than copy another wrapper.
 
 `npm.cmd run lint` is not currently a valid non-interactive gate: the repository has no completed ESLint configuration and the Next.js lint command enters setup/deprecation behavior. Use typecheck/build and focused suites until lint is repaired as a separate tooling task.
 
@@ -150,6 +160,7 @@ The commands above do not provide automatic `finally` behavior when run manually
 - Live mode is used only when output quality or provider integration is the acceptance criterion.
 - Use the smallest bounded call set that supplies the missing evidence.
 - Do not run the full multi-room paid release matrix without owner confirmation.
+- Do not run the three-room, multi-path visual benchmark without an agreed bounded call plan and owner confirmation.
 
 ## Database schema and migrations
 
@@ -177,6 +188,6 @@ Applying a migration directly to production, pushing, merging, or deploying requ
 
 ## Evidence and reporting
 
-Machine-readable suite results belong in `test-runs/suite-results/`. Screenshots belong in `test-runs/screenshots/`. Durable milestone evidence belongs once under `reports/`.
+Machine-readable suite results belong in `test-runs/suite-results/`. Screenshots belong in `test-runs/screenshots/`. Durable gate reports, benchmark manifests, scorecards, and consumption summaries belong once under `reports/`; private source/result images remain outside public bundles.
 
 The active agent updates `docs/ACTIVE_BUILD.md` with a concise handoff. Do not append the same narrative to multiple plans or resurrect `SESSION_LOG.md` as startup context.

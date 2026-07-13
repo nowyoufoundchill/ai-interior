@@ -1,9 +1,11 @@
 ---
 name: atelier-design-review
-description: Capture owner-facing states at three widths, then use a fresh-context reviewer to score them against docs/PRODUCT.md and the brand guidelines.
+description: Capture the legacy P0 owner-facing states at three widths and review mechanical/brand regressions without treating the old workflow as the P1 product contract.
 ---
 
 # atelier-design-review
+
+> **Legacy P0 capture only:** this records the currently implemented tabbed journey. It is not part of `verify:p0-6`, does not define the replacement P1 experience in `docs/PRODUCT.md`, and must not trigger work that preserves obsolete tabs or concept ceremony. P1.2 replaces this contract.
 
 Runs against a **fresh `npm.cmd run seed:test` state**. Two phases: mechanical capture (scriptable), then judgment (requires a fresh-context agent — a script cannot do this part).
 
@@ -33,14 +35,14 @@ The orchestrating agent must:
 1. Read `test-runs/screenshots/design-review/manifest.json`.
 2. Spawn a **fresh-context** subagent (it must not be the agent that wrote the room-workspace UI code — that agent's read of its own work is not independent) with:
    - The list of screenshot file paths from the manifest.
-   - The rubric in `docs/PRODUCT.md` plus `brand-guidelines.html`: calm/editorial presentation, room specificity, typed-dimension fidelity, meaningful concept differentiation, and rationale for products and design moves.
-   - Instructions to score each screen 1–10 and flag any rubric violation by name.
+   - The legacy-capture rubric: image loading, no clipping/overflow, readable hierarchy, usable tap targets, calm brand execution, and no raw provider/model/error terminology.
+   - Instructions to score each screen 1–10 and separately record gaps against the new deliverable-forward contract as expected migration work, not P0 failures.
 3. Take the subagent's per-screenshot scores and violations, and write them to `test-runs/suite-results/design-review.json` in the same shape the other suites use (`{ suite, ranAt, total, passed, failed, checks: [{description, passed, detail}] }`) — one `check` per screenshot, `passed = score >= 8 with zero violations`.
 
 ## Pass condition
 
-Every screen scores ≥8/10 with zero named product or brand violations. Reviewer findings that recur across cycles must be encoded into an active product/brand rule or executable check rather than fixed once.
+Every screen scores ≥8/10 on the legacy-capture rubric. Do not fail or expand P0 because the old workflow differs from the replacement product contract.
 
 ## On failure
 
-Fix the UI/copy, then **reseed and re-run both phases from a clean state**.
+Fix only a regression against the legacy-capture rubric, then **reseed and re-run both phases from a clean state**. Product-contract migration belongs to the active P1 slice.

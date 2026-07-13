@@ -5,6 +5,8 @@ description: Run the current artifact integrity and invalidation suite through t
 
 # atelier-integrity
 
+> **Legacy P0 verification:** the current rows and invalidation routes remain useful transition evidence, but the accepted design version in `docs/PRODUCT.md` is the future downstream contract. Update these assertions with the P1 data transition; do not treat mood-board ceremony as permanent.
+
 Runs against a **fresh `npm.cmd run seed:test` state** under `docs/OPERATIONS.md`; never verify against dirty seeded state.
 
 ## Preconditions
@@ -25,7 +27,7 @@ Equivalent to `node scripts/suites/integrity.mjs`.
 
 ## What it checks
 
-The artifact rules in `docs/PRODUCT.md`, driven through real API calls (not raw SQL) against the seeded room, then asserted via `GET /api/debug/room-state/[roomId]`:
+Transitional regression rules for the currently implemented diagnosis/mood-board data model, driven through real API calls (not raw SQL) against the seeded room, then asserted via `GET /api/debug/room-state/[roomId]`:
 
 - New photo → current diagnosis marked `stale`, kept (not deleted), nothing else touched.
 - Diagnosis re-run → existing mood boards marked `stale`, kept.

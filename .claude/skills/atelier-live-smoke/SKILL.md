@@ -5,6 +5,8 @@ description: Run the bounded paid live-provider smoke once at a release mileston
 
 # atelier-live-smoke
 
+> **Legacy P0 verification:** this proves the current provider connections with the least expensive implemented path. It does not define the P1 Designer Autopilot call graph. Replace the diagnosis/locked-concept setup only when P1.2 provides its durable one-action path.
+
 **Costs real money. Run at most once per verification cycle.** Runs against a fresh `npm.cmd run seed:test` state, but against a dev server that is NOT in mock mode.
 
 ## Preconditions

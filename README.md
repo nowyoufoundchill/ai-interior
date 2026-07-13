@@ -1,8 +1,8 @@
 # AI Interior Designer
 
-A private, premium interior-design application for one household. It turns room briefs, typed dimensions, and real photographs into a designer diagnosis, approved concept direction, multi-perspective room visualizations, confirmed refinements, and a sourced product plan.
+A private interior-design application for one household. It turns a few plain-language needs and real room photographs into one designer-quality recommendation, conversational revisions, an implementation-aware room package, and a coherent design record across rooms.
 
-The application is currently entering **P0.5 — guided workflow and recovery**. See [docs/ACTIVE_BUILD.md](docs/ACTIVE_BUILD.md) for the next implementation slice.
+The application is currently closing **P0.6 — reliability foundation** before beginning the three-room Designer Autopilot benchmark. See [docs/ACTIVE_BUILD.md](docs/ACTIVE_BUILD.md) for the next unchecked slice and [docs/PRODUCT.md](docs/PRODUCT.md) for the replacement P1.1–P1.6 contract.
 
 ## Start the application
 

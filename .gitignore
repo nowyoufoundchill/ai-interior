@@ -13,6 +13,7 @@ dist/
 !.env*.example
 spike/runs/
 test-runs/
+benchmarks/private/
 .spike-dev*.log
 .batch-start*.log
 .render-*.log

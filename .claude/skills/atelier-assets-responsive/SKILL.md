@@ -5,6 +5,8 @@ description: Run the current asset and responsive suite at 390, 768, and 1440 pi
 
 # atelier-assets-responsive
 
+> **Legacy P0 verification:** this builds the current diagnosis/concept journey only to verify the existing application's assets and responsive behavior during P0.6. It is not the P1 product contract; update the fixture journey with P1.2 rather than preserving obsolete tabs.
+
 Runs against a **fresh `npm.cmd run seed:test` state**. Builds its own diagnosis/concepts/locked-concept/products/render state first (via `scripts/suites/_journey.mjs`), then checks assets and layout.
 
 ## Preconditions
