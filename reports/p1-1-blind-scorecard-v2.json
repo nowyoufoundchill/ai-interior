@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "phase": "P1.1",
+  "supersedes": "p1-1-blind-scorecard.json",
+  "status": "owner_scored",
+  "review_instructions": "Blind finished-image review. Candidate-path and prompt information were withheld.",
+  "owner_preference_label": "F",
+  "scored_at": "2026-07-14T03:12:18.078Z",
+  "unknown_clearances": "unverified",
+  "candidates": [
+    { "review_label": "A", "case_id": "OPENPLAN-01", "result_sha256": "770edaba5d9ff51670e4671f0ad6d787383fcfc494d9e11e163bc1393a9a46bd", "hard_failure": false, "notes": "The couch was used in a strange way. Above the fireplace would commonly be converted to a TV.", "rubric_scores": { "architecture": 10, "function": 5, "spatial": 8, "photo": 9, "coherence": 7, "preference": 6 }, "weighted_score": 78.5 },
+    { "review_label": "B", "case_id": "OPENPLAN-01", "result_sha256": "1fc251e09bf348be2b267059c09833fd986e0ee0f8dde04e590741767a1c68f4", "hard_failure": false, "notes": "Good mixture of items across the image. Use of rugs, credenzas, and plants.", "rubric_scores": { "architecture": 10, "function": 9, "spatial": 9, "photo": 9, "coherence": 9, "preference": 9 }, "weighted_score": 93 },
+    { "review_label": "C", "case_id": "CHILDROOM-01", "result_sha256": "0a4b9723ba90207f07dcddb65a52902dec0edf233db513692149c382197036cd", "hard_failure": false, "notes": null, "rubric_scores": { "architecture": 10, "function": 6, "spatial": 4, "photo": 10, "coherence": 6, "preference": 8 }, "weighted_score": 77 },
+    { "review_label": "D", "case_id": "GARAGE-01", "result_sha256": "f4971316de4e5d9b44f23b648d88f0bbb6aa42ab01c9256135ef576446dd5aa0", "hard_failure": false, "notes": "The photo I provided does not take the full room into consideration, but photo credibility was perfect for the photo provided.", "rubric_scores": { "architecture": 10, "function": 9, "spatial": 10, "photo": 8, "coherence": 10, "preference": 9 }, "weighted_score": 94 },
+    { "review_label": "E", "case_id": "GARAGE-01", "result_sha256": "45e1f38c4dae8ee9e400678340cc02ee0eb3ad937718dc2be372a6424898908f", "hard_failure": false, "notes": null, "rubric_scores": { "architecture": 10, "function": 7, "spatial": 8, "photo": 8, "coherence": 6, "preference": 6 }, "weighted_score": 80 },
+    { "review_label": "F", "case_id": "CHILDROOM-01", "result_sha256": "75ce856133d074c6eb8127a89f47bdc0ce52353caffb04b9c7556fa4ea1e87e6", "hard_failure": false, "notes": "Great use of space and realism. Great use of art and toys too.", "rubric_scores": { "architecture": 10, "function": 10, "spatial": 10, "photo": 10, "coherence": 10, "preference": 10 }, "weighted_score": 100 }
+  ],
+  "rubric": [
+    { "criterion": "fixed-architecture and named-item retention", "weight": 30 },
+    { "criterion": "required-function and program fulfillment", "weight": 20 },
+    { "criterion": "spatial plausibility, access, and safety", "weight": 15 },
+    { "criterion": "photographic and geometric credibility", "weight": 15 },
+    { "criterion": "design coherence and whole-home fit", "weight": 10 },
+    { "criterion": "owner preference", "weight": 10 }
+  ]
+}

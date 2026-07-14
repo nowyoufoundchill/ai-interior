@@ -1,105 +1,77 @@
-# Active Build — P0.6 Reliability Foundation Close
+# Active Build - P1.2 Designer Autopilot
 
-**Updated:** 2026-07-12
+**Updated:** 2026-07-13
 
 **Application baseline:** `9c3599358e44a7cc16c1e5eb5403b32c40e42b47`
 
-**Accepted complete:** P0.0 through P0.5
+**Accepted complete:** P0.0 through P0.6
 
-**Current phase:** P0.6
+**Current phase:** P1.2
 
-**Next committed phase:** P1.1 — Three-Room Benchmark and Outcome Contract
+**Next committed phase:** P1.2 - Designer Autopilot: minimal input to one design
 
-**External blocker:** None
+**External blocker:** None. P1.1 benchmark evidence is complete. The current pipeline remains unavailable for private benchmark sources because it would require the public photo bucket; this is recorded baseline evidence, not a P1.1 blocker.
 
-`PRODUCT.md` owns the replacement P1.1–P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
+`PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
-## P0.6 objective
+## P1.1 completion record
 
-Close the already-built durability, recovery, and verification foundation before changing the homeowner journey. P0.6 proves that the existing system can run repeatably from a fresh configured seed and clean up after itself.
+Establish reproducible, private evidence for the three required room benchmarks before optimizing the homeowner journey, prompts, or pipeline. This phase records evidence; it does not run an unapproved paid comparison or change the owner-facing workflow.
 
-P0.6 is a reliability baseline. It does not certify the current diagnosis → concepts → render interface as the future product or as household-ready.
+The supplied manual results are fixed comparison evidence, not gold standards. Unknown original inputs, historical model settings, and unmeasured clearances remain explicitly unknown.
 
-## Current slice — Run the complete automated gate
+## P1.1 completion checklist
 
-- [x] Provide one configurable release runner that performs typecheck and production build once.
-- [x] Fresh-seed every selected suite so state does not leak across lifecycle boundaries.
-- [x] Always run teardown and residue checks, including after failure.
-- [x] Support focused `P06_SUITES` subsets while keeping the complete default gate.
-- [x] Fail closed unless the configured test environment is isolated or the repository contains the explicit owner-approved production-test acknowledgment.
-- [x] Run the complete default gate through the configured approved test mode.
-- [x] Fix only failures that cross the P0 durability, recovery, accessibility, or test-isolation boundary.
-- [x] Write one concise immutable gate report under `reports/` with commit, environment mode, suites, failures/retries, residue result, and final status.
+- [x] Place the supplied source photographs under ignored `benchmarks/private/<CASE_ID>/` and record redacted SHA-256 checksums.
+- [x] Place the supplied `GARAGE-01` fixed manual reference image and original prompt under ignored private storage; record only their redacted checksums and provenance.
+- [x] Place the supplied `OPENPLAN-01` original homeowner request and Sol system prompt under ignored private storage; record only their redacted checksums and provenance.
+- [x] Place the supplied `CHILDROOM-01` fixed manual reference image under ignored private storage and record only its redacted checksum.
+- [x] Place the supplied `OPENPLAN-01` fixed manual reference image and final prompt under ignored private storage; record only their redacted checksums and provenance.
+- [x] Confirm the original `CHILDROOM-01` conversation is not supplied; record its absence and the minimal homeowner input as `unknown` rather than reconstructing either.
+- [x] Record the existing original minimal homeowner input when available; record `unknown` rather than reconstructing it when absent.
+- [x] Produce a redacted manifest/checksum record under `reports/` for each case, including asset checksums, prompt provenance, fixed architecture, required program, unknowns, historical settings, and current-pipeline baseline consumption.
+- [x] Confirm raw assets, conversations, and prompt text remain private and that committed reports contain only permitted redacted evidence.
+- [x] Freeze the blind finished-image scoring procedure, rubric, hard failures, uncertainty rule, and controlled-comparison requirements before generation.
+- [x] Record owner direction that photo-observed physical facts are preservation constraints while room type/program remains flexible.
+- [x] Inspect existing persisted current-pipeline consumption evidence; record only observed calls, tokens, elapsed time, and estimated cost, or retain `not_recorded` when no evidence exists.
+- [x] Run the owner-authorized, privacy-safe controlled image set: three available full-prompt edits and three compact-brief edits using the same configured image model/settings, with no retries.
+- [x] Complete blind scoring of the completed source/result pairs and record owner preference without candidate-path information.
 
-Run:
+Do not substitute existing spike fixtures for these supplied room cases, recreate manual evidence, or run provider calls while the private materials are absent.
 
-```powershell
-npm.cmd run verify:p0-6
-```
+## P1.1 gate
 
-For focused development only:
+P1.1 completes only when:
 
-```powershell
-$env:P06_SUITES="integrity,p05Browser"
-npm.cmd run verify:p0-6
-```
+- all three private evidence sets and redacted manifests are reproducible;
+- owner-reviewed preservation/program checklists are recorded before generation;
+- fixed manual-reference evidence and current-application consumption are recorded rather than guessed;
+- the controlled comparison's shared model/settings and blind scoring procedure are frozen before optimization; and
+- any paid multi-path comparison has an owner-approved bounded call plan.
 
-## P0.6 gate
+## P1.2 first-design intake
 
-P0.6 completes only when:
+- [x] Trace the existing first-design browser-to-job path and implement the smallest progressive intake that collects a usable room photo and plain-language outcome before compiling the one-design request.
 
-- typecheck and production build pass;
-- the complete configured mock suite set passes from fresh tagged state;
-- when the approved production project is used, every mutation carries the current `test_run_id`, teardown runs after every suite, and verified residue is zero;
-- duplicate actions resolve to one logical durable job;
-- refresh and reopen restore active and recoverable work;
-- partial batch failure preserves successful perspectives and retries only failed work;
-- failure and stale states provide plain-language recovery without losing owner input;
-- required progress, completion, and failure announcements remain accessible;
-- teardown completes and the residue check is zero;
-- the immutable gate report exists.
+## Current slice - P1.2 first-design operation
 
-Do not add legacy workflow UI, extra concepts, or new product behavior merely to make this gate larger. A failure outside the P0 boundary is recorded for the relevant P1 phase.
-
-## Preserved foundation for P1
-
-- Append-only artifact and version history.
-- Durable, bounded, idempotent long-running work.
-- Checkpointed paid output where supported.
-- Refresh, reopen, retry, and duplicate-submit recovery.
-- Successful batch siblings survive partial failure.
-- Typed homeowner facts outrank inference.
-- Service credentials and provider access remain server-side.
-- Accessible progress and recovery are part of every future slice.
+- [ ] Connect the successful progressive intake to the versioned brief compiler and one durable first-design job.
 
 ## Current non-goals
 
 - Improving the legacy diagnosis, concept, product, or tabbed workspace.
-- Adding five concepts or a full concept editor.
+- Substituting test or spike images for owner benchmark evidence.
+- Reconstructing unknown prompts, settings, homeowner input, or clearances.
 - Running the paid three-room comparison matrix.
 - Building the brief compiler, image critic, implementation package, or multi-room view.
 - Broad refactors, analytics, authentication, billing, deployment, or provider changes.
-
-## Next phase preview — P1.1
-
-After the P0.6 report is green, replace this file with the P1.1 active slices. P1.1 will:
-
-1. place raw benchmark assets for `OPENPLAN-01`, `CHILDROOM-01`, and `GARAGE-01` under ignored `benchmarks/private/`, and commit only redacted manifests/checksums under `reports/`;
-2. record original minimal homeowner inputs when available and mark missing input unknown rather than inventing it;
-3. freeze the source-preservation and design-quality rubric from `PRODUCT.md`;
-4. preserve the supplied ChatGPT images as fixed manual references with unknown historical settings where necessary, then capture controlled full-prompt, compact-brief, and current-pipeline candidates with the same source and current image model/settings;
-5. record provider calls, tokens, elapsed time, and estimated cost;
-6. select the shortest P1.2 pipeline that preserves or improves the delivered result.
-
-Paid benchmark calls require a bounded plan and owner authorization. P1.1 measures before it optimizes; it does not improve prompts or rebuild the UI while establishing the baseline.
 
 ## Handoff format
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** complete P0.6 reliability gate is green in the owner-approved production test mode; the runner now records an immutable report, avoids wildcard-port collisions, tears down the exact seeded run, and supports fresh failure-fixture/browser journeys.
-- **Files or migrations changed:** `scripts/verify-p0-6.mjs`, `scripts/suites/failure-fixtures.mjs`, `scripts/suites/_journey.mjs`, `scripts/suites/p05-browser.mjs`; no migration.
-- **Focused verification:** `node --check` for changed suites; focused `failureFixtures` gate green (29/29); focused browser gates green (`p05Browser` 22/22, `assetsResponsive` 57/57); complete `npm.cmd run verify:p0-6` green with typecheck/build, all seven suites, teardown, and zero residue.
-- **Gate report:** [`reports/p0-6-gate-1783913623123-9c35993.md`](/C:/Users/darre/Documents/AI%20Interior%20Designer/reports/p0-6-gate-1783913623123-9c35993.md)
-- **Known limitation or blocker:** none for P0.6. P1.1 remains the next committed phase.
-- **Next unchecked slice:** replace this handoff with the P1.1 active slices after the green P0.6 report.
+- **Outcome delivered:** P1.2's first-design intake replaces the legacy room dossier with one image, one plain-language outcome, an optional room name, and one `Design my room` action. It creates the room only once during an upload attempt, retains that draft for retry if the photo upload fails, and rejects non-image files before storage.
+- **Files or migrations changed:** `components/forms/room-autopilot-intake.tsx`, `app/homes/[homeId]/rooms/new/page.tsx`, `app/api/rooms/[roomId]/photos/route.ts`, `tsconfig.json`, `docs/ACTIVE_BUILD.md`; no migration.
+- **Focused verification:** `npm.cmd run typecheck` passes. Browser verification against an existing local home confirms the first-design page renders the minimal photo/outcome/optional-name intake and one visible `Design my room` action. Submission was intentionally not exercised because the available local data store is not a fresh tagged test run; no unscoped room or storage object was created.
+- **Known limitation or blocker:** an isolated or freshly tagged seeded test database is still needed for a mutation-level browser check. Current-pipeline benchmark lanes remain unavailable because private local sources would require the public photo bucket. Unknown physical clearances remain unverified.
+- **Next unchecked slice:** connect a successful intake submit to the versioned brief compiler and one durable first-design job, then exercise it against a freshly tagged test database.

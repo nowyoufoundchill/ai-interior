@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "phase": "P1.1",
+  "observed_on": "2026-07-13",
+  "source": "read-only public.ai_runs query",
+  "scope": {
+    "untagged_run_count": 98,
+    "completed_run_count": 83,
+    "completed_non_mock_run_count": 83
+  },
+  "benchmark_attribution": {
+    "attributable_run_count": 0,
+    "status": "not_recorded",
+    "reason": "No persisted ai_run is linked to the private benchmark source checksums or case IDs. Global historical runs cannot be assigned to a benchmark baseline without guessing."
+  },
+  "fields_not_inferred": ["provider calls", "tokens", "elapsed time", "estimated cost"]
+}

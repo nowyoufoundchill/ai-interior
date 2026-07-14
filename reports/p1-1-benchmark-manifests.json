@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "phase": "P1.1",
+  "purpose": "Redacted benchmark evidence record. Private source and reference assets, original conversations, and prompt text are excluded.",
+  "generated_on": "2026-07-13",
+  "cases": [
+    {
+      "id": "OPENPLAN-01",
+      "room": "Connected living/dining/kitchen",
+      "source": { "status": "present", "sha256": "8e453c0f49a1ab8ec7a75dfad9d14e47c74c6afb7c82ed4804f4d28835139d38", "bytes": 184653 },
+      "manual_reference": { "status": "present", "sha256": "e5d015b13347cf9584440c17edd44ba9c33020e270cdae7c211ec553c2b48353", "bytes": 2863228, "historical_model_settings": "unknown" },
+      "original_minimal_homeowner_input": { "status": "present", "sha256": "ab884334b43289acfa8b9524807a48dffcb889408573916c325a3071addbdc6b", "bytes": 421, "content_location": "private" },
+      "prompt_provenance": {
+        "status": "present",
+        "components": [
+          { "kind": "user-supplied original homeowner request", "sha256": "ab884334b43289acfa8b9524807a48dffcb889408573916c325a3071addbdc6b", "bytes": 421 },
+          { "kind": "user-supplied Sol system prompt", "sha256": "77a88fee84deb7ff50f2d9cd6e36ed854bdedcb163233c6593abfbb0e049117a", "bytes": 6366 },
+          { "kind": "user-supplied final manual-reference prompt", "sha256": "414d94c3adc0b1d7a2ad6c6565b9bb8643d873fac4788934ae217612924ce9bb", "bytes": 6031 }
+        ],
+        "content_location": "private"
+      },
+      "historical_manual_settings": { "status": "unknown" },
+      "current_pipeline_baseline_consumption": { "status": "not_recorded" },
+      "photo_observed_candidate_preservation_items": ["fireplace and surround", "open kitchen and island", "exposed ceiling beams", "windows and exterior door", "ceiling fans"],
+      "required_program": { "source": "PRODUCT.md benchmark scenario", "items": ["connected living", "dining", "kitchen"], "constraint_status": "scenario for comparison, not a fixed preservation constraint" },
+      "preservation_program_checklist": { "status": "pending_owner_review" }
+    },
+    {
+      "id": "CHILDROOM-01",
+      "room": "Five-year-old child's bedroom",
+      "source": { "status": "present", "sha256": "f9fc5c140610f2831b14422176c9616d6aca5bc53e1a4396ec3cd32f2fdfcfc8", "bytes": 103115 },
+      "manual_reference": { "status": "present", "sha256": "a119b3f848ec2760229cbd9dc4fff7aa2695d2e115e0d7355ad9e020c79f9bb1", "bytes": 2539248, "historical_model_settings": "unknown" },
+      "original_conversation": { "status": "partial_prompt_supplied", "note": "An original expert prompt was supplied; the original minimal homeowner conversation remains unavailable." },
+      "original_minimal_homeowner_input": { "status": "unknown" },
+      "prompt_provenance": { "status": "present", "kind": "user-supplied original expert prompt", "sha256": "3362434912a62cd2220dde71af449bff21476789b216c6b81bad8e0fc5eb9815", "bytes": 14487, "content_location": "private" },
+      "historical_manual_settings": { "status": "unknown" },
+      "current_pipeline_baseline_consumption": { "status": "not_recorded" },
+      "photo_observed_candidate_preservation_items": ["two windows", "entry door", "ceiling fan", "wall grille and ceiling vents"],
+      "required_program": { "source": "PRODUCT.md benchmark scenario", "items": ["five-year-old child's bedroom"], "constraint_status": "scenario for comparison, not a fixed preservation constraint" },
+      "preservation_program_checklist": { "status": "pending_owner_review" }
+    },
+    {
+      "id": "GARAGE-01",
+      "room": "Workshop, storage, surf, gym, and parking",
+      "source": { "status": "present", "sha256": "4351c7788f6e55935f86f726741c2f6ceb2a6e9b00f50605616d4ee4639bfd36", "bytes": 284897 },
+      "manual_reference": { "status": "present", "sha256": "db5afd4a5a6e0b7411be5b9ffe06b37e0dde47ddb8b996a26902e2ebbd80dcc3", "bytes": 3031986, "historical_model_settings": "unknown" },
+      "original_minimal_homeowner_input": { "status": "unknown", "note": "A detailed original design prompt was supplied, but no distinct minimal homeowner intake was identified." },
+      "prompt_provenance": { "status": "present", "kind": "user-supplied original design prompt", "sha256": "c7ac1e453800c3163cb59c0d9b44c55374ae0c991d624083454f790353e1a5e7", "bytes": 11405, "content_location": "private" },
+      "historical_manual_settings": { "status": "unknown" },
+      "current_pipeline_baseline_consumption": { "status": "not_recorded" },
+      "photo_observed_candidate_preservation_items": ["structural posts and exposed framing", "windows and door openings", "existing wall shelving", "ceiling-mounted light fixtures"],
+      "required_program": { "source": "user-supplied original design prompt", "items": ["two-car garage", "tooling area", "workbench", "lawn-equipment storage", "gym area", "squat rack", "cable machine", "adjustable bench", "surfboard storage"], "constraint_status": "benchmark scenario; actual room use may change unless explicitly locked for a run" },
+      "preservation_program_checklist": { "status": "pending_owner_review" }
+    }
+  ]
+}

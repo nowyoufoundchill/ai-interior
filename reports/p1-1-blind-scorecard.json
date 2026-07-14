@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "phase": "P1.1",
+  "status": "ready_for_blind_review",
+  "review_instructions": "Review each source/result pair without candidate-path or prompt information. Score quality separately from consumption. Unknown clearances remain unverified.",
+  "candidates": [
+    { "review_label": "A", "case_id": "OPENPLAN-01", "result_sha256": "770edaba5d9ff51670e4671f0ad6d787383fcfc494d9e11e163bc1393a9a46bd" },
+    { "review_label": "B", "case_id": "OPENPLAN-01", "result_sha256": "1fc251e09bf348be2b267059c09833fd986e0ee0f8dde04e590741767a1c68f4" },
+    { "review_label": "C", "case_id": "CHILDROOM-01", "result_sha256": "0a4b9723ba90207f07dcddb65a52902dec0edf233db513692149c382197036cd" },
+    { "review_label": "D", "case_id": "GARAGE-01", "result_sha256": "f4971316de4e5d9b44f23b648d88f0bbb6aa42ab01c9256135ef576446dd5aa0" },
+    { "review_label": "E", "case_id": "GARAGE-01", "result_sha256": "45e1f38c4dae8ee9e400678340cc02ee0eb3ad937718dc2be372a6424898908f" }
+  ],
+  "rubric": [
+    { "criterion": "fixed-architecture and named-item retention", "weight": 30 },
+    { "criterion": "required-function and program fulfillment", "weight": 20 },
+    { "criterion": "spatial plausibility, access, and safety", "weight": 15 },
+    { "criterion": "photographic and geometric credibility", "weight": 15 },
+    { "criterion": "design coherence and whole-home fit", "weight": 10 },
+    { "criterion": "owner preference", "weight": 10 }
+  ],
+  "scores": []
+}

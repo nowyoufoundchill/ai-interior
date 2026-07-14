@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "phase": "P1.1",
+  "status": "frozen_pre_generation",
+  "purpose": "Blind finished-image scoring procedure for the three private benchmark cases. No raw prompts, private images, or provider credentials are included.",
+  "candidate_paths": [
+    "full expert prompt",
+    "application concise compiled brief",
+    "current application pipeline baseline"
+  ],
+  "controlled-comparison": {
+    "same_source_image_per_case": true,
+    "same_current_image_model_and_settings_per_case": true,
+    "quality_scoring_separate_from_consumption": true,
+    "provider_calls_require_owner_approved_bounded_plan": true
+  },
+  "blind_scoring": {
+    "reviewer_sees": ["source image", "one anonymized finished image", "case preservation/program checklist"],
+    "reviewer_does_not_see": ["candidate path", "prompt text", "provider settings", "calls", "tokens", "latency", "cost"],
+    "candidate_labels": "opaque and randomized per case"
+  },
+  "rubric": [
+    { "criterion": "fixed-architecture and named-item retention", "weight": 30 },
+    { "criterion": "required-function and program fulfillment", "weight": 20 },
+    { "criterion": "spatial plausibility, access, and safety", "weight": 15 },
+    { "criterion": "photographic and geometric credibility", "weight": 15 },
+    { "criterion": "design coherence and whole-home fit", "weight": 10 },
+    { "criterion": "owner preference", "weight": 10 }
+  ],
+  "hard_failures": [
+    "moved or removed fixed opening without explicit owner authorization",
+    "moved or removed structural member without explicit owner authorization",
+    "moved or removed required access path without explicit owner authorization",
+    "moved or removed named keep item without explicit owner authorization",
+    "moved or removed vent or visible utility without explicit owner authorization"
+  ],
+  "uncertainty_rule": "Unknown clearances remain unverified and cannot silently pass.",
+  "program_rule": "A benchmark program measures scenario fit; it is not a fixed preservation constraint. Room use may change unless the owner explicitly locks a requirement for that run.",
+  "owner_review": {
+    "required_before_generation": false,
+    "checklists": ["OPENPLAN-01", "CHILDROOM-01", "GARAGE-01"],
+    "status": "physical-preservation baseline confirmed; program remains flexible"
+  }
+}

@@ -31,6 +31,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       return NextResponse.json({ error: "A photo file is required." }, { status: 400 });
     }
 
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Choose an image file for your room photo." }, { status: 400 });
+    }
+
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-");
     const storagePath = `${roomId}/${crypto.randomUUID()}-${safeName}`;
     const { error: uploadError } = await supabase.storage.from(ROOM_PHOTOS_BUCKET).upload(storagePath, file, {

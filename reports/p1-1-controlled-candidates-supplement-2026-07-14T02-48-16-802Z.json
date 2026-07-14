@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "phase": "P1.1",
+  "run_id": "2026-07-14T02-48-16-802Z",
+  "model": "gpt-5.4-mini-2026-03-17",
+  "reason": "Original CHILDROOM-01 expert prompt was supplied after the initial controlled run.",
+  "completed_candidates": [
+    { "case_id": "CHILDROOM-01", "path": "full_expert_prompt", "result_sha256": "75ce856133d074c6eb8127a89f47bdc0ce52353caffb04b9c7556fa4ea1e87e6", "result_bytes": 2285477, "input_tokens": 7213, "output_tokens": 849, "total_tokens": 8062, "elapsed_ms": 52031, "estimated_cost": null }
+  ],
+  "privacy": "The generated image and prompt-bearing metadata remain only under benchmarks/private/. This report contains a checksum and consumption metadata only."
+}

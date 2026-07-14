@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "phase": "P1.1",
+  "run_id": "2026-07-14T02-36-48-986Z",
+  "model": "gpt-5.4-mini-2026-03-17",
+  "status": "partial_completed",
+  "completed_candidates": [
+    { "case_id": "OPENPLAN-01", "path": "full_expert_prompt", "result_sha256": "770edaba5d9ff51670e4671f0ad6d787383fcfc494d9e11e163bc1393a9a46bd", "result_bytes": 2543763, "input_tokens": 4923, "output_tokens": 487, "total_tokens": 5410, "elapsed_ms": 50158, "estimated_cost": null },
+    { "case_id": "OPENPLAN-01", "path": "compact_brief", "result_sha256": "1fc251e09bf348be2b267059c09833fd986e0ee0f8dde04e590741767a1c68f4", "result_bytes": 2545347, "input_tokens": 3754, "output_tokens": 274, "total_tokens": 4028, "elapsed_ms": 56420, "estimated_cost": null },
+    { "case_id": "CHILDROOM-01", "path": "compact_brief", "result_sha256": "0a4b9723ba90207f07dcddb65a52902dec0edf233db513692149c382197036cd", "result_bytes": 2201298, "input_tokens": 3869, "output_tokens": 396, "total_tokens": 4265, "elapsed_ms": 48199, "estimated_cost": null },
+    { "case_id": "GARAGE-01", "path": "full_expert_prompt", "result_sha256": "f4971316de4e5d9b44f23b648d88f0bbb6aa42ab01c9256135ef576446dd5aa0", "result_bytes": 2504996, "input_tokens": 6321, "output_tokens": 802, "total_tokens": 7123, "elapsed_ms": 55181, "estimated_cost": null },
+    { "case_id": "GARAGE-01", "path": "compact_brief", "result_sha256": "45e1f38c4dae8ee9e400678340cc02ee0eb3ad937718dc2be372a6424898908f", "result_bytes": 2657937, "input_tokens": 3875, "output_tokens": 381, "total_tokens": 4256, "elapsed_ms": 48672, "estimated_cost": null }
+  ],
+  "totals": { "image_calls": 5, "input_tokens": 22742, "output_tokens": 2340, "total_tokens": 25082, "elapsed_ms": 258630, "result_bytes": 12453341, "estimated_cost": null },
+  "not_run": [
+    { "case_id": "CHILDROOM-01", "path": "full_expert_prompt", "reason": "Original expert prompt was not supplied and was not reconstructed." },
+    { "case_id": "OPENPLAN-01", "path": "current_application_pipeline", "reason": "The current pipeline requires an application photo URL; the current photo bucket is public, so uploading a private benchmark source would violate the private-asset contract." },
+    { "case_id": "CHILDROOM-01", "path": "current_application_pipeline", "reason": "The current pipeline requires an application photo URL; the current photo bucket is public, so uploading a private benchmark source would violate the private-asset contract." },
+    { "case_id": "GARAGE-01", "path": "current_application_pipeline", "reason": "The current pipeline requires an application photo URL; the current photo bucket is public, so uploading a private benchmark source would violate the private-asset contract." }
+  ],
+  "privacy": "Generated images and prompt-bearing run metadata remain only under benchmarks/private/. This report contains checksums and aggregate consumption only."
+}
