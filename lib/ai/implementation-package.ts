@@ -41,15 +41,19 @@ export async function compileImplementationPackage(input: {
 export function auditImplementationPackage(plan: ImplementationPackagePlan, requiredCoverageLabels: string[] = []): string[] {
   const issues: string[] = [];
   const itemIds = new Set(plan.furnishing_schedule.map((item) => item.id));
-  const taskIds = new Set(plan.field_verification_tasks.map((task) => task.id));
+  const tasksById = new Map(plan.field_verification_tasks.map((task) => [task.id, task]));
   const allClaims: ImplementationClaim[] = [
     ...plan.placement_guidance,
     ...plan.measurement_and_clearance_claims,
     ...plan.furnishing_schedule.flatMap((item) => [item.placement, ...item.dimensions])
   ];
   for (const claim of allClaims) {
-    if (claim.provenance === "unknown" && (!claim.field_task_id || !taskIds.has(claim.field_task_id))) {
+    if (claim.provenance !== "unknown") continue;
+    const task = claim.field_task_id ? tasksById.get(claim.field_task_id) : null;
+    if (!task) {
       issues.push(`Unknown claim ${claim.id} has no valid field-verification task.`);
+    } else if (!task.resolves_claim_ids.includes(claim.id)) {
+      issues.push(`Field-verification task ${task.id} does not explicitly resolve unknown claim ${claim.id}.`);
     }
   }
   for (const coverage of plan.coverage) {

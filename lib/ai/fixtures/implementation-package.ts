@@ -23,14 +23,19 @@ export function buildImplementationPackageFixture(input: {
   room: Record<string, unknown>;
   brief: Record<string, unknown>;
 }): ImplementationPackagePlan {
-  const fieldTasks = PRODUCT_REFERENCES.map((item, index) => ({
-    id: `field-${index + 1}`,
-    task: `Measure the available width, depth, and circulation around the ${item[0].toLowerCase()} location.`,
-    reason: "A photograph and typed room envelope do not prove exact product fit or installation clearance.",
+  const roomDimensions = asRecord(input.room.dimensions);
+  const fieldTaskId = "field-room-fit";
+  const fieldTasks = [{
+    id: fieldTaskId,
+    task: "In one measuring pass, record the available width, depth, height, and circulation at each planned furnishing location.",
+    reason: "Use this single room check before ordering; the photograph and room envelope do not prove exact product fit or installation clearance.",
     priority: "before_purchase" as const,
-    resolves_claim_ids: [`dimension-${index + 1}`],
+    resolves_claim_ids: [
+      ...PRODUCT_REFERENCES.map((_, index) => `dimension-${index + 1}`),
+      ...(Object.keys(roomDimensions).length ? [] : ["room-envelope"])
+    ],
     status: "open" as const
-  }));
+  }];
   const schedule = PRODUCT_REFERENCES.map(([category, description, retailer, url, low, high], index) => {
     const classification = url ? "design_reference" : retailer === "Custom" ? "custom" : "illustrative";
     return {
@@ -52,7 +57,7 @@ export function buildImplementationPackageFixture(input: {
         statement: `Exact ${category.toLowerCase()} size and clearance are unknown until the intended location is measured.`,
         provenance: "unknown" as const,
         source_detail: "No manufacturer-selected item and no location-specific owner measurement are available.",
-        field_task_id: `field-${index + 1}`
+        field_task_id: fieldTaskId
       }],
       product: url ? {
         retailer,
@@ -93,7 +98,6 @@ export function buildImplementationPackageFixture(input: {
   }
   const totalLow = schedule.reduce((sum, item) => sum + item.budget_low * item.quantity, 0);
   const totalHigh = schedule.reduce((sum, item) => sum + item.budget_high * item.quantity, 0);
-  const roomDimensions = asRecord(input.room.dimensions);
   const typedDimensionText = Object.entries(roomDimensions).map(([key, value]) => `${key}: ${String(value)}`).join(", ") || "No complete room dimensions supplied";
 
   return implementationPackageSchema.parse({
@@ -103,7 +107,7 @@ export function buildImplementationPackageFixture(input: {
       statement: `Use the owner-entered room envelope as the planning baseline (${typedDimensionText}); verify each product location before purchase.`,
       provenance: Object.keys(roomDimensions).length ? "owner_measured" : "unknown",
       source_detail: Object.keys(roomDimensions).length ? "Typed room dimensions supplied by the owner." : "No owner measurement is stored.",
-      field_task_id: Object.keys(roomDimensions).length ? null : fieldTasks[0].id
+      field_task_id: Object.keys(roomDimensions).length ? null : fieldTaskId
     }],
     measurement_and_clearance_claims: schedule.flatMap((item) => item.dimensions),
     furnishing_schedule: schedule,
