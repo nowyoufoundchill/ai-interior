@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { GenerationJob, ImplementationPackage, Photo, Render, Room } from "@/types/database";
@@ -23,6 +23,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
   const currentPackage = implementationPackages.find((item) => item.status === "current" && item.accepted_render_id === current?.id);
   const packagePlan = currentPackage?.package as unknown as ImplementationPackagePlan | undefined;
   const [busy, setBusy] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"before" | "after">("after");
   const [revisionText, setRevisionText] = useState("");
@@ -52,6 +53,35 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
     if (!response.ok) setError((await response.json().catch(() => ({}))).error ?? "We couldn't start your room design.");
     else router.refresh();
     setBusy(false);
+  }
+
+  async function uploadSourcePhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      event.target.value = "";
+      setError("Choose an image file for your room photo.");
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("label", "Main angle");
+      const response = await fetch(`/api/rooms/${room.id}/photos`, { method: "POST", body: formData });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? "We couldn't add that room photo.");
+      }
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "We couldn't add that room photo.");
+    } finally {
+      event.target.value = "";
+      setIsUploadingPhoto(false);
+    }
   }
 
   async function acceptDesign() {
@@ -161,7 +191,23 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
           </figcaption>
         </figure>
       ) : (
-        <div className="atelier-empty">Add one clear room photo to begin.</div>
+        <div data-testid="empty-room-photo-state" className="atelier-empty flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+          <div>
+            <p className="font-medium text-atelier-ink">Add one clear room photo to begin.</p>
+            <p className="mt-1 text-sm text-atelier-umber">A wide view that shows the room and its fixed features is enough.</p>
+          </div>
+          <label className={`atelier-btn shrink-0 ${isUploadingPhoto ? "pointer-events-none opacity-50" : ""}`}>
+            {isUploadingPhoto ? "Adding photo" : "Add room photo"}
+            <input
+              data-testid="empty-room-photo-upload-input"
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={uploadSourcePhoto}
+              disabled={isUploadingPhoto}
+            />
+          </label>
+        </div>
       )}
       {current ? (
         <form className="atelier-card grid gap-3 p-5" onSubmit={reviseDesign}>
@@ -210,7 +256,11 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
                 ? isAccepted
                   ? "This is the design you chose to keep."
                   : "See how this direction feels in your room."
-                : "Your photo and outcome are ready."}
+                : source
+                  ? "Your photo and outcome are ready."
+                  : isUploadingPhoto
+                    ? "Adding your room photo."
+                    : "Add one clear photo to start your design."}
           {error ? <p role="alert" className="mt-2 text-atelier-clay">{error}</p> : null}
         </div>
         {current && !isAccepted ? <button data-testid="accept-design-submit" className="atelier-btn shrink-0" onClick={acceptDesign} disabled={busy}>Keep this design</button> : isAccepted && !packagePlan && !activePackageJob ? <button data-testid="implementation-package-submit" className="atelier-btn shrink-0" onClick={createRoomPlan} disabled={busy}>{failedPackageJob ? "Try room plan again" : "Create room plan"}</button> : !current && source && !activeJob ? <button data-testid="first-design-submit" className="atelier-btn shrink-0" onClick={startDesign} disabled={busy}>{busy ? "Starting your design" : failedJob ? "Try again" : "Design my room"}</button> : null}

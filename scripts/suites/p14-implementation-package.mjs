@@ -33,6 +33,13 @@ async function main() {
   const { serverAiMode } = await requireServerIsolation();
   if (serverAiMode !== "mock") throw new Error(`P1.4 implementation gate requires AI_MODE=mock (got ${serverAiMode}).`);
   const { roomId } = readCurrentTestRun();
+  const seededPhotosResponse = await fetchJson(`${BASE_URL}/api/rooms/${roomId}/photos`);
+  const seededPhotos = seededPhotosResponse.body?.photos ?? [];
+  const photoDeletions = await Promise.all(seededPhotos.map((photo) => fetchJson(`${BASE_URL}/api/rooms/${roomId}/photos`, {
+    method: "DELETE",
+    body: JSON.stringify({ photo_id: photo.id, storage_path: photo.storage_path })
+  })));
+  reporter.assert(seededPhotosResponse.ok && photoDeletions.length > 0 && photoDeletions.every((response) => response.ok), "precondition: tagged room can enter the no-photo state", photoDeletions.map((response) => response.status));
   const browser = await chromium.launch();
   const page = await browser.newPage();
   const consoleErrors = [];
@@ -48,13 +55,22 @@ async function main() {
   });
   try {
     await page.goto(`${BASE_URL}/rooms/${roomId}`, { waitUntil: "networkidle" });
+    reporter.assert(
+      await page.getByTestId("empty-room-photo-state").isVisible() && await page.getByTestId("empty-room-photo-upload-input").count() === 1,
+      "an existing room without photos offers an actionable upload control"
+    );
+    const photoUploadResponse = page.waitForResponse((response) => response.url().endsWith(`/api/rooms/${roomId}/photos`) && response.request().method() === "POST");
+    await page.getByTestId("empty-room-photo-upload-input").setInputFiles(path.join(process.cwd(), "spike", "input-images", "IMG_1126.jpg"));
+    const uploadedPhoto = await photoUploadResponse;
+    await page.getByTestId("first-design-submit").waitFor({ state: "visible" });
+    reporter.assert(uploadedPhoto.ok() && await page.getByTestId("current-design").getAttribute("data-render-id") === "source", "uploaded photo appears and unlocks Design my room");
     await page.getByTestId("first-design-submit").click();
     let state = await pollState(roomId, (value) => value.renders.some((render) => render.status === "candidate"));
     const firstCandidate = state.renders.find((render) => render.status === "candidate");
     reporter.assert(Boolean(firstCandidate), "precondition: one reviewed design is ready", state.renders);
     await page.reload({ waitUntil: "networkidle" });
     await page.getByTestId("accept-design-submit").click();
-    state = await pollState(roomId, (value) => value.renders.some((render) => render.id === firstCandidate?.id && render.status === "accepted"));
+    state = await pollState(roomId, (value) => value.room.status === "approved" && value.renders.some((render) => render.id === firstCandidate?.id && render.status === "accepted"));
     reporter.assert(state.room.status === "approved", "keeping the design unlocks the room-plan action", state.room);
     await page.reload({ waitUntil: "networkidle" });
 

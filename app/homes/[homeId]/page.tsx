@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { PreferencesManager } from "@/components/homes/preferences-manager";
-import { ROOM_STATUSES } from "@/lib/constants";
+import { RoomList } from "@/components/homes/room-list";
 import { getDesignPreferences, getHome } from "@/lib/data/queries";
 
 export default async function HomeDetailPage({ params }: { params: Promise<{ homeId: string }> }) {
@@ -54,36 +54,7 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
             </Link>
           </div>
 
-          {rooms.length === 0 ? (
-            <div className="atelier-empty">The first room begins the home.</div>
-          ) : (
-            <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-              {rooms.map((room) => (
-                <Link
-                  key={room.id}
-                  href={`/rooms/${room.id}`}
-                  data-testid={`room-card-${room.id}`}
-                  className="atelier-card grid gap-5 p-8 transition-colors duration-300 hover:border-atelier-brass/50"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="atelier-label">{room.room_type || "Room"}</p>
-                      <h3 className="mt-2 font-serif text-2xl text-atelier-ink">{room.name}</h3>
-                    </div>
-                    <span aria-hidden="true" className="font-serif text-xl text-atelier-taupe">
-                      →
-                    </span>
-                  </div>
-                  <p className="text-sm font-light leading-7 text-atelier-umber">
-                    {room.purpose || "Add a purpose and design brief."}
-                  </p>
-                  <span className={`atelier-status w-fit ${room.job_status ? "border-atelier-brass/50 text-atelier-brass" : ""}`}>
-                    {room.job_status ? jobLabel(room.job_status, room.job_type) : statusLabel(room.current_stage || room.status)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <RoomList initialRooms={rooms} />
         </section>
       </div>
     </AppShell>
@@ -92,13 +63,4 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
 
 function jsonList(value: unknown) {
   return Array.isArray(value) && value.length ? value.join(", ") : "Not defined yet.";
-}
-
-function statusLabel(status: string) {
-  return ROOM_STATUSES[status as keyof typeof ROOM_STATUSES] ?? status;
-}
-
-function jobLabel(status: string, type: string | null | undefined) {
-  const noun = type === "batch_render" ? "Perspectives" : type === "chat_action" ? "Requested change" : type === "diagnosis" ? "Room reading" : type === "render" ? "Visualization" : "Design step";
-  return status === "retryable_failed" || status === "terminal_failed" ? `${noun} needs attention` : `${noun} in progress`;
 }
