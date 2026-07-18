@@ -90,6 +90,55 @@ function normalize(message: string): string {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
+export type DirectVisualRevisionDecision =
+  | { actionable: true; instructions: string }
+  | { actionable: false; error: string; code: "needs_detail" | "needs_scope" | "not_visual" };
+
+/**
+ * The autopilot revision field is already scoped to the one design visible
+ * above it. Concrete, reversible visual changes can therefore run immediately;
+ * requests that imply standing memory, another room, shopping, or an unclear
+ * target stop before a job is created.
+ */
+export function classifyDirectVisualRevision(message: string): DirectVisualRevisionDecision {
+  const cleaned = normalize(message);
+  const text = cleaned.toLowerCase();
+  if (!text || text.length < 5 || QUESTION_LEAD.test(text) || VAGUE_CHANGE.test(text)) {
+    return {
+      actionable: false,
+      code: "needs_detail",
+      error: "Name the visible change you want, such as making the palette warmer, adding closed storage, or using less furniture."
+    };
+  }
+  if (PREFERENCE_CUE.test(text) || CONCEPT_CUE.test(text)) {
+    return {
+      actionable: false,
+      code: "needs_scope",
+      error: "That request may affect your standing preferences or other rooms. Restate one change for only this displayed design."
+    };
+  }
+  if (SHOPPING_CUE.test(text)) {
+    return {
+      actionable: false,
+      code: "not_visual",
+      error: "This field changes the room image. Save shopping and product requests for the implementation package."
+    };
+  }
+
+  const directVisualCue =
+    CHANGE_VERB.test(text) ||
+    VISUAL_ANCHOR.test(text) ||
+    /\b(warmth|storage|furniture|texture|cozier|cosier|brighter|darker|minimal|less|more|open|airy|soft|bold)\b/.test(text);
+  if (!directVisualCue) {
+    return {
+      actionable: false,
+      code: "needs_detail",
+      error: "Describe one visible adjustment to this design so I can revise it without guessing."
+    };
+  }
+  return { actionable: true, instructions: cleaned };
+}
+
 /**
  * Classify a chat turn and produce a proposal draft. `revisionType` is the chat
  * agent's own coarse label (from lib/schemas revisionSchema); we refine it here

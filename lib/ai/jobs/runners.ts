@@ -14,6 +14,7 @@ import { classifyPhotos } from "@/lib/ai/photo-eligibility";
 import { evaluateBatchConsistency, type RenderForConsistency } from "@/lib/ai/batch-consistency";
 import { updateProposal } from "@/lib/data/proposals";
 import { executeFirstDesign } from "./first-design";
+import { executeVisualRevision } from "./visual-revision";
 import {
   advanceStage,
   checkpointResult,
@@ -79,7 +80,11 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
       }
       case "render": {
         const payload = (claimed.request_payload as Record<string, unknown>) ?? {};
-        const job = payload.operation === "first_design" ? await executeFirstDesign(claimed) : await executeRender(claimed);
+        const job = payload.operation === "first_design"
+          ? await executeFirstDesign(claimed)
+          : payload.operation === "visual_revision"
+            ? await executeVisualRevision(claimed)
+            : await executeRender(claimed);
         return { ran: true, job };
       }
       case "batch_render": {

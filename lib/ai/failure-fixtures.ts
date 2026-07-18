@@ -21,6 +21,7 @@ export const FAILURE_FIXTURES = [
   "critic_rejection",
   "critic_timeout",
   "finished_image_critical",
+  "finished_image_repairable",
   "image_no_image",
   "storage_upload_failure",
   "db_persist_failure",

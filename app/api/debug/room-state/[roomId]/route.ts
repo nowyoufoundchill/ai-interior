@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
   const { roomId } = await params;
   const supabase = createServerSupabaseClient();
 
-  const [room, diagnoses, moodBoards, products, renders, chatMessages, jobs] = await Promise.all([
+  const [room, diagnoses, moodBoards, products, renders, revisions, chatMessages, jobs] = await Promise.all([
     supabase.from("rooms").select("*").eq("id", roomId).maybeSingle(),
     supabase
       .from("room_analyses")
@@ -31,7 +31,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
       .order("created_at", { ascending: true }),
     supabase
       .from("renders")
-      .select("id, status, mood_board_version, source_photo_id, preservation_constraints, negative_instructions, render_prompt, critique, quality_score, created_at")
+      .select("id, status, mood_board_version, source_photo_id, user_regeneration_instructions, preservation_constraints, negative_instructions, render_prompt, critique, quality_score, created_at")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("revisions")
+      .select("id, user_message, assistant_response, revision_type, state_before, state_after, created_at")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true }),
     supabase
@@ -42,7 +47,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
     // P0.1 durable jobs (tolerant of the table being absent pre-migration 008).
     supabase
       .from("generation_jobs")
-      .select("id, job_type, status, stage, attempt_count, max_attempts, idempotency_key, progress_current, progress_total, result_refs, error_code, correlation_id, created_at")
+      .select("id, job_type, status, stage, attempt_count, max_attempts, idempotency_key, request_payload, progress_current, progress_total, result_refs, error_code, correlation_id, created_at")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true })
   ]);
@@ -76,6 +81,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
     mood_boards: moodBoards.data ?? [],
     products: products.data ?? [],
     renders: renders.data ?? [],
+    revisions: revisions.data ?? [],
     chat_messages: chatMessages.data ?? [],
     generation_jobs: jobs.error ? [] : (jobs.data ?? []),
     action_proposals: proposals.error ? [] : (proposals.data ?? []),

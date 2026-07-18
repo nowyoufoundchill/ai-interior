@@ -168,9 +168,11 @@ export async function reviewFinishedImage(input: {
   finishedImageUrl: string;
   brief: AutopilotBrief;
   typedFacts: unknown;
+  attempt?: 1 | 2;
   provider?: GatewayProvider;
 }): Promise<FinishedImageReview> {
   const fixture = await activeFailureFixture();
+  const attempt = input.attempt ?? 1;
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Finished Image Reviewer",
@@ -184,6 +186,7 @@ export async function reviewFinishedImage(input: {
       task: "Compare the finished room image with its source and decide whether it is safe to present as the current candidate.",
       compiled_brief: input.brief,
       typed_facts: input.typedFacts,
+      review_attempt: attempt,
       image_order: ["source", "finished"]
     },
     images: [
@@ -191,7 +194,7 @@ export async function reviewFinishedImage(input: {
       { url: input.finishedImageUrl, detail: "high" }
     ],
     mock: () =>
-      fixture === "finished_image_critical"
+      fixture === "finished_image_critical" || (fixture === "finished_image_repairable" && attempt === 1)
         ? buildCriticalFinishedImageReviewFixture()
         : buildFinishedImageReviewFixture()
   });

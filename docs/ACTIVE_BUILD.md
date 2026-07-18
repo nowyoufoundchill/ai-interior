@@ -2,7 +2,7 @@
 
 **Updated:** 2026-07-18
 
-**Application baseline:** `9c3599358e44a7cc16c1e5eb5403b32c40e42b47`
+**Application baseline:** `ef337b8e57ca350d89705c5130c4bc65e85364db`
 
 **Accepted complete:** P0.0 through P1.2
 
@@ -71,7 +71,15 @@ P1.1 completes only when:
 
 ## Next slice - P1.3 bounded repair
 
-- [ ] Permit at most one automatic image repair after a critical finished-image verdict, preserving the failed attempt and review while enforcing the two-edit/two-review ceiling.
+- [x] Permit at most one automatic image repair after a critical finished-image verdict, preserving the failed attempt and review while enforcing the two-edit/two-review ceiling.
+
+## Current slice - P1.3 direct conversational revision
+
+- [x] Add one direct, durable visual revision action under the current design that appends exactly one reviewed version from one unambiguous one-room request, without a second confirmation step.
+
+## Next slice - P1.3 seeded phase gate
+
+- [ ] Freeze and run the complete seeded finished-image corpus and five owner revision scenarios required by the P1.3 gate, then record owner acceptance without weakening the zero-critical-miss requirement.
 
 ## Current non-goals
 
@@ -80,15 +88,14 @@ P1.1 completes only when:
 - Reconstructing unknown prompts, settings, homeowner input, or clearances.
 - Running the paid three-room comparison matrix.
 - Building the implementation package or multi-room view.
-- Conversational revision and the full seeded P1.3 corpus gate until the bounded repair path is complete.
 - Broad refactors, analytics, authentication, billing, deployment, or provider changes.
 
 ## Handoff format
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** Every new first design now receives a post-generation review that sees the real source image, finished image, compiled room program, and typed room facts. The structured verdict and evidence persist on the render. A critical result is saved as `review_failed`, ends with `finished_image_critical_violation`, and cannot replace or be accepted as the current candidate. Passing results remain candidates. The room view adds an accessible in-place Before/After switch and identifies reviewed results without exposing internal scoring.
-- **Files or migrations changed:** `app/api/debug/room-state/[roomId]/route.ts`, `components/rooms/autopilot-room-workspace.tsx`, `lib/ai/critic.ts`, `lib/ai/failure-fixtures.ts`, `lib/ai/fixtures/critic.ts`, `lib/ai/jobs/first-design.ts`, `lib/schemas/index.ts`, `lib/schemas/json.ts`, `prompts/critic/review-finished-image.v1.md`, `docs/ACTIVE_BUILD.md`; no migration was required or applied.
-- **Focused verification:** `npm.cmd run typecheck` passes. A tagged mock first-design run persisted a `pass` verdict with evidence and a quality score on one candidate. A second run using the deterministic critical finished-image fixture persisted one `review_failed` attempt, terminally failed with `finished_image_critical_violation`, and preserved the original candidate. Tagged teardown removed two jobs, two renders, two compiled artifacts, four AI runs, the room/home/photos, and four storage objects; `check:residue` reports zero residue. Browser verification on the existing accepted room confirms Before/After changes the displayed source/result label and pressed state with no console warnings or errors.
-- **Known limitation or blocker:** Automatic repair and owner-authored conversational revisions are not implemented yet. The frozen seeded critical corpus and owner revision scenarios remain P1.3 phase-gate work.
-- **Next unchecked slice:** implement one bounded automatic repair while preserving both attempts and enforcing the two-edit/two-review ceiling.
+- **Outcome delivered:** Finished-image critical failures now receive at most one source-based repair and a second review, with every attempt append-only and no third edit. The current-design view also has a direct revision field: one concrete one-room request starts a replay-safe durable job immediately, edits the current design, reviews it against the original source, appends exactly one passing candidate in the normal path, records one revision event, and retains the parent as history. Vague, cross-room, preference-memory, and shopping requests stop before job creation.
+- **Files or migrations changed:** `app/api/debug/room-state/[roomId]/route.ts`, `app/api/rooms/[roomId]/visual-revision/route.ts`, `components/rooms/autopilot-room-workspace.tsx`, `lib/ai/critic.ts`, `lib/ai/failure-fixtures.ts`, `lib/ai/jobs/first-design.ts`, `lib/ai/jobs/runners.ts`, `lib/ai/jobs/service.ts`, `lib/ai/jobs/visual-revision.ts`, `lib/ai/proposals.ts`, and `docs/ACTIVE_BUILD.md`; no migration was required or applied.
+- **Focused verification:** `npm.cmd run typecheck` and `git diff --check` pass. Prior tagged normal, repairable, and terminal critical cycles proved the one-edit normal path and two-edit/two-review ceiling. A fresh tagged browser/API cycle proved a vague request returns `422` with no job; one actionable submission plus an immediate replay produced one completed job, one `pass` review, one new candidate, one revision row, one attempt render ID, a historical parent, preserved source-photo linkage, persisted owner instructions, and the same job ID on replay. The latest change remained visible after a real page reload.
+- **Known limitation or blocker:** The frozen seeded critical-failure corpus and all five owner revision scenarios still need to run as the complete P1.3 phase gate. No external blocker affects the implemented revision path.
+- **Next unchecked slice:** freeze and execute the full P1.3 seeded corpus plus five owner revision scenarios, then record the strict gate and owner decision.
