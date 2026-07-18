@@ -15,6 +15,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ roomId: st
     const job = await getJob(jobId, roomId);
     if (!job) return NextResponse.json({ error: "Job not found." }, { status: 404 });
 
+    // A deployment or local dev callback can end after persisting the queued
+    // row but before `after()` begins execution. Polling is also a recovery
+    // trigger: reschedule queued work and let claimJob enforce exactly-once
+    // execution when multiple reopen/poll requests arrive together.
+    if (job.status === "queued") {
+      scheduleJob(job.id);
+      return NextResponse.json({ job: toOwnerSafeJob(job), rescheduled: true });
+    }
+
     const reclaimed = await reclaimIfStale(job);
     if (reclaimed) {
       scheduleJob(reclaimed.id);

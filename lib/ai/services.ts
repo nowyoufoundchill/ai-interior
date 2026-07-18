@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  autopilotBriefSchema,
   briefInterpretationSchema,
   designCriticSchema,
   designMemorySchema,
@@ -10,6 +11,7 @@ import {
   roomAnalysisSchema,
   wholeHomeContextSchema,
   type BriefInterpretation,
+  type AutopilotBrief,
   type DesignCriticScore,
   type DesignMemory,
   type MoodBoardConcept,
@@ -22,6 +24,7 @@ import {
   type WholeHomeContext
 } from "@/lib/schemas";
 import {
+  autopilotBriefJsonSchema,
   diagnosisCritiqueJsonSchema,
   moodBoardJsonSchema,
   moodBoardListJsonSchema,
@@ -182,6 +185,54 @@ export async function designBriefInterpreter(input: {
     taste_profile: toArray(input.room.style_preferences).slice(0, 6),
     budget_strategy: input.room.budget_range ?? "Define investment pieces and smart substitutions.",
     confidence_level: 0.74
+  });
+}
+
+/** One concise, versionable program for the first recommendation. */
+export async function firstDesignBriefCompiler(input: {
+  room: RoomLike;
+  home?: HomeLike | null;
+  sourcePhoto: PhotoLike;
+  provider?: GatewayProvider;
+}): Promise<AutopilotBrief> {
+  const fallback = autopilotBriefSchema.parse({
+    room_summary: input.room.purpose ?? input.room.design_brief ?? "A room ready for a complete, lived-in update.",
+    design_direction: "Create one calm, specific, and practical recommendation that makes the stated outcome feel resolved.",
+    functions_and_zones: [input.room.purpose ?? "Support the room's stated purpose."],
+    fixed_architecture: ["Preserve all visible walls, openings, windows, ceiling, floor plane, and camera angle."],
+    keep_or_remove: toArray(input.room.existing_items).map((item) => `Keep or assess: ${item}`),
+    palette_materials_lighting: [input.home?.style_notes ?? "Use warm, durable materials and layered light appropriate to the room."],
+    preservation_constraints: ["Preserve visible architecture and the source photo perspective."],
+    negative_instructions: ["Do not move openings, distort geometry, block access, or overfill the room."],
+    unknowns: ["Exact dimensions and clearances are not verified from the photograph."],
+    blocking_questions: [],
+    confidence: 0.7
+  });
+
+  return runStructuredTask({
+    roomId: input.room.id,
+    serviceName: "First Design Brief Compiler",
+    provider: input.provider ?? "anthropic",
+    promptPath: "prompts/diagnosis/room-diagnosis.v2.md",
+    schemaName: "autopilot_brief",
+    schema: autopilotBriefJsonSchema,
+    zodSchema: autopilotBriefSchema,
+    maxTokens: 4096,
+    taskInput: {
+      task: "Compile one compact, room-specific design program for a single recommended photo edit.",
+      room: input.room,
+      home: input.home,
+      source_photo: { id: input.sourcePhoto.id, label: input.sourcePhoto.label },
+      success_criteria: [
+        "Use the owner's plain-language outcome as the primary program.",
+        "Treat visible architecture as preservation constraints, not measurements.",
+        "Specify functions, zones, materials, lighting, and a coherent design direction without offering multiple concepts.",
+        "Record unknowns instead of inventing dimensions, hidden conditions, or exact clearances.",
+        "Return blocking_questions only when a missing answer genuinely prevents a useful image edit."
+      ]
+    },
+    images: [{ url: input.sourcePhoto.file_url, detail: "high" }],
+    mock: () => fallback
   });
 }
 

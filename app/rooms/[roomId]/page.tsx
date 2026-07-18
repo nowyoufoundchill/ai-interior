@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-import { RoomWorkspace } from "@/components/rooms/room-workspace";
+import { AutopilotRoomWorkspace } from "@/components/rooms/autopilot-room-workspace";
 import { getRoomWorkspace } from "@/lib/data/queries";
 
 export default async function RoomDetailPage({ params }: { params: Promise<{ roomId: string }> }) {
@@ -13,7 +13,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ roo
 
   return (
     <AppShell>
-      <RoomWorkspace {...workspace} home={workspace.home} />
+      <AutopilotRoomWorkspace room={workspace.room} photos={workspace.photos} renders={workspace.renders} generationJobs={workspace.generationJobs} />
     </AppShell>
   );
 }

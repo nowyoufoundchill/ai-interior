@@ -7,6 +7,7 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
   const router = useRouter();
   const [photo, setPhoto] = useState<File | null>(null);
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
+  const [uploadedPhotoId, setUploadedPhotoId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,13 +57,29 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
         setCreatedRoomId(roomId);
       }
 
-      const photoForm = new FormData();
-      photoForm.set("file", photo);
-      photoForm.set("label", "Main angle");
-      const photoResponse = await fetch(`/api/rooms/${roomId}/photos`, { method: "POST", body: photoForm });
-      if (!photoResponse.ok) {
+      let photoId = uploadedPhotoId;
+      if (!photoId) {
+        const photoForm = new FormData();
+        photoForm.set("file", photo);
+        photoForm.set("label", "Main angle");
+        const photoResponse = await fetch(`/api/rooms/${roomId}/photos`, { method: "POST", body: photoForm });
+        if (!photoResponse.ok) {
+          const photoPayload = await photoResponse.json().catch(() => ({}));
+          throw new Error(photoPayload.error ?? "Your room is saved. Please try the photo again.");
+        }
         const photoPayload = await photoResponse.json().catch(() => ({}));
-        throw new Error(photoPayload.error ?? "Your room is saved. Please try the photo again.");
+        photoId = photoPayload.photo?.id ?? null;
+        if (!photoId) throw new Error("Your room is saved, but we couldn't confirm its photo.");
+        setUploadedPhotoId(photoId);
+      }
+      const designResponse = await fetch(`/api/rooms/${roomId}/first-design`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source_photo_id: photoId })
+      });
+      if (!designResponse.ok) {
+        const designPayload = await designResponse.json().catch(() => ({}));
+        throw new Error(designPayload.error ?? "Your room is saved, but we couldn't start its design.");
       }
       router.push(`/rooms/${roomId}`);
     } catch (caught) {

@@ -41,6 +41,20 @@ export const briefInterpretationSchema = z.object({
   confidence_level: z.number().min(0).max(1)
 });
 
+export const autopilotBriefSchema = z.object({
+  room_summary: z.string(),
+  design_direction: z.string(),
+  functions_and_zones: z.array(z.string()),
+  fixed_architecture: z.array(z.string()),
+  keep_or_remove: z.array(z.string()),
+  palette_materials_lighting: z.array(z.string()),
+  preservation_constraints: z.array(z.string()),
+  negative_instructions: z.array(z.string()),
+  unknowns: z.array(z.string()),
+  blocking_questions: z.array(z.string()),
+  confidence: z.number().min(0).max(1)
+});
+
 export const wholeHomeContextSchema = z.object({
   palette_guidance: z.array(z.string()),
   repeated_material_guidance: z.array(z.string()),
@@ -217,6 +231,7 @@ export const diagnosisCritiqueSchema = z.object({
 
 export type RoomAnalysis = z.infer<typeof roomAnalysisSchema>;
 export type BriefInterpretation = z.infer<typeof briefInterpretationSchema>;
+export type AutopilotBrief = z.infer<typeof autopilotBriefSchema>;
 export type WholeHomeContext = z.infer<typeof wholeHomeContextSchema>;
 export type MoodBoardConcept = z.infer<typeof moodBoardSchema>;
 export type ProductPlanItem = z.infer<typeof productSchema>;

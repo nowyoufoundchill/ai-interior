@@ -10,7 +10,7 @@
 
 **Next committed phase:** P1.2 - Designer Autopilot: minimal input to one design
 
-**External blocker:** None. P1.1 benchmark evidence is complete. The current pipeline remains unavailable for private benchmark sources because it would require the public photo bucket; this is recorded baseline evidence, not a P1.1 blocker.
+**External blocker:** None for the durable first-design operation. The remaining P1.2 quality and owner-preference gate requires owner review and authorized benchmark evidence; it is not inferred from mock verification.
 
 `PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
@@ -55,7 +55,15 @@ P1.1 completes only when:
 
 ## Current slice - P1.2 first-design operation
 
-- [ ] Connect the successful progressive intake to the versioned brief compiler and one durable first-design job.
+- [x] Connect the successful progressive intake to the versioned brief compiler and one durable first-design job.
+
+## Current slice - P1.2 durable operation verification
+
+- [x] Run the first-design operation against the configured tagged test project after its `generation_jobs` schema cache is available.
+
+## Current slice - P1.2 phase gate evidence
+
+- [ ] Complete the owner-reviewed visual-quality, preference, and responsive gate evidence required to accept P1.2.
 
 ## Current non-goals
 
@@ -70,8 +78,8 @@ P1.1 completes only when:
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** P1.2's first-design intake replaces the legacy room dossier with one image, one plain-language outcome, an optional room name, and one `Design my room` action. It creates the room only once during an upload attempt, retains that draft for retry if the photo upload fails, and rejects non-image files before storage.
-- **Files or migrations changed:** `components/forms/room-autopilot-intake.tsx`, `app/homes/[homeId]/rooms/new/page.tsx`, `app/api/rooms/[roomId]/photos/route.ts`, `tsconfig.json`, `docs/ACTIVE_BUILD.md`; no migration.
-- **Focused verification:** `npm.cmd run typecheck` passes. Browser verification against an existing local home confirms the first-design page renders the minimal photo/outcome/optional-name intake and one visible `Design my room` action. Submission was intentionally not exercised because the available local data store is not a fresh tagged test run; no unscoped room or storage object was created.
-- **Known limitation or blocker:** an isolated or freshly tagged seeded test database is still needed for a mutation-level browser check. Current-pipeline benchmark lanes remain unavailable because private local sources would require the public photo bucket. Unknown physical clearances remain unverified.
-- **Next unchecked slice:** connect a successful intake submit to the versioned brief compiler and one durable first-design job, then exercise it against a freshly tagged test database.
+- **Outcome delivered:** P1.2 now sends the intake directly into one durable existing render-lane job, marked `operation: first_design` so it works with migration 008's deployed job-type constraint without a production migration. The job compiles and persists a versioned room program, creates one image edit, persists one candidate design, and preserves checkpoints for recovery. Status polling reschedules a saved queued job after an interrupted callback; claim semantics keep that recovery idempotent. The result-first room screen shows the source image or latest candidate, one status, and the single primary action; `Keep this design` promotes that candidate without deleting history.
+- **Files or migrations changed:** `components/forms/room-autopilot-intake.tsx`, `components/rooms/autopilot-room-workspace.tsx`, `app/homes/[homeId]/rooms/new/page.tsx`, `app/rooms/[roomId]/page.tsx`, `app/api/rooms/[roomId]/first-design/route.ts`, `app/api/rooms/[roomId]/designs/[renderId]/accept/route.ts`, `app/api/rooms/[roomId]/jobs/route.ts`, `app/api/rooms/[roomId]/jobs/[jobId]/route.ts`, `app/api/rooms/[roomId]/photos/route.ts`, `lib/ai/jobs/first-design.ts`, `lib/ai/jobs/runners.ts`, `lib/ai/jobs/service.ts`, `lib/ai/services.ts`, `lib/schemas/index.ts`, `lib/schemas/json.ts`, `tsconfig.json`, `docs/ACTIVE_BUILD.md`; no migration was applied.
+- **Focused verification:** `npm.cmd run typecheck` passes. Tagged mock verification starts one first-design request and immediately repeats it; both resolve to one active durable job. The completed job references one persisted compiled brief and one candidate render. Tagged teardown removes that job, compiler artifact, render, photos, room, home, and storage objects; `check:residue` reports zero residue. Browser verification confirms a source-photo-first viewport and one visible `Design my room` action. The existing durable-job suite reaches the table after restarting the local mock server; its stale-heartbeat assertions remain affected by the local/database clock mismatch and are outside this first-design change.
+- **Known limitation or blocker:** P1.2's owner-reviewed visual-quality, preference, and responsive gate evidence remains required. It includes authorized benchmark work and owner reactions, so it cannot be claimed from mock runs or inferred.
+- **Next unchecked slice:** complete the bounded owner-reviewed P1.2 phase gate evidence; do not run paid benchmark calls without the existing authorization.

@@ -13,6 +13,7 @@ import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/s
 import { classifyPhotos } from "@/lib/ai/photo-eligibility";
 import { evaluateBatchConsistency, type RenderForConsistency } from "@/lib/ai/batch-consistency";
 import { updateProposal } from "@/lib/data/proposals";
+import { executeFirstDesign } from "./first-design";
 import {
   advanceStage,
   checkpointResult,
@@ -77,7 +78,8 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
         return { ran: true, job };
       }
       case "render": {
-        const job = await executeRender(claimed);
+        const payload = (claimed.request_payload as Record<string, unknown>) ?? {};
+        const job = payload.operation === "first_design" ? await executeFirstDesign(claimed) : await executeRender(claimed);
         return { ran: true, job };
       }
       case "batch_render": {

@@ -71,6 +71,25 @@ export const roomAnalysisJsonSchema = {
   ]
 } as const;
 
+export const autopilotBriefJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    room_summary: { type: "string" },
+    design_direction: { type: "string" },
+    functions_and_zones: stringArray,
+    fixed_architecture: stringArray,
+    keep_or_remove: stringArray,
+    palette_materials_lighting: stringArray,
+    preservation_constraints: stringArray,
+    negative_instructions: stringArray,
+    unknowns: stringArray,
+    blocking_questions: stringArray,
+    confidence: { type: "number", minimum: 0, maximum: 1 }
+  },
+  required: ["room_summary", "design_direction", "functions_and_zones", "fixed_architecture", "keep_or_remove", "palette_materials_lighting", "preservation_constraints", "negative_instructions", "unknowns", "blocking_questions", "confidence"]
+} as const;
+
 export const moodBoardJsonSchema = {
   type: "object",
   additionalProperties: false,
