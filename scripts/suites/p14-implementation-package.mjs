@@ -41,8 +41,10 @@ async function main() {
   page.on("pageerror", (error) => consoleErrors.push(error.message));
   page.on("response", (response) => { if (response.status() >= 400) failedRequests.push(`${response.status()} ${response.request().method()} ${response.url()}`); });
   page.on("requestfailed", (request) => {
-    const expectedRscAbort = request.url().includes("_rsc=") && request.failure()?.errorText === "net::ERR_ABORTED";
-    if (!expectedRscAbort) failedRequests.push(`NETWORK_FAIL ${request.method()} ${request.url()}`);
+    const errorText = request.failure()?.errorText;
+    const expectedRscAbort = request.url().includes("_rsc=") && errorText === "net::ERR_ABORTED";
+    const expectedCompletedJobPollAbort = request.method() === "GET" && request.url().includes(`/api/rooms/${roomId}/jobs/`) && errorText === "net::ERR_ABORTED";
+    if (!expectedRscAbort && !expectedCompletedJobPollAbort) failedRequests.push(`NETWORK_FAIL ${request.method()} ${request.url()} (${errorText ?? "unknown"})`);
   });
   try {
     await page.goto(`${BASE_URL}/rooms/${roomId}`, { waitUntil: "networkidle" });
