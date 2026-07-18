@@ -1,4 +1,6 @@
 import { chromium } from "playwright";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { BASE_URL, fetchJson, getRoomState, readCurrentTestRun, requireServerIsolation, SuiteReporter, waitForServer } from "./_lib.mjs";
 
 const reporter = new SuiteReporter("p14-implementation-package");
@@ -112,6 +114,9 @@ async function main() {
     await page.reload({ waitUntil: "networkidle" });
     reporter.assert(await page.getByTestId("implementation-package").isVisible(), "the package survives refresh in the accepted room workspace");
     reporter.assert(await page.getByTestId("field-verification-list").isVisible() && await page.getByTestId("budget-summary").isVisible(), "the owner can identify what to measure and the total range without internal artifacts");
+    const screenshotDirectory = path.join(process.cwd(), "test-runs", "screenshots");
+    await mkdir(screenshotDirectory, { recursive: true });
+    await page.screenshot({ path: path.join(screenshotDirectory, "p14-implementation-package.png"), fullPage: true });
 
     await page.getByTestId("visual-revision-input").fill("Make the desk wall warmer in this design.");
     await page.getByTestId("visual-revision-submit").click();
