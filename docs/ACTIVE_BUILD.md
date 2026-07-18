@@ -1,16 +1,16 @@
-# Active Build - P1.4 Implementation-ready room package
+# Active Build - P1.5 Whole-home continuity and multi-room persistence
 
 **Updated:** 2026-07-18
 
 **Application baseline:** `ef337b8e57ca350d89705c5130c4bc65e85364db`
 
-**Accepted complete:** P0.0 through P1.3
+**Accepted complete:** P0.0 through P1.4
 
-**Current phase:** P1.4
+**Current phase:** P1.5
 
-**Next committed phase:** P1.4 - Implementation-ready room package
+**Next committed phase:** P1.5 - Whole-home continuity and multi-room persistence
 
-**Approval gate:** The additive `implementation_packages` migration is created but intentionally not applied to the configured production project without explicit owner approval.
+**External blocker:** P1.5 requires at least three accepted real-room designs before whole-home memory or the visual room index is built. The read-only production count is currently one.
 
 `PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
@@ -81,9 +81,13 @@ P1.1 completes only when:
 
 - [x] Freeze and run the complete seeded finished-image corpus and five owner revision scenarios required by the P1.3 gate, then record owner acceptance without weakening the zero-critical-miss requirement.
 
-## Current slice - P1.4 implementation-ready room package
+## Completed slice - P1.4 implementation-ready room package
 
-- [ ] Bind one provenance-aware room plan and furnishing schedule to the accepted design, exposing honest measurement and field-verification tasks before product sourcing expands.
+- [x] Bind one provenance-aware room plan and furnishing schedule to the accepted design, exposing honest measurement and field-verification tasks before product sourcing expands.
+
+## Next slice - P1.5 continuity precondition
+
+- [ ] Reach three accepted, materially different real-room designs before applying scoped whole-home memory or building the simple visual room index.
 
 ## Current non-goals
 
@@ -98,8 +102,8 @@ P1.1 completes only when:
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** P1.4 code is ready for its configured-project gate. An accepted render now compiles into an append-only, versioned implementation package with placement guidance, a ten-item furnishing schedule, explicit product classifications, provenance on every implementation claim, linked field tasks for unknown dimensions, a reconciled budget range, and an installation sequence. Accepting a newer design stales rather than deletes the prior package. Replay-safe job routing, persistence, owner-facing measure/buy/do-next UI, teardown, residue detection, and a full browser gate are implemented.
-- **Files or migrations changed:** Added `supabase/migrations/20260718162713_implementation_packages.sql`, the implementation schema/compiler/fixture/job/route/prompt, and `scripts/suites/p14-implementation-package.mjs` plus `scripts/verify-p1-4.mjs`; extended typed database access, room queries/page/workspace, accepted-design invalidation, debug state, job dispatch, package scripts, teardown, and residue checks. P1.3's previously completed uncommitted files remain in the same working tree.
-- **Focused verification:** `npm.cmd run typecheck`, `npm.cmd run build`, `git diff --check`, and both P1.4 script syntax checks pass. The ten deterministic sourcing URLs all return HTTP 200 under Node fetch with redirects, including the exact links the browser gate will sample. The migration is not applied, so the tagged persistence/browser/residue gate has not been run yet.
-- **Known limitation or blocker:** Applying a migration to the configured production Supabase project requires explicit owner approval. The local migration-list check could not connect because no local Supabase database is running. The phase also requires an owner usefulness rating of at least 8/10 after the complete package is visible; the verifier records this from `P14_OWNER_USEFULNESS_RATING` and does not invent it.
-- **Next unchecked slice:** With explicit approval, apply the additive `implementation_packages` migration, run `npm.cmd run verify:p1-4` with a fresh tagged mock-AI seed and the owner's usefulness rating, confirm zero residue, then mark P1.4 accepted complete.
+- **Outcome delivered:** P1.4 is complete. An accepted render now creates an append-only, versioned implementation package with placement guidance, a ten-item furnishing schedule, honest sourcing classifications, provenance on every claim, consolidated field verification for unknown fit, a reconciled budget range, and installation sequence. A newer accepted design stales rather than deletes the prior package. The owner reviewed the complete package, requested removal of repetitive per-item measurement reminders, accepted the consolidated one-pass measurement presentation, confirmed the measure/buy/do-next path, and rated the revised package 9/10.
+- **Files or migrations changed:** `supabase/migrations/20260718162713_implementation_packages.sql`; implementation package schema, JSON schema, compiler, fixture, audit, durable job, job dispatch, prompt, API route, accepted-design invalidation, typed database access, room query/page/workspace, debug state, package scripts, teardown/residue coverage, `scripts/suites/p14-implementation-package.mjs`, `scripts/verify-p1-4.mjs`, `reports/p1-4-gate-1784397150039-2b3a34f.md`, and this handoff. The additive migration was applied by GitHub `Supabase DB Deploy` run `29654208780` after explicit owner approval.
+- **Focused verification:** `P14_OWNER_USEFULNESS_RATING=9 npm.cmd run verify:p1-4` passes from a production build. The real-browser/data journey passed 29/29 checks: accepted-render binding, 100% schedule coverage, provenance and field-task linkage, budget reconciliation, ten opening classified product links, replay safety, reload persistence, v1-to-v2 stale history, and zero console/application-network failures. Fresh tagged teardown removed all created rows and four storage objects; the independent residue gate passed across all tracked tables and Storage.
+- **Known limitation or blocker:** P1.4 has no open blocker. P1.5 must not start its continuity implementation until three materially different real rooms have accepted designs; a read-only production check currently finds one.
+- **Next unchecked slice:** Complete and accept two additional materially different real rooms. Once the count reaches three, apply scoped whole-home decisions without leaking room-only exceptions and add the simple visual room index required by P1.5.
