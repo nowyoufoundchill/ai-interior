@@ -1,4 +1,7 @@
 import { headers } from "next/headers";
+import finishedImageCorpus from "@/lib/ai/fixtures/p1-3-finished-image-corpus.json";
+
+const FINISHED_IMAGE_CORPUS_FIXTURES = finishedImageCorpus.critical_cases.map((item) => item.fixture);
 
 /**
  * P0.0 deterministic failure fixtures (docs/P0_P1_EXECUTION_PLAN_2026-07-10.md).
@@ -22,13 +25,14 @@ export const FAILURE_FIXTURES = [
   "critic_timeout",
   "finished_image_critical",
   "finished_image_repairable",
+  ...FINISHED_IMAGE_CORPUS_FIXTURES,
   "image_no_image",
   "storage_upload_failure",
   "db_persist_failure",
   "slow_generation"
 ] as const;
 
-export type FailureFixture = (typeof FAILURE_FIXTURES)[number];
+export type FailureFixture = string;
 
 export const FIXTURE_HEADER = "x-test-failure-fixture";
 export const FIXTURE_DELAY_HEADER = "x-test-fixture-delay-ms";

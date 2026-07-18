@@ -497,6 +497,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["generation_jobs"]["Insert"]>;
         Relationships: [];
       };
+      implementation_packages: {
+        Row: {
+          id: string;
+          room_id: string;
+          accepted_render_id: string;
+          version: number;
+          status: string;
+          package: Json;
+          test_run_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          room_id: string;
+          accepted_render_id: string;
+          version: number;
+          status?: string;
+          package: Json;
+          test_run_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["implementation_packages"]["Insert"]>;
+        Relationships: [];
+      };
       action_proposals: {
         Row: {
           id: string;
@@ -558,4 +582,5 @@ export type MoodBoard = Database["public"]["Tables"]["mood_boards"]["Row"];
 export type Product = Database["public"]["Tables"]["products"]["Row"];
 export type Render = Database["public"]["Tables"]["renders"]["Row"];
 export type GenerationJob = Database["public"]["Tables"]["generation_jobs"]["Row"];
+export type ImplementationPackage = Database["public"]["Tables"]["implementation_packages"]["Row"];
 export type ActionProposal = Database["public"]["Tables"]["action_proposals"]["Row"];

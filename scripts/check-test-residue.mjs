@@ -13,6 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 const TABLES = [
   "action_proposals",
   "generation_jobs",
+  "implementation_packages",
   "ai_runs",
   "revisions",
   "design_memories",

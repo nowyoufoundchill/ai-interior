@@ -225,6 +225,99 @@ export const finishedImageReviewSchema = z.object({
   confidence: z.number().min(0).max(1)
 });
 
+export const provenanceSchema = z.enum([
+  "owner_measured",
+  "photo_observed",
+  "model_inferred",
+  "manufacturer_specified",
+  "unknown"
+]);
+
+export const implementationClaimSchema = z.object({
+  id: z.string(),
+  statement: z.string(),
+  provenance: provenanceSchema,
+  source_detail: z.string(),
+  field_task_id: z.string().nullable()
+});
+
+export const furnishingScheduleItemSchema = z.object({
+  id: z.string(),
+  category: z.string(),
+  description: z.string(),
+  quantity: z.number().int().positive(),
+  coverage_labels: z.array(z.string()),
+  classification: z.enum([
+    "exact_match",
+    "near_match",
+    "design_reference",
+    "custom",
+    "illustrative",
+    "non_purchasable"
+  ]),
+  placement: implementationClaimSchema,
+  dimensions: z.array(implementationClaimSchema),
+  product: z
+    .object({
+      retailer: z.string(),
+      canonical_url: z.string().url(),
+      image_url: z.string().url().nullable(),
+      price: z.number().nonnegative().nullable(),
+      availability: z.string(),
+      verified_at: z.string(),
+      verification_status: z.enum(["verified", "unverified"])
+    })
+    .nullable(),
+  alternatives: z.array(
+    z.object({
+      label: z.string(),
+      classification: z.enum(["near_match", "design_reference"]),
+      canonical_url: z.string().url().nullable()
+    })
+  ),
+  budget_low: z.number().nonnegative(),
+  budget_high: z.number().nonnegative(),
+  notes: z.array(z.string())
+});
+
+export const implementationPackageSchema = z.object({
+  summary: z.string(),
+  placement_guidance: z.array(implementationClaimSchema),
+  measurement_and_clearance_claims: z.array(implementationClaimSchema),
+  furnishing_schedule: z.array(furnishingScheduleItemSchema),
+  coverage: z.array(
+    z.object({
+      label: z.string(),
+      kind: z.enum(["named_must_have", "major_visible_furnishing"]),
+      schedule_item_id: z.string(),
+      disposition: z.enum(["scheduled", "custom", "illustrative", "non_purchasable"])
+    })
+  ),
+  field_verification_tasks: z.array(
+    z.object({
+      id: z.string(),
+      task: z.string(),
+      reason: z.string(),
+      priority: z.enum(["before_purchase", "before_installation", "recommended"]),
+      resolves_claim_ids: z.array(z.string()),
+      status: z.literal("open")
+    })
+  ),
+  budget: z.object({
+    currency: z.string(),
+    total_low: z.number().nonnegative(),
+    total_high: z.number().nonnegative(),
+    target_low: z.number().nonnegative().nullable(),
+    target_high: z.number().nonnegative().nullable(),
+    variance_summary: z.string(),
+    assumptions: z.array(z.string())
+  }),
+  installation_sequence: z.array(
+    z.object({ order: z.number().int().positive(), step: z.string(), caveats: z.array(z.string()) })
+  ),
+  assumptions: z.array(z.string())
+});
+
 export const diagnosisCritiqueDimensionsSchema = z.object({
   room_specificity: z.number().min(0).max(100),
   downstream_usefulness: z.number().min(0).max(100),
@@ -257,3 +350,7 @@ export type DiagnosisCritique = z.infer<typeof diagnosisCritiqueSchema>;
 export type ProductCritique = z.infer<typeof productCritiqueSchema>;
 export type RenderCritique = z.infer<typeof renderCritiqueSchema>;
 export type FinishedImageReview = z.infer<typeof finishedImageReviewSchema>;
+export type Provenance = z.infer<typeof provenanceSchema>;
+export type ImplementationClaim = z.infer<typeof implementationClaimSchema>;
+export type FurnishingScheduleItem = z.infer<typeof furnishingScheduleItemSchema>;
+export type ImplementationPackagePlan = z.infer<typeof implementationPackageSchema>;

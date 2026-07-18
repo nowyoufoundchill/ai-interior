@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { critiqueRender } from "@/lib/ai/critic";
+import { critiqueRender, reviewFinishedImage } from "@/lib/ai/critic";
 import { FixtureFailureError, activeFailureFixture } from "@/lib/ai/failure-fixtures";
 import { generateImageEdit, runStructuredTask } from "@/lib/ai/gateway";
 import { currentCorrelationId } from "@/lib/observability";
@@ -17,7 +17,7 @@ import type { RenderPlan } from "@/lib/schemas";
  * `?roomId=<seeded room>` so every ai_runs row this logs inherits that
  * room's test_run_id (an untagged row would be invisible to the residue
  * check — the exact leak class fixed on 2026-07-08); optionally
- * `&boundary=structured|image|critic` (default structured).
+ * `&boundary=structured|image|critic|finished-image` (default structured).
  */
 export async function GET(request: Request) {
   if (process.env.AI_MODE !== "mock") {
@@ -38,7 +38,35 @@ export async function GET(request: Request) {
   const startedAt = Date.now();
 
   try {
-    if (boundary === "image") {
+    if (boundary === "finished-image") {
+      const review = await reviewFinishedImage({
+        roomId,
+        sourceImageUrl: "https://fixtures.invalid/p1-3/source.jpg",
+        finishedImageUrl: "https://fixtures.invalid/p1-3/finished.jpg",
+        brief: {
+          room_summary: "Seeded office used only to exercise the finished-image review boundary.",
+          design_direction: "Calm, warm, functional office",
+          functions_and_zones: ["unobstructed access", "work zone", "reading zone"],
+          fixed_architecture: ["window", "structural post", "ventilation grille"],
+          keep_or_remove: ["keep fixed architecture"],
+          palette_materials_lighting: ["warm wood", "soft neutral walls"],
+          preservation_constraints: ["preserve window, post, vent, access, and camera"],
+          negative_instructions: ["do not move openings or block access"],
+          unknowns: ["exact clearances require field measurement"],
+          blocking_questions: [],
+          confidence: 0.95
+        },
+        typedFacts: { room_type: "office", required_zones: ["work zone", "reading zone"] }
+      });
+      return NextResponse.json({
+        ok: true,
+        boundary,
+        fixture,
+        correlation_id: correlationId,
+        elapsed_ms: Date.now() - startedAt,
+        review
+      });
+    } else if (boundary === "image") {
       await generateImageEdit({
         roomId,
         serviceName: "Fixture Check (image)",

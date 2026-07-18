@@ -6,6 +6,7 @@ import type {
   ProductCritique,
   RenderCritique
 } from "@/lib/schemas";
+import finishedImageCorpus from "@/lib/ai/fixtures/p1-3-finished-image-corpus.json";
 
 /**
  * P0.0 `critic_rejection` fixture: a deterministic BLOCKING critique so the
@@ -159,6 +160,30 @@ export function buildCriticalFinishedImageReviewFixture(): FinishedImageReview {
     warnings: [],
     evidence: ["Deterministic critical finished-image fixture; no provider call was made."],
     summary: "This result must not be presented as ready.",
+    confidence: 0.99
+  };
+}
+
+export function buildSeededCriticalFinishedImageReviewFixture(fixture: string): FinishedImageReview | null {
+  const seededCase = finishedImageCorpus.critical_cases.find((item) => item.fixture === fixture);
+  if (!seededCase) return null;
+  const violations: Record<string, string> = {
+    "moved-window": "The finished image moves a fixed source-visible window.",
+    "removed-post": "The finished image removes a fixed structural post.",
+    "disappeared-vent": "The finished image removes a source-visible ventilation grille.",
+    "blocked-access": "New furniture blocks the required access route.",
+    "missing-required-zone": "The finished image omits the required work zone from the compiled brief."
+  };
+  return {
+    verdict: "failure",
+    architecture_preservation_score: seededCase.id === "missing-required-zone" ? 88 : 24,
+    program_fulfillment_score: seededCase.id === "missing-required-zone" ? 28 : 74,
+    access_and_safety_score: seededCase.id === "blocked-access" ? 20 : 72,
+    realism_score: 70,
+    critical_violations: [violations[seededCase.id] ?? seededCase.description],
+    warnings: [],
+    evidence: [`Frozen seeded corpus case: ${seededCase.id}.`],
+    summary: "This seeded critical result must not be presented as ready.",
     confidence: 0.99
   };
 }

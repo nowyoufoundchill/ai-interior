@@ -13,7 +13,7 @@ export default async function RoomDetailPage({ params }: { params: Promise<{ roo
 
   return (
     <AppShell>
-      <AutopilotRoomWorkspace room={workspace.room} photos={workspace.photos} renders={workspace.renders} generationJobs={workspace.generationJobs} />
+      <AutopilotRoomWorkspace room={workspace.room} photos={workspace.photos} renders={workspace.renders} generationJobs={workspace.generationJobs} implementationPackages={workspace.implementationPackages} />
     </AppShell>
   );
 }

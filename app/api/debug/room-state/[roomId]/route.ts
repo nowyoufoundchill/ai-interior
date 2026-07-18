@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
   const { roomId } = await params;
   const supabase = createServerSupabaseClient();
 
-  const [room, diagnoses, moodBoards, products, renders, revisions, chatMessages, jobs] = await Promise.all([
+  const [room, diagnoses, moodBoards, products, renders, revisions, chatMessages, jobs, implementationPackages] = await Promise.all([
     supabase.from("rooms").select("*").eq("id", roomId).maybeSingle(),
     supabase
       .from("room_analyses")
@@ -49,7 +49,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
       .from("generation_jobs")
       .select("id, job_type, status, stage, attempt_count, max_attempts, idempotency_key, request_payload, progress_current, progress_total, result_refs, error_code, correlation_id, created_at")
       .eq("room_id", roomId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("implementation_packages")
+      .select("id, accepted_render_id, version, status, package, test_run_id, created_at")
+      .eq("room_id", roomId)
+      .order("version", { ascending: true })
   ]);
 
   // P0.4 action proposals (tolerant of the table being absent pre-migration 009).
@@ -84,6 +89,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
     revisions: revisions.data ?? [],
     chat_messages: chatMessages.data ?? [],
     generation_jobs: jobs.error ? [] : (jobs.data ?? []),
+    implementation_packages: implementationPackages.error ? [] : (implementationPackages.data ?? []),
     action_proposals: proposals.error ? [] : (proposals.data ?? []),
     derived: {
       current_diagnosis_version: (diagnoses.data ?? []).find((d) => d.status === "current")?.version ?? null,

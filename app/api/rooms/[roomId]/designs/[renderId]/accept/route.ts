@@ -12,6 +12,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ roomId: s
   }
   const { error: acceptError } = await supabase.from("renders").update({ status: "accepted" }).eq("id", candidate.id).eq("room_id", roomId);
   if (acceptError) return NextResponse.json({ error: acceptError.message }, { status: 500 });
+  await supabase.from("implementation_packages").update({ status: "stale" }).eq("room_id", roomId).eq("status", "current").neq("accepted_render_id", candidate.id);
+  await supabase.from("products").update({ status: "stale" }).eq("room_id", roomId).in("status", ["suggested", "approved"]);
   await supabase.from("rooms").update({ status: "approved", current_stage: "approved" }).eq("id", roomId);
   return NextResponse.json({ ok: true });
 }

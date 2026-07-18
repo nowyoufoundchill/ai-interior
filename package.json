@@ -32,7 +32,12 @@
     "suite:recommended-next-action": "node --experimental-strip-types scripts/suites/recommended-next-action.mjs",
     "suite:p05-browser": "node scripts/suites/p05-browser.mjs",
     "verify:p0-4": "node scripts/verify-p0-4.mjs",
-    "verify:p0-6": "node scripts/verify-p0-6.mjs"
+    "verify:p0-6": "node scripts/verify-p0-6.mjs",
+    "suite:p13-finished-image": "node scripts/suites/p13-finished-image.mjs",
+    "suite:p13-revisions": "node scripts/suites/p13-revisions.mjs",
+    "verify:p1-3": "node scripts/verify-p1-3.mjs",
+    "suite:p14-implementation-package": "node scripts/suites/p14-implementation-package.mjs",
+    "verify:p1-4": "node scripts/verify-p1-4.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

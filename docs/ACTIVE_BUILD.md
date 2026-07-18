@@ -1,16 +1,16 @@
-# Active Build - P1.3 Finished-image quality and refinement
+# Active Build - P1.4 Implementation-ready room package
 
 **Updated:** 2026-07-18
 
 **Application baseline:** `ef337b8e57ca350d89705c5130c4bc65e85364db`
 
-**Accepted complete:** P0.0 through P1.2
+**Accepted complete:** P0.0 through P1.3
 
-**Current phase:** P1.3
+**Current phase:** P1.4
 
-**Next committed phase:** P1.3 - Finished-image quality and conversational refinement
+**Next committed phase:** P1.4 - Implementation-ready room package
 
-**External blocker:** None.
+**Approval gate:** The additive `implementation_packages` migration is created but intentionally not applied to the configured production project without explicit owner approval.
 
 `PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
@@ -77,25 +77,29 @@ P1.1 completes only when:
 
 - [x] Add one direct, durable visual revision action under the current design that appends exactly one reviewed version from one unambiguous one-room request, without a second confirmation step.
 
-## Next slice - P1.3 seeded phase gate
+## Completed slice - P1.3 seeded phase gate
 
-- [ ] Freeze and run the complete seeded finished-image corpus and five owner revision scenarios required by the P1.3 gate, then record owner acceptance without weakening the zero-critical-miss requirement.
+- [x] Freeze and run the complete seeded finished-image corpus and five owner revision scenarios required by the P1.3 gate, then record owner acceptance without weakening the zero-critical-miss requirement.
+
+## Current slice - P1.4 implementation-ready room package
+
+- [ ] Bind one provenance-aware room plan and furnishing schedule to the accepted design, exposing honest measurement and field-verification tasks before product sourcing expands.
 
 ## Current non-goals
 
-- Improving the legacy diagnosis, concept, product, or tabbed workspace.
+- Improving the legacy diagnosis, concept, product, or tabbed workspace outside the accepted-design implementation package.
 - Substituting test or spike images for owner benchmark evidence.
 - Reconstructing unknown prompts, settings, homeowner input, or clearances.
 - Running the paid three-room comparison matrix.
-- Building the implementation package or multi-room view.
+- Building the multi-room view.
 - Broad refactors, analytics, authentication, billing, deployment, or provider changes.
 
 ## Handoff format
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** Finished-image critical failures now receive at most one source-based repair and a second review, with every attempt append-only and no third edit. The current-design view also has a direct revision field: one concrete one-room request starts a replay-safe durable job immediately, edits the current design, reviews it against the original source, appends exactly one passing candidate in the normal path, records one revision event, and retains the parent as history. Vague, cross-room, preference-memory, and shopping requests stop before job creation.
-- **Files or migrations changed:** `app/api/debug/room-state/[roomId]/route.ts`, `app/api/rooms/[roomId]/visual-revision/route.ts`, `components/rooms/autopilot-room-workspace.tsx`, `lib/ai/critic.ts`, `lib/ai/failure-fixtures.ts`, `lib/ai/jobs/first-design.ts`, `lib/ai/jobs/runners.ts`, `lib/ai/jobs/service.ts`, `lib/ai/jobs/visual-revision.ts`, `lib/ai/proposals.ts`, and `docs/ACTIVE_BUILD.md`; no migration was required or applied.
-- **Focused verification:** `npm.cmd run typecheck` and `git diff --check` pass. Prior tagged normal, repairable, and terminal critical cycles proved the one-edit normal path and two-edit/two-review ceiling. A fresh tagged browser/API cycle proved a vague request returns `422` with no job; one actionable submission plus an immediate replay produced one completed job, one `pass` review, one new candidate, one revision row, one attempt render ID, a historical parent, preserved source-photo linkage, persisted owner instructions, and the same job ID on replay. The latest change remained visible after a real page reload.
-- **Known limitation or blocker:** The frozen seeded critical-failure corpus and all five owner revision scenarios still need to run as the complete P1.3 phase gate. No external blocker affects the implemented revision path.
-- **Next unchecked slice:** freeze and execute the full P1.3 seeded corpus plus five owner revision scenarios, then record the strict gate and owner decision.
+- **Outcome delivered:** P1.4 code is ready for its configured-project gate. An accepted render now compiles into an append-only, versioned implementation package with placement guidance, a ten-item furnishing schedule, explicit product classifications, provenance on every implementation claim, linked field tasks for unknown dimensions, a reconciled budget range, and an installation sequence. Accepting a newer design stales rather than deletes the prior package. Replay-safe job routing, persistence, owner-facing measure/buy/do-next UI, teardown, residue detection, and a full browser gate are implemented.
+- **Files or migrations changed:** Added `supabase/migrations/20260718162713_implementation_packages.sql`, the implementation schema/compiler/fixture/job/route/prompt, and `scripts/suites/p14-implementation-package.mjs` plus `scripts/verify-p1-4.mjs`; extended typed database access, room queries/page/workspace, accepted-design invalidation, debug state, job dispatch, package scripts, teardown, and residue checks. P1.3's previously completed uncommitted files remain in the same working tree.
+- **Focused verification:** `npm.cmd run typecheck`, `npm.cmd run build`, `git diff --check`, and both P1.4 script syntax checks pass. The ten deterministic sourcing URLs all return HTTP 200 under Node fetch with redirects, including the exact links the browser gate will sample. The migration is not applied, so the tagged persistence/browser/residue gate has not been run yet.
+- **Known limitation or blocker:** Applying a migration to the configured production Supabase project requires explicit owner approval. The local migration-list check could not connect because no local Supabase database is running. The phase also requires an owner usefulness rating of at least 8/10 after the complete package is visible; the verifier records this from `P14_OWNER_USEFULNESS_RATING` and does not invent it.
+- **Next unchecked slice:** With explicit approval, apply the additive `implementation_packages` migration, run `npm.cmd run verify:p1-4` with a fresh tagged mock-AI seed and the owner's usefulness rating, confirm zero residue, then mark P1.4 accepted complete.

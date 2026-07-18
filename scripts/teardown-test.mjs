@@ -31,6 +31,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 const TABLES_CHILD_TO_PARENT = [
   "action_proposals",
   "generation_jobs",
+  "implementation_packages",
   "ai_runs",
   "revisions",
   "design_memories",

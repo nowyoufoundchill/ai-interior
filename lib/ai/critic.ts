@@ -30,6 +30,7 @@ import {
   buildDiagnosisCritiqueFixture,
   buildCriticalFinishedImageReviewFixture,
   buildFinishedImageReviewFixture,
+  buildSeededCriticalFinishedImageReviewFixture,
   buildProductCritiqueFixture,
   buildRejectingConceptCritiqueFixture,
   buildRejectingRenderCritiqueFixture,
@@ -173,6 +174,7 @@ export async function reviewFinishedImage(input: {
 }): Promise<FinishedImageReview> {
   const fixture = await activeFailureFixture();
   const attempt = input.attempt ?? 1;
+  const seededCriticalReview = fixture ? buildSeededCriticalFinishedImageReviewFixture(fixture) : null;
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Finished Image Reviewer",
@@ -194,9 +196,10 @@ export async function reviewFinishedImage(input: {
       { url: input.finishedImageUrl, detail: "high" }
     ],
     mock: () =>
-      fixture === "finished_image_critical" || (fixture === "finished_image_repairable" && attempt === 1)
+      seededCriticalReview ??
+      (fixture === "finished_image_critical" || (fixture === "finished_image_repairable" && attempt === 1)
         ? buildCriticalFinishedImageReviewFixture()
-        : buildFinishedImageReviewFixture()
+        : buildFinishedImageReviewFixture())
   });
 }
 

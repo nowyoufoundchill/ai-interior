@@ -1,0 +1,46 @@
+{
+  "version": "p1.3-seeded-corpus-v1",
+  "frozen_at": "2026-07-18",
+  "critical_cases": [
+    {
+      "id": "moved-window",
+      "fixture": "finished_image_moved_window",
+      "expected_signal": "window",
+      "description": "A fixed source-visible window is moved in the finished image."
+    },
+    {
+      "id": "removed-post",
+      "fixture": "finished_image_removed_post",
+      "expected_signal": "post",
+      "description": "A fixed structural post is removed from the finished image."
+    },
+    {
+      "id": "disappeared-vent",
+      "fixture": "finished_image_disappeared_vent",
+      "expected_signal": "vent",
+      "description": "A source-visible ventilation grille disappears from the finished image."
+    },
+    {
+      "id": "blocked-access",
+      "fixture": "finished_image_blocked_access",
+      "expected_signal": "access",
+      "description": "New furniture blocks the room's required access route."
+    },
+    {
+      "id": "missing-required-zone",
+      "fixture": "finished_image_missing_required_zone",
+      "expected_signal": "work zone",
+      "description": "The finished image omits a required work zone from the compiled brief."
+    }
+  ],
+  "known_good_controls": [
+    {
+      "id": "architecture-preserved",
+      "description": "Fixed openings, structure, ventilation, access, and camera remain unchanged."
+    },
+    {
+      "id": "program-preserved",
+      "description": "All required functional zones remain visible without blocking access."
+    }
+  ]
+}

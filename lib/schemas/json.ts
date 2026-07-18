@@ -416,6 +416,110 @@ export const finishedImageReviewJsonSchema = {
   ]
 } as const;
 
+const provenance = {
+  type: "string",
+  enum: ["owner_measured", "photo_observed", "model_inferred", "manufacturer_specified", "unknown"]
+} as const;
+
+const implementationClaim = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    statement: { type: "string" },
+    provenance,
+    source_detail: { type: "string" },
+    field_task_id: { type: ["string", "null"] }
+  },
+  required: ["id", "statement", "provenance", "source_detail", "field_task_id"]
+} as const;
+
+export const implementationPackageJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "string" },
+    placement_guidance: { type: "array", items: implementationClaim },
+    measurement_and_clearance_claims: { type: "array", items: implementationClaim },
+    furnishing_schedule: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" }, category: { type: "string" }, description: { type: "string" },
+          quantity: { type: "integer", minimum: 1 }, coverage_labels: stringArray,
+          classification: { type: "string", enum: ["exact_match", "near_match", "design_reference", "custom", "illustrative", "non_purchasable"] },
+          placement: implementationClaim,
+          dimensions: { type: "array", items: implementationClaim },
+          product: {
+            anyOf: [
+              { type: "null" },
+              {
+                type: "object", additionalProperties: false,
+                properties: {
+                  retailer: { type: "string" }, canonical_url: { type: "string" }, image_url: { type: ["string", "null"] },
+                  price: { type: ["number", "null"], minimum: 0 }, availability: { type: "string" }, verified_at: { type: "string" },
+                  verification_status: { type: "string", enum: ["verified", "unverified"] }
+                },
+                required: ["retailer", "canonical_url", "image_url", "price", "availability", "verified_at", "verification_status"]
+              }
+            ]
+          },
+          alternatives: {
+            type: "array", items: {
+              type: "object", additionalProperties: false,
+              properties: { label: { type: "string" }, classification: { type: "string", enum: ["near_match", "design_reference"] }, canonical_url: { type: ["string", "null"] } },
+              required: ["label", "classification", "canonical_url"]
+            }
+          },
+          budget_low: { type: "number", minimum: 0 }, budget_high: { type: "number", minimum: 0 }, notes: stringArray
+        },
+        required: ["id", "category", "description", "quantity", "coverage_labels", "classification", "placement", "dimensions", "product", "alternatives", "budget_low", "budget_high", "notes"]
+      }
+    },
+    coverage: {
+      type: "array", items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          label: { type: "string" }, kind: { type: "string", enum: ["named_must_have", "major_visible_furnishing"] },
+          schedule_item_id: { type: "string" }, disposition: { type: "string", enum: ["scheduled", "custom", "illustrative", "non_purchasable"] }
+        },
+        required: ["label", "kind", "schedule_item_id", "disposition"]
+      }
+    },
+    field_verification_tasks: {
+      type: "array", items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          id: { type: "string" }, task: { type: "string" }, reason: { type: "string" },
+          priority: { type: "string", enum: ["before_purchase", "before_installation", "recommended"] },
+          resolves_claim_ids: stringArray, status: { type: "string", enum: ["open"] }
+        },
+        required: ["id", "task", "reason", "priority", "resolves_claim_ids", "status"]
+      }
+    },
+    budget: {
+      type: "object", additionalProperties: false,
+      properties: {
+        currency: { type: "string" }, total_low: { type: "number", minimum: 0 }, total_high: { type: "number", minimum: 0 },
+        target_low: { type: ["number", "null"], minimum: 0 }, target_high: { type: ["number", "null"], minimum: 0 },
+        variance_summary: { type: "string" }, assumptions: stringArray
+      },
+      required: ["currency", "total_low", "total_high", "target_low", "target_high", "variance_summary", "assumptions"]
+    },
+    installation_sequence: {
+      type: "array", items: {
+        type: "object", additionalProperties: false,
+        properties: { order: { type: "integer", minimum: 1 }, step: { type: "string" }, caveats: stringArray },
+        required: ["order", "step", "caveats"]
+      }
+    },
+    assumptions: stringArray
+  },
+  required: ["summary", "placement_guidance", "measurement_and_clearance_claims", "furnishing_schedule", "coverage", "field_verification_tasks", "budget", "installation_sequence", "assumptions"]
+} as const;
+
 export const revisionJsonSchema = {
   type: "object",
   additionalProperties: false,

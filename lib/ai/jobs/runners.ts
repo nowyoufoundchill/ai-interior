@@ -15,6 +15,7 @@ import { evaluateBatchConsistency, type RenderForConsistency } from "@/lib/ai/ba
 import { updateProposal } from "@/lib/data/proposals";
 import { executeFirstDesign } from "./first-design";
 import { executeVisualRevision } from "./visual-revision";
+import { executeImplementationPackage } from "./implementation-package";
 import {
   advanceStage,
   checkpointResult,
@@ -93,6 +94,17 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
       }
       case "chat_action": {
         const job = await executeChatAction(claimed);
+        return { ran: true, job };
+      }
+      case "products": {
+        const payload = (claimed.request_payload as Record<string, unknown>) ?? {};
+        const job = payload.operation === "implementation_package"
+          ? await executeImplementationPackage(claimed)
+          : await failJob(claimed.id, {
+              errorCode: "unsupported_products_operation",
+              ownerMessage: "This product operation is not available yet.",
+              retryable: false
+            });
         return { ran: true, job };
       }
       default: {

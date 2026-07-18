@@ -15,6 +15,7 @@ type ChatMessage = Database["public"]["Tables"]["chat_messages"]["Row"];
 type Memory = Database["public"]["Tables"]["design_memories"]["Row"];
 type AiRun = Database["public"]["Tables"]["ai_runs"]["Row"];
 type GenerationJob = Database["public"]["Tables"]["generation_jobs"]["Row"];
+type ImplementationPackage = Database["public"]["Tables"]["implementation_packages"]["Row"];
 
 export type HomeSummary = Home & {
   rooms: HomeRoom[];
@@ -44,6 +45,7 @@ export type RoomWorkspaceData = {
   memories: Memory[];
   aiRuns: AiRun[];
   generationJobs: GenerationJob[];
+  implementationPackages: ImplementationPackage[];
 };
 
 export async function getHomes() {
@@ -174,6 +176,12 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     .order("created_at", { ascending: false })
     .limit(100)
     .then((result) => (result.error ? [] : ((result.data ?? []) as GenerationJob[])));
+  const implementationPackages = await supabase
+    .from("implementation_packages")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("version", { ascending: false })
+    .then((result) => (result.error ? [] : ((result.data ?? []) as ImplementationPackage[])));
 
   return {
     room: roomWithHome,
@@ -188,6 +196,7 @@ export async function getRoomWorkspace(roomId: string): Promise<RoomWorkspaceDat
     actionProposals,
     memories: (memories.data ?? []) as Memory[],
     aiRuns: (aiRuns.data ?? []) as AiRun[],
-    generationJobs
+    generationJobs,
+    implementationPackages
   };
 }
