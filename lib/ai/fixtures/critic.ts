@@ -1,4 +1,11 @@
-import type { ConceptCritique, DiagnosisCritique, MoodBoardConcept, ProductCritique, RenderCritique } from "@/lib/schemas";
+import type {
+  ConceptCritique,
+  DiagnosisCritique,
+  FinishedImageReview,
+  MoodBoardConcept,
+  ProductCritique,
+  RenderCritique
+} from "@/lib/schemas";
 
 /**
  * P0.0 `critic_rejection` fixture: a deterministic BLOCKING critique so the
@@ -121,6 +128,38 @@ export function buildRenderCritiqueFixture(): RenderCritique {
     blocking_violations: [],
     issues: ["Mock render critique only — no model call made."],
     notes: ["Preservation and constraint adherence assumed from the mock plan."]
+  };
+}
+
+export function buildFinishedImageReviewFixture(): FinishedImageReview {
+  return {
+    verdict: "pass",
+    architecture_preservation_score: 92,
+    program_fulfillment_score: 86,
+    access_and_safety_score: 90,
+    realism_score: 88,
+    critical_violations: [],
+    warnings: [],
+    evidence: ["Mock control preserves the source image, fixed architecture, openings, and camera."],
+    summary: "The finished image is safe to present as the current candidate.",
+    confidence: 0.94
+  };
+}
+
+export function buildCriticalFinishedImageReviewFixture(): FinishedImageReview {
+  return {
+    verdict: "failure",
+    architecture_preservation_score: 28,
+    program_fulfillment_score: 72,
+    access_and_safety_score: 38,
+    realism_score: 55,
+    critical_violations: [
+      "The finished image removes a source-visible ventilation grille and blocks the primary doorway."
+    ],
+    warnings: [],
+    evidence: ["Deterministic critical finished-image fixture; no provider call was made."],
+    summary: "This result must not be presented as ready.",
+    confidence: 0.99
   };
 }
 

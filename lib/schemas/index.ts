@@ -212,6 +212,19 @@ export const renderCritiqueSchema = z.object({
   notes: z.array(z.string())
 });
 
+export const finishedImageReviewSchema = z.object({
+  verdict: z.enum(["pass", "warning", "failure"]),
+  architecture_preservation_score: z.number().min(0).max(100),
+  program_fulfillment_score: z.number().min(0).max(100),
+  access_and_safety_score: z.number().min(0).max(100),
+  realism_score: z.number().min(0).max(100),
+  critical_violations: z.array(z.string()),
+  warnings: z.array(z.string()),
+  evidence: z.array(z.string()),
+  summary: z.string(),
+  confidence: z.number().min(0).max(1)
+});
+
 export const diagnosisCritiqueDimensionsSchema = z.object({
   room_specificity: z.number().min(0).max(100),
   downstream_usefulness: z.number().min(0).max(100),
@@ -243,3 +256,4 @@ export type ConceptCritique = z.infer<typeof conceptCritiqueSchema>;
 export type DiagnosisCritique = z.infer<typeof diagnosisCritiqueSchema>;
 export type ProductCritique = z.infer<typeof productCritiqueSchema>;
 export type RenderCritique = z.infer<typeof renderCritiqueSchema>;
+export type FinishedImageReview = z.infer<typeof finishedImageReviewSchema>;

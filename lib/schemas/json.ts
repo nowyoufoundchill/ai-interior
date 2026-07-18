@@ -387,6 +387,35 @@ export const renderCritiqueJsonSchema = {
   ]
 } as const;
 
+export const finishedImageReviewJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    verdict: { type: "string", enum: ["pass", "warning", "failure"] },
+    architecture_preservation_score: score,
+    program_fulfillment_score: score,
+    access_and_safety_score: score,
+    realism_score: score,
+    critical_violations: stringArray,
+    warnings: stringArray,
+    evidence: stringArray,
+    summary: { type: "string" },
+    confidence: { type: "number", minimum: 0, maximum: 1 }
+  },
+  required: [
+    "verdict",
+    "architecture_preservation_score",
+    "program_fulfillment_score",
+    "access_and_safety_score",
+    "realism_score",
+    "critical_violations",
+    "warnings",
+    "evidence",
+    "summary",
+    "confidence"
+  ]
+} as const;
+
 export const revisionJsonSchema = {
   type: "object",
   additionalProperties: false,

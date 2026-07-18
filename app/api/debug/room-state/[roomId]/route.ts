@@ -31,7 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ roo
       .order("created_at", { ascending: true }),
     supabase
       .from("renders")
-      .select("id, status, mood_board_version, source_photo_id, preservation_constraints, negative_instructions, render_prompt, created_at")
+      .select("id, status, mood_board_version, source_photo_id, preservation_constraints, negative_instructions, render_prompt, critique, quality_score, created_at")
       .eq("room_id", roomId)
       .order("created_at", { ascending: true }),
     supabase

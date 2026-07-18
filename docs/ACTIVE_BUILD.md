@@ -1,16 +1,16 @@
-# Active Build - P1.2 Designer Autopilot
+# Active Build - P1.3 Finished-image quality and refinement
 
-**Updated:** 2026-07-13
+**Updated:** 2026-07-18
 
 **Application baseline:** `9c3599358e44a7cc16c1e5eb5403b32c40e42b47`
 
-**Accepted complete:** P0.0 through P0.6
+**Accepted complete:** P0.0 through P1.2
 
-**Current phase:** P1.2
+**Current phase:** P1.3
 
-**Next committed phase:** P1.2 - Designer Autopilot: minimal input to one design
+**Next committed phase:** P1.3 - Finished-image quality and conversational refinement
 
-**External blocker:** None for the durable first-design operation. The remaining P1.2 quality and owner-preference gate requires owner review and authorized benchmark evidence; it is not inferred from mock verification.
+**External blocker:** None.
 
 `PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
@@ -61,9 +61,17 @@ P1.1 completes only when:
 
 - [x] Run the first-design operation against the configured tagged test project after its `generation_jobs` schema cache is available.
 
-## Current slice - P1.2 phase gate evidence
+## P1.2 phase gate evidence
 
-- [ ] Complete the owner-reviewed visual-quality, preference, and responsive gate evidence required to accept P1.2.
+- [x] Owner accepted the reviewed first-design result as visually useful, preference-aligned, and ready to proceed through the responsive homeowner flow.
+
+## Current slice - P1.3 finished-image review
+
+- [x] Compare the actual source/result pair with the compiled brief and typed facts, persist a structured pass/warning/failure verdict on the append-only render, and prevent critical failures from becoming the current candidate.
+
+## Next slice - P1.3 bounded repair
+
+- [ ] Permit at most one automatic image repair after a critical finished-image verdict, preserving the failed attempt and review while enforcing the two-edit/two-review ceiling.
 
 ## Current non-goals
 
@@ -71,15 +79,16 @@ P1.1 completes only when:
 - Substituting test or spike images for owner benchmark evidence.
 - Reconstructing unknown prompts, settings, homeowner input, or clearances.
 - Running the paid three-room comparison matrix.
-- Building the brief compiler, image critic, implementation package, or multi-room view.
+- Building the implementation package or multi-room view.
+- Conversational revision and the full seeded P1.3 corpus gate until the bounded repair path is complete.
 - Broad refactors, analytics, authentication, billing, deployment, or provider changes.
 
 ## Handoff format
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** P1.2 now sends the intake directly into one durable existing render-lane job, marked `operation: first_design` so it works with migration 008's deployed job-type constraint without a production migration. The job compiles and persists a versioned room program, creates one image edit, persists one candidate design, and preserves checkpoints for recovery. Status polling reschedules a saved queued job after an interrupted callback; claim semantics keep that recovery idempotent. The result-first room screen shows the source image or latest candidate, one status, and the single primary action; `Keep this design` promotes that candidate without deleting history.
-- **Files or migrations changed:** `components/forms/room-autopilot-intake.tsx`, `components/rooms/autopilot-room-workspace.tsx`, `app/homes/[homeId]/rooms/new/page.tsx`, `app/rooms/[roomId]/page.tsx`, `app/api/rooms/[roomId]/first-design/route.ts`, `app/api/rooms/[roomId]/designs/[renderId]/accept/route.ts`, `app/api/rooms/[roomId]/jobs/route.ts`, `app/api/rooms/[roomId]/jobs/[jobId]/route.ts`, `app/api/rooms/[roomId]/photos/route.ts`, `lib/ai/jobs/first-design.ts`, `lib/ai/jobs/runners.ts`, `lib/ai/jobs/service.ts`, `lib/ai/services.ts`, `lib/schemas/index.ts`, `lib/schemas/json.ts`, `tsconfig.json`, `docs/ACTIVE_BUILD.md`; no migration was applied.
-- **Focused verification:** `npm.cmd run typecheck` passes. Tagged mock verification starts one first-design request and immediately repeats it; both resolve to one active durable job. The completed job references one persisted compiled brief and one candidate render. Tagged teardown removes that job, compiler artifact, render, photos, room, home, and storage objects; `check:residue` reports zero residue. Browser verification confirms a source-photo-first viewport and one visible `Design my room` action. The existing durable-job suite reaches the table after restarting the local mock server; its stale-heartbeat assertions remain affected by the local/database clock mismatch and are outside this first-design change.
-- **Known limitation or blocker:** P1.2's owner-reviewed visual-quality, preference, and responsive gate evidence remains required. It includes authorized benchmark work and owner reactions, so it cannot be claimed from mock runs or inferred.
-- **Next unchecked slice:** complete the bounded owner-reviewed P1.2 phase gate evidence; do not run paid benchmark calls without the existing authorization.
+- **Outcome delivered:** Every new first design now receives a post-generation review that sees the real source image, finished image, compiled room program, and typed room facts. The structured verdict and evidence persist on the render. A critical result is saved as `review_failed`, ends with `finished_image_critical_violation`, and cannot replace or be accepted as the current candidate. Passing results remain candidates. The room view adds an accessible in-place Before/After switch and identifies reviewed results without exposing internal scoring.
+- **Files or migrations changed:** `app/api/debug/room-state/[roomId]/route.ts`, `components/rooms/autopilot-room-workspace.tsx`, `lib/ai/critic.ts`, `lib/ai/failure-fixtures.ts`, `lib/ai/fixtures/critic.ts`, `lib/ai/jobs/first-design.ts`, `lib/schemas/index.ts`, `lib/schemas/json.ts`, `prompts/critic/review-finished-image.v1.md`, `docs/ACTIVE_BUILD.md`; no migration was required or applied.
+- **Focused verification:** `npm.cmd run typecheck` passes. A tagged mock first-design run persisted a `pass` verdict with evidence and a quality score on one candidate. A second run using the deterministic critical finished-image fixture persisted one `review_failed` attempt, terminally failed with `finished_image_critical_violation`, and preserved the original candidate. Tagged teardown removed two jobs, two renders, two compiled artifacts, four AI runs, the room/home/photos, and four storage objects; `check:residue` reports zero residue. Browser verification on the existing accepted room confirms Before/After changes the displayed source/result label and pressed state with no console warnings or errors.
+- **Known limitation or blocker:** Automatic repair and owner-authored conversational revisions are not implemented yet. The frozen seeded critical corpus and owner revision scenarios remain P1.3 phase-gate work.
+- **Next unchecked slice:** implement one bounded automatic repair while preserving both attempts and enforcing the two-edit/two-review ceiling.

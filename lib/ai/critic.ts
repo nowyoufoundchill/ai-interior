@@ -1,10 +1,13 @@
 import {
   conceptCritiqueSchema,
   diagnosisCritiqueSchema,
+  finishedImageReviewSchema,
   productCritiqueSchema,
   renderCritiqueSchema,
+  type AutopilotBrief,
   type ConceptCritique,
   type DiagnosisCritique,
+  type FinishedImageReview,
   type MoodBoardConcept,
   type ProductCritique,
   type ProductPlanItem,
@@ -15,6 +18,7 @@ import {
 import {
   conceptCritiqueJsonSchema,
   diagnosisCritiqueJsonSchema,
+  finishedImageReviewJsonSchema,
   productCritiqueJsonSchema,
   renderCritiqueJsonSchema
 } from "@/lib/schemas/json";
@@ -24,6 +28,8 @@ import { activeFailureFixture, FixtureFailureError } from "@/lib/ai/failure-fixt
 import {
   buildConceptCritiqueFixture,
   buildDiagnosisCritiqueFixture,
+  buildCriticalFinishedImageReviewFixture,
+  buildFinishedImageReviewFixture,
   buildProductCritiqueFixture,
   buildRejectingConceptCritiqueFixture,
   buildRejectingRenderCritiqueFixture,
@@ -153,6 +159,41 @@ export async function critiqueRender(input: {
       scale_anchors: SCALE_ANCHORS
     },
     mock: () => (rejecting ? buildRejectingRenderCritiqueFixture() : buildRenderCritiqueFixture())
+  });
+}
+
+export async function reviewFinishedImage(input: {
+  roomId: string;
+  sourceImageUrl: string;
+  finishedImageUrl: string;
+  brief: AutopilotBrief;
+  typedFacts: unknown;
+  provider?: GatewayProvider;
+}): Promise<FinishedImageReview> {
+  const fixture = await activeFailureFixture();
+  return runStructuredTask({
+    roomId: input.roomId,
+    serviceName: "Finished Image Reviewer",
+    provider: input.provider ?? "anthropic",
+    promptPath: "prompts/critic/review-finished-image.v1.md",
+    schemaName: "finished_image_review",
+    schema: finishedImageReviewJsonSchema,
+    zodSchema: finishedImageReviewSchema,
+    maxTokens: 4096,
+    taskInput: {
+      task: "Compare the finished room image with its source and decide whether it is safe to present as the current candidate.",
+      compiled_brief: input.brief,
+      typed_facts: input.typedFacts,
+      image_order: ["source", "finished"]
+    },
+    images: [
+      { url: input.sourceImageUrl, detail: "high" },
+      { url: input.finishedImageUrl, detail: "high" }
+    ],
+    mock: () =>
+      fixture === "finished_image_critical"
+        ? buildCriticalFinishedImageReviewFixture()
+        : buildFinishedImageReviewFixture()
   });
 }
 

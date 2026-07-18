@@ -20,6 +20,7 @@ export const FAILURE_FIXTURES = [
   "provider_server_error",
   "critic_rejection",
   "critic_timeout",
+  "finished_image_critical",
   "image_no_image",
   "storage_upload_failure",
   "db_persist_failure",

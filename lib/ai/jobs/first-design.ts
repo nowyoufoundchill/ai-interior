@@ -1,6 +1,7 @@
 import { firstDesignBriefCompiler } from "@/lib/ai/services";
 import type { AutopilotBrief } from "@/lib/schemas";
 import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
+import { reviewFinishedImage } from "@/lib/ai/critic";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 import { advanceStage, checkpointResult, completeJob, failJob } from "./service";
 import type { GenerationJob } from "@/types/database";
@@ -87,8 +88,34 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
     await checkpointResult(job.id, { image_url: imageUrl, image_ready: true });
   }
 
+  let finishedReview = checkpoint.finished_image_review as Awaited<ReturnType<typeof reviewFinishedImage>> | undefined;
+  if (!finishedReview) {
+    await advanceStage(job.id, "validating", "reviewing the finished room against your photo");
+    try {
+      finishedReview = await reviewFinishedImage({
+        roomId: room.id,
+        sourceImageUrl: sourcePhoto.file_url,
+        finishedImageUrl: imageUrl,
+        brief,
+        typedFacts: {
+          dimensions: room.dimensions,
+          constraints: room.constraints,
+          existing_items: room.existing_items
+        }
+      });
+    } catch (error) {
+      return failJob(job.id, {
+        errorCode: "finished_review_unavailable",
+        ownerMessage: "Your image is saved, but its final room check did not finish. Try again to continue the review.",
+        detail: error instanceof Error ? error.message : String(error)
+      });
+    }
+    await checkpointResult(job.id, { finished_image_review: finishedReview });
+  }
+
   await advanceStage(job.id, "persisting", "saving your room design");
   let renderId = typeof checkpoint.render_id === "string" ? checkpoint.render_id : null;
+  const reviewFailed = finishedReview.verdict === "failure" || finishedReview.critical_violations.length > 0;
   if (!renderId) {
     const { data: render, error: renderError } = await supabase
       .from("renders")
@@ -102,9 +129,15 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
         transformation_instructions: [...brief.functions_and_zones, ...brief.palette_materials_lighting],
         negative_instructions: brief.negative_instructions,
         generated_image_path: imageUrl,
-        status: "candidate",
-        critique: { brief_id: briefId, confidence: brief.confidence, unknowns: brief.unknowns },
-        quality_score: Math.round(brief.confidence * 100),
+        status: reviewFailed ? "review_failed" : "candidate",
+        critique: { brief_id: briefId, finished_image_review: finishedReview },
+        quality_score: Math.round(
+          (finishedReview.architecture_preservation_score +
+            finishedReview.program_fulfillment_score +
+            finishedReview.access_and_safety_score +
+            finishedReview.realism_score) /
+            4
+        ),
         test_run_id: room.test_run_id
       })
       .select("id")
@@ -112,6 +145,14 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
     if (renderError || !render) return failJob(job.id, { errorCode: "render_persist_failed", ownerMessage: "The finished design couldn't be saved. Try again.", detail: renderError?.message });
     renderId = render.id;
     await checkpointResult(job.id, { render_id: renderId });
+  }
+  if (reviewFailed) {
+    return failJob(job.id, {
+      errorCode: "finished_image_critical_violation",
+      ownerMessage: "This attempt changed an important part of your room, so it was saved but not presented as ready.",
+      detail: finishedReview.critical_violations.join(" | "),
+      retryable: false
+    });
   }
   await supabase.from("renders").update({ status: "historical" }).eq("room_id", room.id).eq("source_photo_id", sourcePhoto.id).eq("status", "candidate").neq("id", renderId);
   await supabase.from("rooms").update({ status: "design_ready", current_stage: "design_ready" }).eq("id", room.id);

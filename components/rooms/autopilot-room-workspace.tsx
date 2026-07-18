@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { GenerationJob, Photo, Render, Room } from "@/types/database";
 
@@ -16,6 +17,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs }
   const failedJob = firstDesignJobs.find((job) => ["retryable_failed", "terminal_failed"].includes(job.status));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"before" | "after">("after");
 
   useEffect(() => {
     if (!activeJob) return;
@@ -45,15 +47,57 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs }
     setBusy(false);
   }
 
-  const image = current?.file_url ?? source?.file_url;
+  const image = current && view === "after" ? current.file_url ?? source?.file_url : source?.file_url;
   const isAccepted = current?.status === "accepted";
+  const review = readFinishedReview(current?.critique);
   return (
     <main className="mx-auto grid max-w-6xl gap-6">
       <header className="flex items-end justify-between gap-4 border-b border-hairline pb-5">
         <div><p className="atelier-eyebrow">{room.name}</p><h1 className="mt-2 font-serif text-4xl text-atelier-ink">Your <em>room</em></h1></div>
         <p className="max-w-sm text-right text-sm text-atelier-umber">{current ? (isAccepted ? "Your design is saved." : "Your recommendation is ready.") : "One recommendation, composed around your photo."}</p>
       </header>
-      {image ? <figure className="atelier-card overflow-hidden"><img src={image} alt={current ? `Recommended design for ${room.name}` : `Source photo for ${room.name}`} className="aspect-[4/3] w-full object-cover" /><figcaption className="border-t border-hairline px-4 py-3 text-sm text-atelier-umber">{current ? "Recommended design" : "Your room photo"}</figcaption></figure> : <div className="atelier-empty">Add one clear room photo to begin.</div>}
+      {image ? (
+        <figure className="atelier-card overflow-hidden">
+          <div className="relative aspect-[4/3] w-full">
+            <Image
+              src={image}
+              alt={current && view === "after" ? `Recommended design for ${room.name}` : `Source photo for ${room.name}`}
+              fill
+              priority
+              sizes="(max-width: 1280px) 100vw, 1152px"
+              className="object-cover"
+            />
+          </div>
+          <figcaption className="flex items-center justify-between gap-4 border-t border-hairline px-4 py-3 text-sm text-atelier-umber">
+            <span>
+              {current && view === "after" ? "Recommended design" : "Your room photo"}
+              {review ? " · Reviewed against your source" : ""}
+            </span>
+            {current && source ? (
+              <span className="flex rounded-full border border-hairline p-1" aria-label="Compare before and after">
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-1 ${view === "before" ? "bg-atelier-ink text-white" : ""}`}
+                  aria-pressed={view === "before"}
+                  onClick={() => setView("before")}
+                >
+                  Before
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-1 ${view === "after" ? "bg-atelier-ink text-white" : ""}`}
+                  aria-pressed={view === "after"}
+                  onClick={() => setView("after")}
+                >
+                  After
+                </button>
+              </span>
+            ) : null}
+          </figcaption>
+        </figure>
+      ) : (
+        <div className="atelier-empty">Add one clear room photo to begin.</div>
+      )}
       <section className="flex flex-col items-start gap-4 border-t border-hairline pt-6 sm:flex-row sm:items-center sm:justify-between">
         <div aria-live="polite" className="text-sm text-atelier-umber">
           {activeJob ? "Designing your room. This will continue if you leave the page." : failedJob ? failedJob.error_message : current ? (isAccepted ? "This is the design you chose to keep." : "See how this direction feels in your room.") : "Your photo and outcome are ready."}
@@ -68,4 +112,10 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs }
 function isFirstDesign(job: GenerationJob) {
   const payload = job.request_payload as Record<string, unknown>;
   return payload?.operation === "first_design";
+}
+
+function readFinishedReview(critique: Render["critique"] | undefined) {
+  if (!critique || typeof critique !== "object" || Array.isArray(critique)) return null;
+  const review = (critique as Record<string, unknown>).finished_image_review;
+  return review && typeof review === "object" && !Array.isArray(review) ? review : null;
 }
