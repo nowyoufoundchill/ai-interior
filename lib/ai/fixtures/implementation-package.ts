@@ -7,7 +7,7 @@ const PRODUCT_REFERENCES = [
   ["Area rug", "LOHALS flatwoven rug design reference", "IKEA", "https://www.ikea.com/us/en/p/lohals-rug-flatwoven-natural-00277395/", 300, 900],
   ["Task lamp", "RANARP task-light design reference", "IKEA", "https://www.ikea.com/us/en/p/ranarp-work-lamp-off-white-20231325/", 80, 400],
   ["Wall focal point", "HOVET mirror used only as a scale and finish reference", "IKEA", "https://www.ikea.com/us/en/p/hovet-mirror-aluminum-40507196/", 200, 900],
-  ["Plant", "Sculptural olive tree", "The Sill", "https://www.thesill.com/products/olive-tree", 150, 350],
+  ["Plant", "FEJKA artificial olive-tree design reference", "IKEA", "https://www.ikea.com/us/en/p/fejka-artificial-potted-plant-indoor-outdoor-olive-tree-green-40617699/", 50, 350],
   ["Window treatment", "MERETE curtain design reference; final treatment must fit the measured opening", "IKEA", "https://www.ikea.com/us/en/p/ritva-curtains-with-tie-backs-1-pair-white-40111987/", 200, 1600],
   ["Wall finish", "Warm mineral paint finish", "Illustrative", null, 250, 800],
   ["Cable management", "Concealed floor and desk cable route", "Custom", null, 75, 300]
