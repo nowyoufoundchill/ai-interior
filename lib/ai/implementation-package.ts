@@ -11,24 +11,32 @@ export async function compileImplementationPackage(input: {
   sourcePhoto: Record<string, unknown> | null;
   brief: Record<string, unknown>;
   existingProducts: Record<string, unknown>[];
+  repair?: {
+    previousPlan: ImplementationPackagePlan;
+    issues: string[];
+  };
 }) {
   return runStructuredTask({
     roomId: input.roomId,
     serviceName: "Implementation Package Compiler",
-    provider: "anthropic",
+    provider: "openai",
     promptPath: "prompts/implementation/compile-room-package.v1.md",
     schemaName: "implementation_package",
     schema: implementationPackageJsonSchema,
     zodSchema: implementationPackageSchema,
     maxTokens: 12000,
     taskInput: {
-      task: "Create one honest implementation package bound to the accepted render.",
+      task: input.repair
+        ? "Return a complete corrected implementation package that resolves every required correction."
+        : "Create one honest implementation package bound to the accepted render.",
       room: input.room,
       home: input.home,
       accepted_render: input.acceptedRender,
       source_photo: input.sourcePhoto,
       compiled_brief: input.brief,
-      existing_verified_products: input.existingProducts
+      existing_verified_products: input.existingProducts,
+      previous_package: input.repair?.previousPlan ?? null,
+      required_corrections: input.repair?.issues ?? []
     },
     images: [
       ...(typeof input.sourcePhoto?.file_url === "string" ? [{ url: input.sourcePhoto.file_url, detail: "high" as const }] : []),
@@ -76,6 +84,75 @@ export function auditImplementationPackage(plan: ImplementationPackagePlan, requ
   }
   if (plan.budget.total_high < plan.budget.total_low) issues.push("Package budget range is inverted.");
   return [...new Set(issues)];
+}
+
+export function normalizeImplementationPackage(plan: ImplementationPackagePlan): ImplementationPackagePlan {
+  const normalized = structuredClone(plan);
+  const sourcingClassifications = new Set(["exact_match", "near_match", "design_reference"]);
+
+  for (const item of normalized.furnishing_schedule) {
+    if (sourcingClassifications.has(item.classification) && !item.product) {
+      item.classification = "illustrative";
+    } else if (!sourcingClassifications.has(item.classification) && item.product) {
+      item.product = null;
+    }
+  }
+
+  const itemsById = new Map(normalized.furnishing_schedule.map((item) => [item.id, item]));
+  for (const coverage of normalized.coverage) {
+    const item = itemsById.get(coverage.schedule_item_id);
+    if (!item) continue;
+    coverage.disposition = item.classification === "custom"
+      ? "custom"
+      : item.classification === "illustrative"
+        ? "illustrative"
+        : item.classification === "non_purchasable"
+          ? "non_purchasable"
+          : "scheduled";
+  }
+
+  const tasksById = new Map(normalized.field_verification_tasks.map((task) => [task.id, task]));
+  const claims = [
+    ...normalized.placement_guidance,
+    ...normalized.measurement_and_clearance_claims,
+    ...normalized.furnishing_schedule.flatMap((item) => [item.placement, ...item.dimensions])
+  ];
+  for (const claim of claims) {
+    if (claim.provenance !== "unknown") continue;
+    let task = claim.field_task_id ? tasksById.get(claim.field_task_id) : undefined;
+    if (!task) {
+      let taskId = `field-${claim.id}`;
+      let suffix = 2;
+      while (tasksById.has(taskId)) {
+        taskId = `field-${claim.id}-${suffix}`;
+        suffix += 1;
+      }
+      task = {
+        id: taskId,
+        task: `Verify on site before purchase: ${claim.statement}`,
+        reason: "The accepted rendering and stored room facts do not establish this claim.",
+        priority: "before_purchase",
+        resolves_claim_ids: [claim.id],
+        status: "open"
+      };
+      normalized.field_verification_tasks.push(task);
+      tasksById.set(task.id, task);
+      claim.field_task_id = task.id;
+    } else if (!task.resolves_claim_ids.includes(claim.id)) {
+      task.resolves_claim_ids.push(claim.id);
+    }
+  }
+
+  normalized.budget.total_low = normalized.furnishing_schedule.reduce(
+    (sum, item) => sum + item.budget_low * item.quantity,
+    0
+  );
+  normalized.budget.total_high = normalized.furnishing_schedule.reduce(
+    (sum, item) => sum + item.budget_high * item.quantity,
+    0
+  );
+
+  return normalized;
 }
 
 function normalizeLabel(value: string) {

@@ -1,5 +1,5 @@
 import { autopilotBriefSchema, implementationPackageSchema } from "@/lib/schemas";
-import { auditImplementationPackage, compileImplementationPackage } from "@/lib/ai/implementation-package";
+import { auditImplementationPackage, compileImplementationPackage, normalizeImplementationPackage } from "@/lib/ai/implementation-package";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { GenerationJob, Json } from "@/types/database";
 import { advanceStage, checkpointResult, completeJob, failJob } from "./service";
@@ -58,12 +58,39 @@ export async function executeImplementationPackage(job: GenerationJob): Promise<
   } catch (error) {
     return failJob(job.id, { errorCode: "implementation_compile_failed", ownerMessage: "The room plan did not finish. Your accepted design is safe — try again.", detail: error instanceof Error ? error.message : String(error) });
   }
-  const parsedPlan = implementationPackageSchema.safeParse(plan);
   const requiredCoverageLabels = [
     ...arrayOfStrings(room.existing_items),
     ...parsedBrief.data.keep_or_remove
   ];
-  const auditIssues = parsedPlan.success ? auditImplementationPackage(parsedPlan.data, requiredCoverageLabels) : ["The package did not match its structured contract."];
+  let parsedPlan = implementationPackageSchema.safeParse(plan);
+  if (parsedPlan.success) {
+    plan = normalizeImplementationPackage(parsedPlan.data);
+    parsedPlan = implementationPackageSchema.safeParse(plan);
+  }
+  let auditIssues = parsedPlan.success ? auditImplementationPackage(parsedPlan.data, requiredCoverageLabels) : ["The package did not match its structured contract."];
+  if (parsedPlan.success && auditIssues.length) {
+    await advanceStage(job.id, "generating", "repairing unsupported claims and package consistency");
+    try {
+      plan = await compileImplementationPackage({
+        roomId: room.id,
+        room,
+        home,
+        acceptedRender,
+        sourcePhoto,
+        brief: parsedBrief.data,
+        existingProducts: products ?? [],
+        repair: { previousPlan: parsedPlan.data, issues: auditIssues }
+      });
+      parsedPlan = implementationPackageSchema.safeParse(plan);
+      if (parsedPlan.success) {
+        plan = normalizeImplementationPackage(parsedPlan.data);
+        parsedPlan = implementationPackageSchema.safeParse(plan);
+      }
+      auditIssues = parsedPlan.success ? auditImplementationPackage(parsedPlan.data, requiredCoverageLabels) : ["The corrected package did not match its structured contract."];
+    } catch (error) {
+      return failJob(job.id, { errorCode: "implementation_compile_failed", ownerMessage: "The room plan did not finish. Your accepted design is safe — try again.", detail: error instanceof Error ? error.message : String(error) });
+    }
+  }
   if (!parsedPlan.success || auditIssues.length) {
     return failJob(job.id, { errorCode: "implementation_package_invalid", ownerMessage: "The room plan made claims it could not support, so it was not presented. Try again.", detail: auditIssues.join(" | "), retryable: false });
   }
