@@ -2,6 +2,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listProposals } from "@/lib/data/proposals";
 import type { ActionProposal, Database } from "@/types/database";
+import { deriveRoomIndexState, type RoomIndexState } from "@/lib/home/room-index";
 
 type Home = Database["public"]["Tables"]["homes"]["Row"];
 type Room = Database["public"]["Tables"]["rooms"]["Row"];
@@ -25,10 +26,17 @@ export type HomeRoom = Pick<Room, "id" | "name" | "room_type" | "status" | "curr
   job_status?: string | null;
   job_type?: string | null;
   job_error_message?: string | null;
+  source_photo_url?: string | null;
+  design_image_url?: string | null;
+  display_image_url?: string | null;
+  display_render_id?: string | null;
+  lifecycle_state?: RoomIndexState;
+  lifecycle_label?: string;
+  next_action?: string;
 };
 
 export type HomeDetail = Home & {
-  rooms: (Room & Pick<HomeRoom, "job_status" | "job_type" | "job_error_message">)[];
+  rooms: (Room & HomeRoom)[];
 };
 
 export type RoomWorkspaceData = {
@@ -93,19 +101,54 @@ export async function getHome(homeId: string) {
   const home = data as HomeDetail;
   const roomIds = home.rooms.map((room) => room.id);
   if (!roomIds.length) return home;
-  const { data: jobs } = await supabase
-    .from("generation_jobs")
-    .select("room_id, job_type, status, error_message, created_at")
-    .in("room_id", roomIds)
-    .in("status", ["queued", "planning", "validating", "generating", "persisting", "retryable_failed", "terminal_failed"])
-    .order("created_at", { ascending: false });
+  const [photos, renders, jobs, packages] = await Promise.all([
+    supabase.from("photos").select("id, room_id, file_url, label, created_at").in("room_id", roomIds).order("created_at", { ascending: false }),
+    supabase.from("renders").select("id, room_id, file_url, status, created_at").in("room_id", roomIds).in("status", ["accepted", "candidate", "current"]).order("created_at", { ascending: false }),
+    supabase.from("generation_jobs").select("room_id, job_type, status, error_message, created_at").in("room_id", roomIds).order("created_at", { ascending: false }),
+    supabase.from("implementation_packages").select("room_id, status, created_at").in("room_id", roomIds).eq("status", "current").order("created_at", { ascending: false })
+  ]);
   const latest = new Map<string, { job_type: string; status: string; error_message: string | null }>();
-  for (const job of jobs ?? []) if (!latest.has(job.room_id)) latest.set(job.room_id, job);
+  for (const job of jobs.data ?? []) if (!latest.has(job.room_id)) latest.set(job.room_id, job);
+  const sourceByRoom = new Map<string, string>();
+  const mainPhotoRooms = new Set<string>();
+  for (const photo of photos.data ?? []) {
+    if (photo.label === "Main angle" && !mainPhotoRooms.has(photo.room_id)) {
+      sourceByRoom.set(photo.room_id, photo.file_url);
+      mainPhotoRooms.add(photo.room_id);
+    } else if (!sourceByRoom.has(photo.room_id)) sourceByRoom.set(photo.room_id, photo.file_url);
+  }
+  const renderByRoom = new Map<string, { id: string; file_url: string | null; status: string }>();
+  for (const render of renders.data ?? []) if (!renderByRoom.has(render.room_id)) renderByRoom.set(render.room_id, render);
+  const packageRooms = new Set((packages.data ?? []).map((item) => item.room_id));
+  const photoCounts = new Map<string, number>();
+  for (const photo of photos.data ?? []) photoCounts.set(photo.room_id, (photoCounts.get(photo.room_id) ?? 0) + 1);
   return {
     ...home,
     rooms: home.rooms.map((room) => {
       const job = latest.get(room.id);
-      return { ...room, job_status: job?.status ?? null, job_type: job?.job_type ?? null, job_error_message: job?.error_message ?? null };
+      const render = renderByRoom.get(room.id);
+      const sourcePhotoUrl = sourceByRoom.get(room.id) ?? null;
+      const lifecycle = deriveRoomIndexState({
+        photoCount: photoCounts.get(room.id) ?? 0,
+        currentStage: room.current_stage,
+        roomStatus: room.status,
+        renderStatus: render?.status,
+        latestJobStatus: job?.status,
+        hasCurrentPackage: packageRooms.has(room.id)
+      });
+      return {
+        ...room,
+        job_status: job?.status ?? null,
+        job_type: job?.job_type ?? null,
+        job_error_message: job?.error_message ?? null,
+        source_photo_url: sourcePhotoUrl,
+        design_image_url: render?.file_url ?? null,
+        display_image_url: render?.file_url ?? sourcePhotoUrl,
+        display_render_id: render?.id ?? null,
+        lifecycle_state: lifecycle.state,
+        lifecycle_label: lifecycle.label,
+        next_action: lifecycle.nextAction
+      };
     })
   } as HomeDetail;
 }

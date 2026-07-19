@@ -2,6 +2,7 @@
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { uploadRoomPhoto } from "@/lib/storage/room-photo-upload";
 
 export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
   const router = useRouter();
@@ -57,19 +58,11 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
         setCreatedRoomId(roomId);
       }
 
+      if (!roomId) throw new Error("We could not save this room.");
       let photoId = uploadedPhotoId;
       if (!photoId) {
-        const photoForm = new FormData();
-        photoForm.set("file", photo);
-        photoForm.set("label", "Main angle");
-        const photoResponse = await fetch(`/api/rooms/${roomId}/photos`, { method: "POST", body: photoForm });
-        if (!photoResponse.ok) {
-          const photoPayload = await photoResponse.json().catch(() => ({}));
-          throw new Error(photoPayload.error ?? "Your room is saved. Please try the photo again.");
-        }
-        const photoPayload = await photoResponse.json().catch(() => ({}));
-        photoId = photoPayload.photo?.id ?? null;
-        if (!photoId) throw new Error("Your room is saved, but we couldn't confirm its photo.");
+        const uploaded = await uploadRoomPhoto({ roomId, file: photo, label: "Main angle" });
+        photoId = uploaded.id;
         setUploadedPhotoId(photoId);
       }
       const designResponse = await fetch(`/api/rooms/${roomId}/first-design`, {

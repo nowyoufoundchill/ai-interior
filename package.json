@@ -37,7 +37,11 @@
     "suite:p13-revisions": "node scripts/suites/p13-revisions.mjs",
     "verify:p1-3": "node scripts/verify-p1-3.mjs",
     "suite:p14-implementation-package": "node scripts/suites/p14-implementation-package.mjs",
-    "verify:p1-4": "node scripts/verify-p1-4.mjs"
+    "verify:p1-4": "node scripts/verify-p1-4.mjs",
+    "suite:p15-continuity-logic": "node --experimental-strip-types scripts/suites/p15-continuity-logic.mjs",
+    "suite:p15-whole-home": "node scripts/suites/p15-whole-home.mjs",
+    "verify:p1-5": "node scripts/verify-p1-5.mjs",
+    "suite:photo-upload-direct": "node scripts/suites/photo-upload-direct.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

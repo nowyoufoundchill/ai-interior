@@ -67,14 +67,13 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
   return (
     <section className="grid gap-8">
       <div className="border-b border-hairline pb-6">
-        <p className="atelier-eyebrow">Design preferences</p>
+        <p className="atelier-eyebrow">Whole-home memory</p>
         <h2 className="mt-3 font-serif text-4xl text-atelier-ink">
           Your confirmed <em className="italic">taste</em>
         </h2>
         <p className="mt-4 max-w-2xl text-sm font-light leading-7 text-atelier-umber">
-          Home-level preferences are the source of truth for the studio&apos;s taste graph and
-          outrank a first brief. Design chat can suggest new ones, but nothing is saved here until
-          you add it.
+          Save the decisions that should connect every room. A room&apos;s own needs and constraints
+          stay with that room and take priority when they differ.
         </p>
       </div>
 
@@ -114,7 +113,7 @@ export function PreferencesManager(props: { homeId: string; initialPreferences: 
       </div>
 
       {preferences.length === 0 ? (
-        <div className="atelier-empty">The standing taste rules this home should always follow.</div>
+        <div className="atelier-empty">The shared decisions that should connect every room.</div>
       ) : (
         <div className="flex flex-wrap gap-3">
           {preferences.map((preference) => (

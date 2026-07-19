@@ -70,6 +70,63 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   }
 
   const body = await request.json();
+  const expectedSignedPathPrefix = roomMeta?.test_run_id
+    ? `test-runs/${roomMeta.test_run_id}/${roomId}-`
+    : `${roomId}/`;
+
+  if (body.operation === "report_signed_upload_failure") {
+    const storagePath = typeof body.storage_path === "string" ? body.storage_path : "";
+    if (!storagePath.startsWith(expectedSignedPathPrefix) || storagePath.includes("..")) {
+      return NextResponse.json({ error: "That photo upload does not belong to this room." }, { status: 400 });
+    }
+    console.error("[photo-signed-upload] browser upload failed", {
+      roomId,
+      storagePath,
+      contentType: typeof body.content_type === "string" ? body.content_type.slice(0, 100) : "unknown",
+      fileSize: typeof body.file_size === "number" ? body.file_size : null,
+      error: typeof body.error_message === "string" ? body.error_message.slice(0, 500) : "unknown storage error"
+    });
+    return new Response(null, { status: 204 });
+  }
+
+  if (body.operation === "finalize_signed_upload") {
+    const storagePath = typeof body.storage_path === "string" ? body.storage_path : "";
+    const label = typeof body.label === "string" && body.label.trim() ? body.label.trim() : "Room photo";
+    if (!storagePath.startsWith(expectedSignedPathPrefix) || storagePath.includes("..")) {
+      return NextResponse.json({ error: "That photo upload does not belong to this room." }, { status: 400 });
+    }
+
+    const { data: object, error: objectError } = await supabase.storage.from(ROOM_PHOTOS_BUCKET).info(storagePath);
+    if (objectError || !object || !object.size) {
+      console.error("[photo-finalize] uploaded object missing", { roomId, storagePath, error: objectError?.message ?? "empty object" });
+      return NextResponse.json({ error: "The photo did not finish uploading. Try again." }, { status: 409 });
+    }
+
+    const { data: publicUrlData } = supabase.storage.from(ROOM_PHOTOS_BUCKET).getPublicUrl(storagePath);
+    const { data, error } = await supabase
+      .from("photos")
+      .insert({
+        room_id: roomId,
+        storage_path: storagePath,
+        file_url: publicUrlData.publicUrl,
+        label,
+        angle_type: label,
+        test_run_id: roomMeta?.test_run_id ?? null
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("[photo-finalize] photo row insert failed", { roomId, storagePath, error: error.message });
+      await supabase.storage.from(ROOM_PHOTOS_BUCKET).remove([storagePath]);
+      return NextResponse.json({ error: "The photo uploaded, but we couldn't save it to the room. Try again." }, { status: 500 });
+    }
+
+    await staleCurrentDiagnosis(supabase, roomId);
+    await supabase.from("rooms").update({ status: "photos" }).eq("id", roomId);
+    return NextResponse.json({ photo: data }, { status: 201 });
+  }
+
   const { data, error } = await supabase
     .from("photos")
     .insert({ ...body, room_id: roomId, test_run_id: roomMeta?.test_run_id ?? null })

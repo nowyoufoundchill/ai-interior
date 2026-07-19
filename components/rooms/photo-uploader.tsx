@@ -4,6 +4,7 @@ import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { PHOTO_LABELS } from "@/lib/constants";
 import type { Photo } from "@/types/database";
+import { uploadRoomPhoto } from "@/lib/storage/room-photo-upload";
 
 export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Photo[] }) {
   const router = useRouter();
@@ -15,23 +16,15 @@ export function PhotoUploader({ roomId, photos }: { roomId: string; photos: Phot
     if (!file) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.set("file", file);
-    formData.set("label", label);
-
-    const response = await fetch(`/api/rooms/${roomId}/photos`, {
-      method: "POST",
-      body: formData
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      alert(payload.error ?? "Photo upload failed.");
+    try {
+      await uploadRoomPhoto({ roomId, file, label });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Photo upload failed.");
+    } finally {
+      event.target.value = "";
+      setIsUploading(false);
+      router.refresh();
     }
-
-    event.target.value = "";
-    setIsUploading(false);
-    router.refresh();
   }
 
   async function updateLabel(photoId: string, nextLabel: string) {

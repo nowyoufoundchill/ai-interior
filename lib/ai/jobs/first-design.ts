@@ -1,6 +1,7 @@
 import { reviewFinishedImage } from "@/lib/ai/critic";
 import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
 import { firstDesignBriefCompiler } from "@/lib/ai/services";
+import { buildWholeHomeMemory } from "@/lib/ai/context-brain/whole-home-memory";
 import type { AutopilotBrief, FinishedImageReview } from "@/lib/schemas";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 import type { GenerationJob, Json, Photo, Room } from "@/types/database";
@@ -53,13 +54,27 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
     });
   }
   const { data: home } = await supabase.from("homes").select("*").eq("id", room.home_id).maybeSingle();
+  const { data: preferences } = home
+    ? await supabase
+        .from("design_preferences")
+        .select("preference_type, label")
+        .eq("home_id", home.id)
+        .order("created_at", { ascending: true })
+    : { data: [] };
 
   let brief = checkpoint.autopilot_brief as AutopilotBrief | undefined;
   let briefId = typeof checkpoint.brief_id === "string" ? checkpoint.brief_id : null;
   if (!brief) {
     await advanceStage(job.id, "planning", "composing your room direction");
     try {
-      brief = await firstDesignBriefCompiler({ room, home, sourcePhoto });
+      brief = await firstDesignBriefCompiler({
+        room,
+        home,
+        sourcePhoto,
+        wholeHomeMemory: home
+          ? buildWholeHomeMemory({ home, room, preferences: preferences ?? [] })
+          : undefined
+      });
     } catch (error) {
       return failJob(job.id, {
         errorCode: "brief_compile_failed",

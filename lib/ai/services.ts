@@ -44,6 +44,7 @@ import {
 } from "@/lib/ai/context-brain/trend-intelligence";
 import { deriveRoomIntelligence } from "@/lib/ai/context-brain/room-intelligence";
 import { buildTasteGraph } from "@/lib/ai/context-brain/taste-graph";
+import type { WholeHomeMemory } from "@/lib/ai/context-brain/whole-home-memory";
 import { DESIGN_DISSENT_POLICY } from "@/lib/ai/context-brain/design-policy";
 import { DESIGN_PORTFOLIO } from "@/lib/ai/design-portfolio";
 import { critiqueConcepts, critiqueDiagnosis, critiqueProducts, critiqueRender, overallScore } from "@/lib/ai/critic";
@@ -193,17 +194,29 @@ export async function firstDesignBriefCompiler(input: {
   room: RoomLike;
   home?: HomeLike | null;
   sourcePhoto: PhotoLike;
+  wholeHomeMemory?: WholeHomeMemory;
   provider?: GatewayProvider;
 }): Promise<AutopilotBrief> {
+  const sharedDecisions = input.wholeHomeMemory?.shared_decisions ?? [];
+  const roomOnlyDecisions = input.wholeHomeMemory?.room_only_decisions ?? [];
+  const paletteDecisions = [...sharedDecisions, ...roomOnlyDecisions]
+    .filter((decision) => !["constraint", "avoid", "existing_item"].includes(decision.kind))
+    .map((decision) => decision.label);
+  const preservationDecisions = [...sharedDecisions, ...roomOnlyDecisions]
+    .filter((decision) => ["constraint", "existing_item"].includes(decision.kind))
+    .map((decision) => decision.label);
+  const avoidDecisions = sharedDecisions.filter((decision) => decision.kind === "avoid").map((decision) => decision.label);
   const fallback = autopilotBriefSchema.parse({
     room_summary: input.room.purpose ?? input.room.design_brief ?? "A room ready for a complete, lived-in update.",
     design_direction: "Create one calm, specific, and practical recommendation that makes the stated outcome feel resolved.",
     functions_and_zones: [input.room.purpose ?? "Support the room's stated purpose."],
     fixed_architecture: ["Preserve all visible walls, openings, windows, ceiling, floor plane, and camera angle."],
     keep_or_remove: toArray(input.room.existing_items).map((item) => `Keep or assess: ${item}`),
-    palette_materials_lighting: [input.home?.style_notes ?? "Use warm, durable materials and layered light appropriate to the room."],
-    preservation_constraints: ["Preserve visible architecture and the source photo perspective."],
-    negative_instructions: ["Do not move openings, distort geometry, block access, or overfill the room."],
+    palette_materials_lighting: paletteDecisions.length
+      ? paletteDecisions
+      : [input.home?.style_notes ?? "Use warm, durable materials and layered light appropriate to the room."],
+    preservation_constraints: ["Preserve visible architecture and the source photo perspective.", ...preservationDecisions],
+    negative_instructions: ["Do not move openings, distort geometry, block access, or overfill the room.", ...avoidDecisions],
     unknowns: ["Exact dimensions and clearances are not verified from the photograph."],
     blocking_questions: [],
     confidence: 0.7
@@ -222,9 +235,11 @@ export async function firstDesignBriefCompiler(input: {
       task: "Compile one compact, room-specific design program for a single recommended photo edit.",
       room: input.room,
       home: input.home,
+      continuity_context: input.wholeHomeMemory,
       source_photo: { id: input.sourcePhoto.id, label: input.sourcePhoto.label },
       success_criteria: [
         "Use the owner's plain-language outcome as the primary program.",
+        "Carry appropriate shared home decisions into this room, but never turn another room's exception into a whole-home rule.",
         "Treat visible architecture as preservation constraints, not measurements.",
         "Specify functions, zones, materials, lighting, and a coherent design direction without offering multiple concepts.",
         "Record unknowns instead of inventing dimensions, hidden conditions, or exact clearances.",

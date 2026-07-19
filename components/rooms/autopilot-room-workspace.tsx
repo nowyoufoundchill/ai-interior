@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { GenerationJob, ImplementationPackage, Photo, Render, Room } from "@/types/database";
 import type { ImplementationPackagePlan } from "@/lib/schemas";
+import { uploadRoomPhoto } from "@/lib/storage/room-photo-upload";
 
 type Props = { room: Room; photos: Photo[]; renders: Render[]; generationJobs: GenerationJob[]; implementationPackages: ImplementationPackage[] };
 const ACTIVE = new Set(["queued", "planning", "validating", "generating", "persisting"]);
@@ -67,14 +68,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
     setIsUploadingPhoto(true);
     setError(null);
     try {
-      const formData = new FormData();
-      formData.set("file", file);
-      formData.set("label", "Main angle");
-      const response = await fetch(`/api/rooms/${room.id}/photos`, { method: "POST", body: formData });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error ?? "We couldn't add that room photo.");
-      }
+      await uploadRoomPhoto({ roomId: room.id, file, label: "Main angle" });
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We couldn't add that room photo.");

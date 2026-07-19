@@ -48,6 +48,9 @@ export default async function HomeDetailPage({ params }: { params: Promise<{ hom
               <h2 className="mt-3 font-serif text-4xl text-atelier-ink">
                 Room by <em className="italic">room</em>
               </h2>
+              <p className="mt-3 max-w-xl text-sm font-light leading-6 text-atelier-umber">
+                Each room keeps its latest photograph or design, where it stands, and the one next step.
+              </p>
             </div>
             <Link href={`/homes/${home.id}/rooms/new`} data-testid="room-new-link" className="atelier-btn">
               Add a room

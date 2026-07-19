@@ -10,7 +10,7 @@
 
 **Next committed phase:** P1.5 - Whole-home continuity and multi-room persistence
 
-**External blocker:** P1.5 requires at least three accepted real-room designs before whole-home memory or the visual room index is built. The read-only production count is currently one.
+**External blocker:** P1.5 requires at least three accepted real-room designs for final acceptance. The read-only production count is currently two. The scoped continuity implementation and deterministic six-room gate are complete; a third real-room candidate exists but must be accepted by the owner rather than by automation.
 
 `PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
@@ -85,9 +85,22 @@ P1.1 completes only when:
 
 - [x] Bind one provenance-aware room plan and furnishing schedule to the accepted design, exposing honest measurement and field-verification tasks before product sourcing expands.
 
-## Next slice - P1.5 continuity precondition
+## Next slice - P1.5 real-room acceptance evidence
 
-- [ ] Reach three accepted, materially different real-room designs before applying scoped whole-home memory or building the simple visual room index.
+- [ ] Reach three accepted, materially different real-room designs before final P1.5 acceptance.
+
+## Completed slice - P1.5 scoped continuity implementation
+
+- [x] Apply confirmed home decisions to each new first-design brief while keeping typed room facts and room-only exceptions scoped to that room.
+- [x] Replace the text-only room list with a simple visual room index showing the correct source/latest design, persisted lifecycle state, and one-tap next action.
+- [x] Prove six distinct seeded lifecycle states, navigation/reload persistence, three-room shared-decision inheritance, room-exception isolation, and zero cross-room artifact/job leakage.
+
+## Completed reliability fix - direct room-photo uploads
+
+- [x] Move browser photo bytes out of the Vercel request path and upload them directly to Supabase Storage with a short-lived, server-issued signed token.
+- [x] Finalize only server-scoped objects that exist, are non-empty, and belong to the requested room; preserve the legacy multipart endpoint for existing automation compatibility.
+- [x] Inherit `test_run_id` when creating rooms under tagged homes so browser-created test artifacts and Storage objects remain teardown-safe.
+- [x] Prove the initial-intake flow with a 6 MB JPEG, including immediate workspace visibility and zero application-function photo-byte requests.
 
 ## Current non-goals
 
@@ -95,15 +108,15 @@ P1.1 completes only when:
 - Substituting test or spike images for owner benchmark evidence.
 - Reconstructing unknown prompts, settings, homeowner input, or clearances.
 - Running the paid three-room comparison matrix.
-- Building the multi-room view.
+- Building a complex multi-room command center or automated whole-home generation.
 - Broad refactors, analytics, authentication, billing, deployment, or provider changes.
 
 ## Handoff format
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** P1.4 is complete. An accepted render now creates an append-only, versioned implementation package with placement guidance, a ten-item furnishing schedule, honest sourcing classifications, provenance on every claim, consolidated field verification for unknown fit, a reconciled budget range, and installation sequence. A newer accepted design stales rather than deletes the prior package. The owner reviewed the complete package, requested removal of repetitive per-item measurement reminders, accepted the consolidated one-pass measurement presentation, confirmed the measure/buy/do-next path, and rated the revised package 9/10.
-- **Files or migrations changed:** `supabase/migrations/20260718162713_implementation_packages.sql`; implementation package schema, JSON schema, compiler, fixture, audit, durable job, job dispatch, prompt, API route, accepted-design invalidation, typed database access, room query/page/workspace, debug state, package scripts, teardown/residue coverage, `scripts/suites/p14-implementation-package.mjs`, `scripts/verify-p1-4.mjs`, `reports/p1-4-gate-1784397150039-2b3a34f.md`, and this handoff. The additive migration was applied by GitHub `Supabase DB Deploy` run `29654208780` after explicit owner approval.
-- **Focused verification:** `P14_OWNER_USEFULNESS_RATING=9 npm.cmd run verify:p1-4` passes from a production build. The real-browser/data journey passed 29/29 checks: accepted-render binding, 100% schedule coverage, provenance and field-task linkage, budget reconciliation, ten opening classified product links, replay safety, reload persistence, v1-to-v2 stale history, and zero console/application-network failures. Fresh tagged teardown removed all created rows and four storage objects; the independent residue gate passed across all tracked tables and Storage.
-- **Known limitation or blocker:** P1.4 has no open blocker. P1.5 must not start its continuity implementation until three materially different real rooms have accepted designs; a read-only production check currently finds one.
-- **Next unchecked slice:** Complete and accept two additional materially different real rooms. Once the count reaches three, apply scoped whole-home decisions without leaking room-only exceptions and add the simple visual room index required by P1.5.
+- **Outcome delivered:** P1.5 implementation is complete. Confirmed home decisions now enter every first-design compiler as explicit shared context, while each room's typed facts, existing items, and exceptions remain local and higher priority. The home page is now a calm visual room index with the correct source photograph or latest design, plain-language persisted state, and one-tap next action. Active and failed work remains visible after navigation and reload. Room-photo intake now sends image bytes directly from the browser to signed Supabase Storage, preventing large photos from being rejected by the Vercel function request limit and leaving a room stuck asking for its first photo.
+- **Files or migrations changed:** scoped whole-home memory compiler; first-design job/compiler integration; room-index lifecycle derivation; enriched home query; home preference and visual room-index UI; signed-upload authorization route; verified photo-finalization route; shared browser upload client; all three room-photo intake surfaces; tagged-room inheritance; `scripts/suites/p15-continuity-logic.mjs`; `scripts/suites/p15-whole-home.mjs`; `scripts/suites/photo-upload-direct.mjs`; `scripts/verify-p1-5.mjs`; package scripts; `reports/p1-5-gate-1784416122819-ffc31c4.md`; and this handoff. No migration or production schema change was required.
+- **Focused verification:** `npm.cmd run verify:p1-5` passes the technical gate from a production build. Scoped logic proves three materially different room types inherit identical shared decisions without room-only leakage. The browser/data journey passed 27/27 checks across six lifecycle states, correct source/result binding, one-tap actions, reload persistence, cross-room isolation, and zero console/application-network failures. `npm.cmd run suite:photo-upload-direct` passed 8/8 with a 6 MB JPEG through the real new-room intake: the application received only two small JSON requests, the browser uploaded the complete object directly to signed Storage, the tagged photo row was persisted, and the workspace displayed it immediately. TypeScript and the production build pass. Fresh tagged teardowns and the independent residue gate passed across every tracked table and Storage after both browser runs.
+- **Known limitation or blocker:** Final P1.5 acceptance remains owner-blocked at two of three accepted, materially different real rooms. A third untagged real-room candidate is persisted for `Master`, but automation did not mark it accepted. The technical gate report records `REAL-ROOM ACCEPTANCE PENDING`.
+- **Next unchecked slice:** The owner reviews and either accepts the existing `Master` candidate or accepts another materially different real-room design. Then rerun `npm.cmd run verify:p1-5`; when the read-only count reaches three, mark the P1.5 precondition and phase gate complete and advance to P1.6.
