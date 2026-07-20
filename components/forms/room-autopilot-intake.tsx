@@ -83,7 +83,7 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-8" aria-describedby={error ? "autopilot-intake-error" : undefined}>
+    <form onSubmit={submit} className="grid gap-8" aria-busy={isSubmitting} aria-describedby={error ? "autopilot-intake-error" : undefined}>
       <label className="grid gap-2">
         <span className="atelier-label">Your room photo</span>
         <input data-testid="autopilot-photo-input" type="file" accept="image/*" className="atelier-field" onChange={selectPhoto} disabled={isSubmitting} />
@@ -98,6 +98,7 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
         <input data-testid="autopilot-room-name-input" name="room_name" className="atelier-field" placeholder="Living room" disabled={isSubmitting || Boolean(createdRoomId)} />
       </label>
       {error ? <p id="autopilot-intake-error" role="alert" className="text-sm text-atelier-clay">{error}</p> : null}
+      <p role="status" aria-live="polite" className="sr-only">{isSubmitting ? "Saving your room and starting its design." : ""}</p>
       <button data-testid="autopilot-intake-submit" type="submit" className="atelier-btn w-fit" disabled={isSubmitting}>
         {isSubmitting ? "Starting your room" : "Design my room"}
       </button>

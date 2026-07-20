@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "frozen_on": "2026-07-20",
+  "status": "owner_evidence_pending",
+  "privacy": "Only redacted room labels, scores, timings, provider consumption, and hard-failure findings may be committed. Source and result images remain private.",
+  "room_count": 3,
+  "room_requirements": {
+    "materially_different_types": true,
+    "actual_phone_and_browser": true,
+    "developer_instruction_during_journey": false,
+    "maximum_owner_directed_revisions_per_room": 1
+  },
+  "timing_protocol": {
+    "start": "immediately after the owner finishes selecting the room photo",
+    "stop": "when the first reviewed design is visible",
+    "metric": "active owner interaction time, excluding persisted provider wait",
+    "median_max_seconds": 120
+  },
+  "per_room_evidence": [
+    {
+      "room_label": null,
+      "room_type": null,
+      "phone_model": null,
+      "browser_and_version": null,
+      "active_intake_seconds": null,
+      "first_design_useful_enough_to_continue": null,
+      "revision_count": null,
+      "final_design_acceptable": null,
+      "final_visual_score_0_to_100": null,
+      "hard_preservation_failures": null,
+      "design_usefulness_1_to_10": null,
+      "architecture_confidence_1_to_10": null,
+      "implementation_package_usefulness_1_to_10": null,
+      "manual_refresh_count": null,
+      "duplicate_paid_generation_count": null,
+      "recovery_or_terminal_guidance_for_every_failure": null,
+      "provider_calls": null,
+      "provider_latency_ms": null,
+      "token_estimate": null,
+      "cost_estimate_usd": null,
+      "result_artifact_ids": []
+    },
+    {
+      "room_label": null,
+      "room_type": null,
+      "phone_model": null,
+      "browser_and_version": null,
+      "active_intake_seconds": null,
+      "first_design_useful_enough_to_continue": null,
+      "revision_count": null,
+      "final_design_acceptable": null,
+      "final_visual_score_0_to_100": null,
+      "hard_preservation_failures": null,
+      "design_usefulness_1_to_10": null,
+      "architecture_confidence_1_to_10": null,
+      "implementation_package_usefulness_1_to_10": null,
+      "manual_refresh_count": null,
+      "duplicate_paid_generation_count": null,
+      "recovery_or_terminal_guidance_for_every_failure": null,
+      "provider_calls": null,
+      "provider_latency_ms": null,
+      "token_estimate": null,
+      "cost_estimate_usd": null,
+      "result_artifact_ids": []
+    },
+    {
+      "room_label": null,
+      "room_type": null,
+      "phone_model": null,
+      "browser_and_version": null,
+      "active_intake_seconds": null,
+      "first_design_useful_enough_to_continue": null,
+      "revision_count": null,
+      "final_design_acceptable": null,
+      "final_visual_score_0_to_100": null,
+      "hard_preservation_failures": null,
+      "design_usefulness_1_to_10": null,
+      "architecture_confidence_1_to_10": null,
+      "implementation_package_usefulness_1_to_10": null,
+      "manual_refresh_count": null,
+      "duplicate_paid_generation_count": null,
+      "recovery_or_terminal_guidance_for_every_failure": null,
+      "provider_calls": null,
+      "provider_latency_ms": null,
+      "token_estimate": null,
+      "cost_estimate_usd": null,
+      "result_artifact_ids": []
+    }
+  ],
+  "overall_owner_evidence": {
+    "workflow_clarity_1_to_10": null,
+    "would_use_for_next_room": null
+  },
+  "technical_evidence": {
+    "responsive_widths": [390, 768, 1440],
+    "keyboard": null,
+    "focus_and_live_regions": null,
+    "console_and_network": null,
+    "typecheck_and_build": null,
+    "deterministic_failures": null,
+    "persistence": null,
+    "teardown_and_residue": null
+  },
+  "bounded_live_plan": {
+    "authorization_required_before_execution": true,
+    "rooms": 3,
+    "normal_first_design_ceiling_per_room": {
+      "openai_image_edits": 1,
+      "anthropic_finished_image_reviews": 1
+    },
+    "optional_owner_revision_ceiling_per_room": {
+      "openai_image_edits": 1,
+      "anthropic_finished_image_reviews": 1
+    },
+    "automatic_repair_ceiling_per_operation": {
+      "additional_openai_image_edits": 1,
+      "additional_anthropic_finished_image_reviews": 1
+    },
+    "implementation_package_ceiling_per_accepted_room": {
+      "anthropic_compiles": 1,
+      "additional_anthropic_repairs_if_audit_fails": 1
+    },
+    "retries": "No provider retry is authorized outside the persisted product recovery action. Stop and record the failure when the bounded ceiling is reached.",
+    "tavily_calls": 0,
+    "reason": "Tavily is not part of the committed first-design, revision, or implementation-package household journey."
+  },
+  "pass_contract": {
+    "first_designs_useful_enough_to_continue_minimum": 2,
+    "all_rooms_acceptable_after_at_most_one_revision": true,
+    "minimum_final_visual_score": 75,
+    "hard_preservation_failures": 0,
+    "minimum_workflow_clarity": 9,
+    "minimum_design_usefulness": 8,
+    "minimum_architecture_confidence": 8,
+    "minimum_implementation_package_usefulness": 8,
+    "manual_refreshes": 0,
+    "duplicate_paid_generations": 0,
+    "owner_would_use_for_next_room": true
+  }
+}

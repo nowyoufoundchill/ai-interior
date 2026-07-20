@@ -140,7 +140,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
   const isAccepted = current?.status === "accepted";
   const review = readFinishedReview(current?.critique);
   return (
-    <main className="mx-auto grid max-w-6xl gap-6">
+    <main className="mx-auto grid max-w-6xl gap-6" aria-busy={Boolean(activeJob || activePackageJob || busy || isUploadingPhoto)}>
       <header className="flex items-end justify-between gap-4 border-b border-hairline pb-5">
         <div><p className="atelier-eyebrow">{room.name}</p><h1 className="mt-2 font-serif text-4xl text-atelier-ink">Your <em>room</em></h1></div>
         <p className="max-w-sm text-right text-sm text-atelier-umber">{current ? (isAccepted ? "Your design is saved." : "Your recommendation is ready.") : "One recommendation, composed around your photo."}</p>
@@ -190,7 +190,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
             <p className="font-medium text-atelier-ink">Add one clear room photo to begin.</p>
             <p className="mt-1 text-sm text-atelier-umber">A wide view that shows the room and its fixed features is enough.</p>
           </div>
-          <label className={`atelier-btn shrink-0 ${isUploadingPhoto ? "pointer-events-none opacity-50" : ""}`}>
+          <label className={`atelier-btn atelier-upload-control shrink-0 ${isUploadingPhoto ? "pointer-events-none opacity-50" : ""}`}>
             {isUploadingPhoto ? "Adding photo" : "Add room photo"}
             <input
               data-testid="empty-room-photo-upload-input"
@@ -203,6 +203,31 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
           </label>
         </div>
       )}
+      <section className="flex flex-col items-start gap-4 border-t border-hairline pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <div role="status" aria-live="polite" aria-atomic="true" className="text-sm text-atelier-umber">
+          {activeJob
+            ? isVisualRevision(activeJob)
+              ? "Updating this design. Your request will continue if you leave the page."
+              : "Designing your room. This will continue if you leave the page."
+            : activePackageJob
+              ? "Creating your room plan. It will continue if you leave the page."
+            : failedPackageJob
+              ? failedPackageJob.error_message
+            : failedJob
+              ? failedJob.error_message
+              : current
+                ? isAccepted
+                  ? "This is the design you chose to keep."
+                  : "See how this direction feels in your room."
+                : source
+                  ? "Your photo and outcome are ready."
+                  : isUploadingPhoto
+                    ? "Adding your room photo."
+                    : "Add one clear photo to start your design."}
+          {error ? <p role="alert" className="mt-2 text-atelier-clay">{error}</p> : null}
+        </div>
+        {current && !isAccepted ? <button data-testid="accept-design-submit" className="atelier-btn shrink-0" onClick={acceptDesign} disabled={busy}>Keep this design</button> : isAccepted && !packagePlan && !activePackageJob ? <button data-testid="implementation-package-submit" className="atelier-btn shrink-0" onClick={createRoomPlan} disabled={busy}>{failedPackageJob ? "Try room plan again" : "Create room plan"}</button> : !current && source && !activeJob ? <button data-testid="first-design-submit" className="atelier-btn shrink-0" onClick={startDesign} disabled={busy}>{busy ? "Starting your design" : failedJob ? "Try again" : "Design my room"}</button> : null}
+      </section>
       {current ? (
         <form className="atelier-card grid gap-3 p-5" onSubmit={reviseDesign}>
           <div>
@@ -234,31 +259,6 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
           ) : null}
         </form>
       ) : null}
-      <section className="flex flex-col items-start gap-4 border-t border-hairline pt-6 sm:flex-row sm:items-center sm:justify-between">
-        <div aria-live="polite" className="text-sm text-atelier-umber">
-          {activeJob
-            ? isVisualRevision(activeJob)
-              ? "Updating this design. Your request will continue if you leave the page."
-              : "Designing your room. This will continue if you leave the page."
-            : activePackageJob
-              ? "Creating your room plan. It will continue if you leave the page."
-            : failedPackageJob
-              ? failedPackageJob.error_message
-            : failedJob
-              ? failedJob.error_message
-              : current
-                ? isAccepted
-                  ? "This is the design you chose to keep."
-                  : "See how this direction feels in your room."
-                : source
-                  ? "Your photo and outcome are ready."
-                  : isUploadingPhoto
-                    ? "Adding your room photo."
-                    : "Add one clear photo to start your design."}
-          {error ? <p role="alert" className="mt-2 text-atelier-clay">{error}</p> : null}
-        </div>
-        {current && !isAccepted ? <button data-testid="accept-design-submit" className="atelier-btn shrink-0" onClick={acceptDesign} disabled={busy}>Keep this design</button> : isAccepted && !packagePlan && !activePackageJob ? <button data-testid="implementation-package-submit" className="atelier-btn shrink-0" onClick={createRoomPlan} disabled={busy}>{failedPackageJob ? "Try room plan again" : "Create room plan"}</button> : !current && source && !activeJob ? <button data-testid="first-design-submit" className="atelier-btn shrink-0" onClick={startDesign} disabled={busy}>{busy ? "Starting your design" : failedJob ? "Try again" : "Design my room"}</button> : null}
-      </section>
       {packagePlan ? <ImplementationPackageView plan={packagePlan} version={currentPackage?.version ?? 1} /> : null}
     </main>
   );

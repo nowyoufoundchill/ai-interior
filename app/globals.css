@@ -30,6 +30,14 @@ a {
   text-decoration: none;
 }
 
+/* Keyboard focus must remain unmistakable on the quiet editorial palette.
+   The offset keeps the brass indicator visible beside hairline controls. */
+:where(a, button, input, textarea, select, summary):focus-visible,
+.atelier-upload-control:focus-within {
+  outline: 2px solid #a5824b;
+  outline-offset: 3px;
+}
+
 input,
 textarea,
 select {
@@ -66,7 +74,7 @@ h3 em {
 /* Inputs: square, paper ground, hairline border. Focus deepens the hairline
    to ink — no rings, no glows. */
 .atelier-field {
-  @apply w-full border border-hairline bg-atelier-paper px-3 py-2.5 text-sm font-light text-atelier-ink outline-none transition-colors duration-300 focus:border-atelier-ink;
+  @apply w-full border border-hairline bg-atelier-paper px-3 py-2.5 text-sm font-light text-atelier-ink transition-colors duration-300 focus:border-atelier-ink;
 }
 
 /* Card: an ivory stage inside a hairline. Never a shadowed, rounded panel. */

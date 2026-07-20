@@ -1,16 +1,16 @@
-# Active Build - P1.5 Whole-home continuity and multi-room persistence
+# Active Build - P1.6 Personal household release gate
 
-**Updated:** 2026-07-18
+**Updated:** 2026-07-20
 
 **Application baseline:** `ef337b8e57ca350d89705c5130c4bc65e85364db`
 
-**Accepted complete:** P0.0 through P1.4
+**Accepted complete:** P0.0 through P1.5
 
-**Current phase:** P1.5
+**Current phase:** P1.6
 
-**Next committed phase:** P1.5 - Whole-home continuity and multi-room persistence
+**Next committed phase:** P1.6 - Personal household release gate
 
-**External blocker:** P1.5 requires at least three accepted real-room designs for final acceptance. The read-only production count is currently two. The scoped continuity implementation and deterministic six-room gate are complete; a third real-room candidate exists but must be accepted by the owner rather than by automation.
+**External blocker:** Final P1.6 acceptance requires the owner-scored three-room real-phone/live matrix and independent next-room choice. Automation cannot supply this evidence.
 
 `PRODUCT.md` owns the stable P1.1-P1.6 product and phase contract. This file owns only the current unchecked work and its immediate handoff.
 
@@ -85,9 +85,9 @@ P1.1 completes only when:
 
 - [x] Bind one provenance-aware room plan and furnishing schedule to the accepted design, exposing honest measurement and field-verification tasks before product sourcing expands.
 
-## Next slice - P1.5 real-room acceptance evidence
+## Completed slice - P1.5 real-room acceptance evidence
 
-- [ ] Reach three accepted, materially different real-room designs before final P1.5 acceptance.
+- [x] Reach three accepted, materially different real-room designs before final P1.5 acceptance.
 
 ## Completed slice - P1.5 scoped continuity implementation
 
@@ -102,6 +102,18 @@ P1.1 completes only when:
 - [x] Inherit `test_run_id` when creating rooms under tagged homes so browser-created test artifacts and Storage objects remain teardown-safe.
 - [x] Prove the initial-intake flow with a 6 MB JPEG, including immediate workspace visibility and zero application-function photo-byte requests.
 
+## Completed slice - P1.6 release matrix and technical gate
+
+- [x] Freeze one redacted three-room owner evidence matrix, including real-phone timing and scoring, bounded live-provider ceilings, cost, preservation, revision, implementation-package, and next-room intent evidence.
+- [x] Harden visible keyboard focus and live work status, and keep the first-result primary action in the phone viewport ahead of optional refinement.
+- [x] Prove the current homeowner journey from phone intake through one reviewed design, one revision, acceptance, and one implementation package at 390, 768, and 1440 pixels with exact durable-operation counts, persistence, console/network health, teardown, and zero residue.
+- [x] Run the integrated mock-mode technical release matrix from a production build across integrity, deterministic failures, finished-image review, five revision scenarios, implementation packages, whole-home persistence, direct large-photo upload, and the current P1.6 homeowner journey.
+
+## Next slice - P1.6 owner phone and live-provider acceptance
+
+- [ ] The owner completes and scores the frozen matrix for three materially different real rooms on an actual phone/browser without developer instruction, using the bounded live plan only after explicit authorization.
+- [ ] Rerun `npm.cmd run verify:p1-6` after recording the redacted owner/live evidence; mark household-ready only if the frozen contract passes.
+
 ## Current non-goals
 
 - Improving the legacy diagnosis, concept, product, or tabbed workspace outside the accepted-design implementation package.
@@ -115,8 +127,8 @@ P1.1 completes only when:
 
 Replace the handoff below; do not append another log.
 
-- **Outcome delivered:** P1.5 implementation is complete. Confirmed home decisions now enter every first-design compiler as explicit shared context, while each room's typed facts, existing items, and exceptions remain local and higher priority. The home page is now a calm visual room index with the correct source photograph or latest design, plain-language persisted state, and one-tap next action. Active and failed work remains visible after navigation and reload. Room-photo intake now sends image bytes directly from the browser to signed Supabase Storage, preventing large photos from being rejected by the Vercel function request limit and leaving a room stuck asking for its first photo.
-- **Files or migrations changed:** scoped whole-home memory compiler; first-design job/compiler integration; room-index lifecycle derivation; enriched home query; home preference and visual room-index UI; signed-upload authorization route; verified photo-finalization route; shared browser upload client; all three room-photo intake surfaces; tagged-room inheritance; `scripts/suites/p15-continuity-logic.mjs`; `scripts/suites/p15-whole-home.mjs`; `scripts/suites/photo-upload-direct.mjs`; `scripts/verify-p1-5.mjs`; package scripts; `reports/p1-5-gate-1784416122819-ffc31c4.md`; and this handoff. No migration or production schema change was required.
-- **Focused verification:** `npm.cmd run verify:p1-5` passes the technical gate from a production build. Scoped logic proves three materially different room types inherit identical shared decisions without room-only leakage. The browser/data journey passed 27/27 checks across six lifecycle states, correct source/result binding, one-tap actions, reload persistence, cross-room isolation, and zero console/application-network failures. `npm.cmd run suite:photo-upload-direct` passed 8/8 with a 6 MB JPEG through the real new-room intake: the application received only two small JSON requests, the browser uploaded the complete object directly to signed Storage, the tagged photo row was persisted, and the workspace displayed it immediately. TypeScript and the production build pass. Fresh tagged teardowns and the independent residue gate passed across every tracked table and Storage after both browser runs.
-- **Known limitation or blocker:** Final P1.5 acceptance remains owner-blocked at two of three accepted, materially different real rooms. A third untagged real-room candidate is persisted for `Master`, but automation did not mark it accepted. The technical gate report records `REAL-ROOM ACCEPTANCE PENDING`.
-- **Next unchecked slice:** The owner reviews and either accepts the existing `Master` candidate or accepts another materially different real-room design. Then rerun `npm.cmd run verify:p1-5`; when the read-only count reaches three, mark the P1.5 precondition and phase gate complete and advance to P1.6.
+- **Outcome delivered:** P1.6 technical preparation is complete. The frozen redacted owner matrix now owns three-room real-phone/live acceptance and exact provider ceilings. The current homeowner flow has visible focus and live work status, and its phone first-result action appears before optional refinement. One release command now verifies the complete automatable matrix without pretending mock runs are owner evidence.
+- **Files or migrations changed:** focus/live-status and first-result ordering in the current intake/workspace UI; `reports/p1-6-release-matrix.json`; `scripts/suites/p16-household-release.mjs`; `scripts/verify-p1-6.mjs`; package scripts; `reports/p1-6-gate-1784553755326-5aefb68.md`; and this handoff. No schema change or production migration was required.
+- **Focused verification:** `npm.cmd run verify:p1-6` passes the complete automatable release matrix from a production build. Typecheck/build pass; current P1.6 journey passes 25/25; integrity 55/55; deterministic failures 29/29; finished-image review 21/21; revisions 34/34; implementation package 32/32; whole-home persistence 27/27; direct large-photo upload 8/8. Every suite uses a fresh tagged seed, teardown passes, and the independent residue gate leaves every tracked production table and Storage clean.
+- **Known limitation or blocker:** Final P1.6 household-release acceptance is owner-blocked. The actual-phone, live-provider, three-real-room scores and independent next-room choice are intentionally blank and were not synthesized. The bounded paid plan is frozen but not authorized or run. The canonical gate status is `OWNER AND LIVE EVIDENCE PENDING`.
+- **Next unchecked slice:** The owner authorizes and completes the frozen three-room real-phone/live matrix without developer instruction. Record only redacted evidence, then rerun `npm.cmd run verify:p1-6`; do not call the product household-ready unless every owner threshold passes.

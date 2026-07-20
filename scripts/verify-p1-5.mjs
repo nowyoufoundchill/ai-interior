@@ -83,7 +83,13 @@ function writeReport({ environment, port, residue, realRooms, error }) {
   ];
   if (realRooms.length) lines.push(`- Accepted room evidence: ${realRooms.map((room) => room.room_type || room.name).join(", ")}`);
   if (error) lines.push(`- Runner error: ${error}`);
-  lines.push("", "The automated gate verifies scoped shared decisions across three room types, room-only exception isolation, six persisted lifecycle states, correct source/result binding, one-tap next actions, reload persistence, zero cross-room artifact/job leakage, browser health, and zero tagged residue. The remaining real-room threshold is owner evidence and is never synthesized by this runner.", "");
+  lines.push(
+    "",
+    realRoomPass
+      ? "The automated gate verifies scoped shared decisions across three room types, room-only exception isolation, six persisted lifecycle states, correct source/result binding, one-tap next actions, reload persistence, zero cross-room artifact/job leakage, browser health, and zero tagged residue. The read-only real-room threshold is satisfied by owner-accepted designs; the runner did not synthesize acceptance."
+      : "The automated gate verifies scoped shared decisions across three room types, room-only exception isolation, six persisted lifecycle states, correct source/result binding, one-tap next actions, reload persistence, zero cross-room artifact/job leakage, browser health, and zero tagged residue. The remaining real-room threshold is owner evidence and is never synthesized by this runner.",
+    ""
+  );
   mkdirSync(path.dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, lines.join("\n"), { flag: "wx" });
   console.log(`[verify:p1-5] immutable report: ${path.relative(cwd, reportPath)}`);
