@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { designRenderSpecSchema, designRenderSpecJsonSchema } from "@/lib/ai/render-contract";
 import {
   autopilotBriefSchema,
   briefInterpretationSchema,
@@ -194,6 +195,11 @@ export async function firstDesignBriefCompiler(input: {
   room: RoomLike;
   home?: HomeLike | null;
   sourcePhoto: PhotoLike;
+  photos?: PhotoLike[];
+  roomMemory?: unknown;
+  previousDesign?: AutopilotBrief;
+  currentDesignUrl?: string;
+  revisionInstructions?: string;
   wholeHomeMemory?: WholeHomeMemory;
   provider?: GatewayProvider;
 }): Promise<AutopilotBrief> {
@@ -221,21 +227,50 @@ export async function firstDesignBriefCompiler(input: {
     blocking_questions: [],
     confidence: 0.7
   });
+  const base = input.previousDesign ?? fallback;
+  const mockBrief = {
+    ...base,
+    design_render_spec: {
+      room_architecture: {
+        confirmed_dimensions: input.room.dimensions ? [JSON.stringify(input.room.dimensions)] : [],
+        doors: [], windows: [], ceiling: "Preserve the source photograph; height unverified.",
+        fixed_features: base.fixed_architecture, camera: "Keep the source perspective."
+      },
+      preserve: [...base.preservation_constraints, ...base.keep_or_remove],
+      design_changes: input.revisionInstructions ? [input.revisionInstructions] : base.functions_and_zones,
+      design_intent: [base.design_direction],
+      render_instructions: {
+        camera: "Keep the source perspective.", lighting: base.palette_materials_lighting.join("; "),
+        composition: "One photorealistic room view, preserving access and the room envelope.",
+        materials: base.palette_materials_lighting, architectural_preservation_rules: base.preservation_constraints
+      },
+      unknowns: base.unknowns
+    }
+  };
 
   return runStructuredTask({
     roomId: input.room.id,
     serviceName: "First Design Brief Compiler",
-    provider: input.provider ?? "anthropic",
-    promptPath: "prompts/diagnosis/room-diagnosis.v2.md",
-    schemaName: "autopilot_brief",
-    schema: autopilotBriefJsonSchema,
-    zodSchema: autopilotBriefSchema,
+    provider: input.provider ?? "openai",
+    promptPath: "prompts/renders/design-render-spec.v1.md",
+    schemaName: "design_render_brief",
+    schema: {
+      ...autopilotBriefJsonSchema,
+      properties: { ...autopilotBriefJsonSchema.properties, design_render_spec: designRenderSpecJsonSchema },
+      required: [...autopilotBriefJsonSchema.required, "design_render_spec"]
+    },
+    zodSchema: autopilotBriefSchema.extend({ design_render_spec: designRenderSpecSchema }),
     maxTokens: 4096,
     taskInput: {
       task: "Compile one compact, room-specific design program for a single recommended photo edit.",
       room: input.room,
       home: input.home,
       continuity_context: input.wholeHomeMemory,
+      room_memory: input.roomMemory ?? [],
+      previous_design: input.previousDesign ?? null,
+      revision_instructions: input.revisionInstructions ?? null,
+      image_roles: input.currentDesignUrl ? "Original room photos first; current design to edit last." : "Source photo first; supporting room views after it.",
+      supporting_photos: input.photos?.map((photo) => ({ id: photo.id, label: photo.label, angle: photo.angle_type })),
       source_photo: { id: input.sourcePhoto.id, label: input.sourcePhoto.label },
       success_criteria: [
         "Use the owner's plain-language outcome as the primary program.",
@@ -246,8 +281,10 @@ export async function firstDesignBriefCompiler(input: {
         "Return blocking_questions only when a missing answer genuinely prevents a useful image edit."
       ]
     },
-    images: [{ url: input.sourcePhoto.file_url, detail: "high" }],
-    mock: () => fallback
+    images: [input.sourcePhoto, ...(input.photos ?? []).filter((photo) => photo.id !== input.sourcePhoto.id)]
+      .slice(0, 10).map((photo) => ({ url: photo.file_url, detail: "high" as const }))
+      .concat(input.currentDesignUrl ? [{ url: input.currentDesignUrl, detail: "high" as const }] : []),
+    mock: () => mockBrief
   });
 }
 

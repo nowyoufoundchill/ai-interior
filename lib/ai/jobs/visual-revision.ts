@@ -1,8 +1,12 @@
 import { autopilotBriefSchema, type AutopilotBrief, type FinishedImageReview } from "@/lib/schemas";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { firstDesignBriefCompiler } from "@/lib/ai/services";
+import { renderModeSchema, renderSpecPrompt } from "@/lib/ai/render-contract";
+import { imageFailureMessage } from "@/lib/ai/openai";
 import type { GenerationJob, Json } from "@/types/database";
 import {
   generateAndStoreImage,
+  loadRoomRenderContext,
   persistRenderAttempt,
   repairFindings,
   reviewAttempt,
@@ -17,6 +21,7 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
   const sourcePhotoId = typeof payload.source_photo_id === "string" ? payload.source_photo_id : null;
   const instructions = typeof payload.instructions === "string" ? payload.instructions.trim() : "";
   const checkpoint = (job.result_refs as Record<string, unknown>) ?? {};
+  const renderMode = renderModeSchema.parse(payload.render_mode ?? "designer");
 
   await advanceStage(job.id, "validating", "checking your requested change");
   const { data: room } = await supabase.from("rooms").select("*").eq("id", job.room_id).maybeSingle();
@@ -54,6 +59,7 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
   if (
     !parent?.file_url ||
     !sourcePhoto ||
+    parent.source_photo_id !== sourcePhotoId ||
     parent.status === "review_failed" ||
     (!alreadyStarted && parent.status !== "candidate" && parent.status !== "accepted")
   ) {
@@ -79,7 +85,7 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
     .eq("id", briefId)
     .eq("room_id", room.id)
     .maybeSingle();
-  const parsedBrief = autopilotBriefSchema.safeParse(briefRow?.analysis);
+  const parsedBrief = autopilotBriefSchema.safeParse(parentCritique.compiled_brief ?? briefRow?.analysis);
   if (!parsedBrief.success) {
     return failJob(job.id, {
       errorCode: "revision_brief_missing",
@@ -87,7 +93,23 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
       retryable: false
     });
   }
-  const brief = parsedBrief.data;
+  let brief = checkpoint.revision_brief as AutopilotBrief | undefined;
+  if (!brief) {
+    await advanceStage(job.id, "planning", "planning your requested change");
+    try {
+      brief = await firstDesignBriefCompiler({
+        room, sourcePhoto, previousDesign: parsedBrief.data,
+        currentDesignUrl: parent.file_url, revisionInstructions: instructions,
+        ...await loadRoomRenderContext(room.id)
+      });
+      if (brief.blocking_questions.length) {
+        return failJob(job.id, { errorCode: "revision_needs_information", ownerMessage: brief.blocking_questions.join(" "), retryable: false });
+      }
+      await checkpointResult(job.id, { revision_brief: brief });
+    } catch (error) {
+      return failJob(job.id, { errorCode: "revision_brief_failed", ownerMessage: "We couldn't finish planning that change. Your request is saved — try again.", detail: error instanceof Error ? error.message : String(error) });
+    }
+  }
   const prompt = visualRevisionPrompt(brief, instructions);
 
   let imageUrl = typeof checkpoint.revision_image_url === "string" ? checkpoint.revision_image_url : null;
@@ -97,14 +119,16 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
       imageUrl = await generateAndStoreImage({
         roomId: room.id,
         sourceImageUrl: parent.file_url,
+        architectureImageUrl: sourcePhoto.file_url,
+        renderMode,
         prompt,
         serviceName: "Visual Revision Image Generator",
-        promptVersion: "visual_revision_v1"
+        promptVersion: "visual_revision_v2"
       });
     } catch (error) {
       return failJob(job.id, {
         errorCode: "revision_image_failed",
-        ownerMessage: "The image service didn't finish that change. Your request is saved — try again.",
+        ownerMessage: imageFailureMessage(error, "The image service didn't finish that change. Your request is saved — try again."),
         detail: error instanceof Error ? error.message : String(error)
       });
     }
@@ -142,6 +166,7 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
       review,
       attempt: 1,
       ownerInstructions: instructions,
+      renderMode,
       parentRenderId,
       operation: "visual_revision"
     });
@@ -177,14 +202,16 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
       repairImageUrl = await generateAndStoreImage({
         roomId: room.id,
         sourceImageUrl: parent.file_url,
+        architectureImageUrl: sourcePhoto.file_url,
+        renderMode,
         prompt: repairPrompt,
         serviceName: "Visual Revision Image Repair",
-        promptVersion: "visual_revision_repair_v1"
+        promptVersion: "visual_revision_repair_v2"
       });
     } catch (error) {
       return failJob(job.id, {
         errorCode: "revision_repair_failed",
-        ownerMessage: "The first revision was not safe to show, and its one repair did not finish. Your request is saved.",
+        ownerMessage: imageFailureMessage(error, "The first revision was not safe to show, and its one repair did not finish. Your request is saved."),
         detail: error instanceof Error ? error.message : String(error)
       });
     }
@@ -224,6 +251,7 @@ export async function executeVisualRevision(job: GenerationJob): Promise<Generat
       repairOfRenderId: renderId,
       repairInstructions,
       ownerInstructions: instructions,
+      renderMode,
       parentRenderId,
       operation: "visual_revision"
     });
@@ -328,6 +356,7 @@ async function completeRevision(input: {
 
 function visualRevisionPrompt(brief: AutopilotBrief, instructions: string) {
   return [
+    ...(brief.design_render_spec ? [renderSpecPrompt(brief.design_render_spec)] : []),
     "Edit this current room design in place. Apply only the owner's requested visual change.",
     `Owner revision: ${instructions}`,
     `Keep the established design direction: ${brief.design_direction}`,

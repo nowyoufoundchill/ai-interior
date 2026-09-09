@@ -221,9 +221,13 @@ export async function advanceStage(
   await supabase.from("generation_jobs").update(patch).eq("id", jobId);
 }
 
-export async function heartbeat(jobId: string, client?: Supabase): Promise<void> {
+export async function heartbeat(jobId: string, client?: Supabase, attemptCount?: number): Promise<void> {
   const supabase = client ?? createServerSupabaseClient();
-  await supabase.from("generation_jobs").update({ heartbeat_at: new Date().toISOString() }).eq("id", jobId);
+  let query = supabase.from("generation_jobs").update({ heartbeat_at: new Date().toISOString() })
+    .eq("id", jobId).in("status", ["planning", "validating", "generating", "persisting"]);
+  if (attemptCount !== undefined) query = query.eq("attempt_count", attemptCount);
+  const { error } = await query;
+  if (error) throw error;
 }
 
 /**

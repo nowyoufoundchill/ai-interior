@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { renderModeSchema } from "@/lib/ai/render-contract";
 import { createOrGetActiveJob, JobsTableMissingError, toOwnerSafeJob } from "@/lib/ai/jobs/service";
 import { scheduleJob } from "@/lib/ai/jobs/runtime";
 import { currentCorrelationId } from "@/lib/observability";
@@ -8,6 +9,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   const { roomId } = await params;
   const body = await request.json().catch(() => ({}));
   const sourcePhotoId = typeof body.source_photo_id === "string" ? body.source_photo_id : null;
+  const mode = renderModeSchema.safeParse(body.render_mode ?? "designer");
+  if (!mode.success) return NextResponse.json({ error: "Choose Designer Render or Concept." }, { status: 400 });
   if (!sourcePhotoId) return NextResponse.json({ error: "A room photo is required." }, { status: 400 });
 
   const supabase = createServerSupabaseClient();
@@ -21,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       // Keep the new operation inside the proven render job lane rather than
       // requiring a production constraint migration before owners can use it.
       jobType: "render",
-      requestPayload: { source_photo_id: sourcePhotoId, operation: "first_design" },
+      requestPayload: { source_photo_id: sourcePhotoId, operation: "first_design", render_mode: mode.data },
       requestedBy: "owner",
       correlationId: await currentCorrelationId(),
       testRunId: room.test_run_id

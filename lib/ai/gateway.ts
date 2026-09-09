@@ -4,6 +4,8 @@ import { logAiRun } from "@/lib/ai/logging";
 import { runAnthropicStructuredResponse, isAnthropicConfigured } from "@/lib/ai/anthropic";
 import { runOpenAiImageGeneration, runOpenAiStructuredResponse, isOpenAiConfigured } from "@/lib/ai/openai";
 import { loadPrompt } from "@/lib/ai/prompts";
+import { getOpenAiImageModel } from "@/lib/ai/openai";
+import type { RenderMode } from "@/lib/ai/render-contract";
 import type { Json } from "@/types/database";
 
 export type GatewayProvider = "openai" | "anthropic" | "mock";
@@ -162,6 +164,9 @@ export async function runStructuredTask<T>(input: {
     throw lastError ?? new Error("Gateway structured task failed.");
   }
 
+  if (!forceMock && provider === "openai") {
+    throw new Error("OPENAI_API_KEY is not configured.");
+  }
   if (!input.mock) {
     throw new Error(
       forceMock
@@ -244,8 +249,10 @@ export async function generateImageEdit(input: {
   promptVersion: string;
   prompt: string;
   sourceImageUrl?: string;
+  architectureImageUrl?: string;
+  renderMode?: RenderMode;
 }) {
-  if (!isOpenAiConfigured() || resolveAiMode() === "mock") {
+  if (resolveAiMode() === "mock") {
     // P0.0 failure fixtures at the image boundary: provider classes throw,
     // image_no_image simulates "OpenAI responded but returned no image".
     const fixture = await activeFailureFixture();
@@ -302,7 +309,9 @@ export async function generateImageEdit(input: {
   try {
     const result = await runOpenAiImageGeneration({
       prompt: input.prompt,
-      sourceImageUrl: input.sourceImageUrl
+      sourceImageUrl: input.sourceImageUrl,
+      architectureImageUrl: input.architectureImageUrl,
+      renderMode: input.renderMode
     });
 
     await logAiRun({
@@ -330,7 +339,7 @@ export async function generateImageEdit(input: {
       serviceName: input.serviceName,
       promptVersion: input.promptVersion,
       provider: "openai",
-      modelName: process.env.OPENAI_MODEL,
+      modelName: getOpenAiImageModel(input.renderMode),
       status: "failed",
       inputPayload: {
         prompt: input.prompt,

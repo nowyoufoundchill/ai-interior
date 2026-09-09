@@ -2,6 +2,8 @@ import { reviewFinishedImage } from "@/lib/ai/critic";
 import { generateImageEdit, resolveAiMode } from "@/lib/ai/gateway";
 import { firstDesignBriefCompiler } from "@/lib/ai/services";
 import { buildWholeHomeMemory } from "@/lib/ai/context-brain/whole-home-memory";
+import { renderModeSchema, renderSpecPrompt, type RenderMode } from "@/lib/ai/render-contract";
+import { DESIGN_MODEL, getOpenAiImageModel, imageFailureMessage } from "@/lib/ai/openai";
 import type { AutopilotBrief, FinishedImageReview } from "@/lib/schemas";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 import type { GenerationJob, Json, Photo, Room } from "@/types/database";
@@ -20,6 +22,7 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
   const payload = (job.request_payload as Record<string, unknown>) ?? {};
   const sourcePhotoId = typeof payload.source_photo_id === "string" ? payload.source_photo_id : null;
   const checkpoint = (job.result_refs as Record<string, unknown>) ?? {};
+  const renderMode = renderModeSchema.parse(payload.render_mode ?? "designer");
 
   await advanceStage(job.id, "validating", "checking your room photo");
   const { data: room, error: roomError } = await supabase.from("rooms").select("*").eq("id", job.room_id).single();
@@ -71,6 +74,7 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
         room,
         home,
         sourcePhoto,
+        ...await loadRoomRenderContext(room.id),
         wholeHomeMemory: home
           ? buildWholeHomeMemory({ home, room, preferences: preferences ?? [] })
           : undefined
@@ -108,7 +112,7 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
         brief_snapshot: {
           outcome: room.design_brief,
           purpose: room.purpose,
-          provenance: "first_design_compiler_v1"
+          provenance: "design_render_spec_v1"
         },
         quality_score: Math.round(brief.confidence * 100),
         test_run_id: room.test_run_id
@@ -136,12 +140,13 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
         sourceImageUrl: sourcePhoto.file_url,
         prompt: basePrompt,
         serviceName: "First Design Image Generator",
-        promptVersion: "first_design_v1"
+        promptVersion: "first_design_v2",
+        renderMode
       });
     } catch (error) {
       return failJob(job.id, {
         errorCode: "image_generation_failed",
-        ownerMessage: "The image service didn't respond. Your room direction is saved — try again.",
+        ownerMessage: imageFailureMessage(error, "The image service didn't respond. Your room direction is saved — try again."),
         detail: error instanceof Error ? error.message : String(error)
       });
     }
@@ -177,6 +182,7 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
       brief,
       briefId,
       review: firstReview,
+      renderMode,
       attempt: 1
     });
   } catch (error) {
@@ -201,12 +207,13 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
         sourceImageUrl: sourcePhoto.file_url,
         prompt: repairPrompt,
         serviceName: "First Design Image Repair",
-        promptVersion: "first_design_repair_v1"
+        promptVersion: "first_design_repair_v2",
+        renderMode
       });
     } catch (error) {
       return failJob(job.id, {
         errorCode: "image_repair_failed",
-        ownerMessage: "The first attempt was not safe to show, and its one repair did not finish. Your work is saved — try again.",
+        ownerMessage: imageFailureMessage(error, "The first attempt was not safe to show, and its one repair did not finish. Your work is saved — try again."),
         detail: error instanceof Error ? error.message : String(error)
       });
     }
@@ -242,6 +249,7 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
       brief,
       briefId,
       review: repairReview,
+      renderMode,
       attempt: 2,
       repairOfRenderId: firstRenderId,
       repairInstructions: repairFindings(firstReview)
@@ -276,6 +284,8 @@ export async function executeFirstDesign(job: GenerationJob): Promise<Generation
 export async function generateAndStoreImage(input: {
   roomId: string;
   sourceImageUrl: string;
+  architectureImageUrl?: string;
+  renderMode?: RenderMode;
   prompt: string;
   serviceName: string;
   promptVersion: string;
@@ -287,7 +297,9 @@ export async function generateAndStoreImage(input: {
     serviceName: input.serviceName,
     promptVersion: input.promptVersion,
     prompt: input.prompt,
-    sourceImageUrl: input.sourceImageUrl
+    sourceImageUrl: input.sourceImageUrl,
+    architectureImageUrl: input.architectureImageUrl,
+    renderMode: input.renderMode
   });
   if (!imageBase64) throw new Error("No image returned.");
 
@@ -338,6 +350,7 @@ export async function persistRenderAttempt(input: {
   repairInstructions?: string[];
   ownerInstructions?: string;
   parentRenderId?: string;
+  renderMode?: RenderMode;
   operation?: "first_design" | "visual_revision";
 }) {
   const supabase = createServerSupabaseClient();
@@ -372,6 +385,11 @@ export async function persistRenderAttempt(input: {
         brief_id: input.briefId,
         generation_job_id: input.jobId,
         operation: input.operation ?? "first_design",
+        compiled_brief: input.brief,
+        design_render_spec: input.brief.design_render_spec ?? null,
+        render_mode: input.renderMode ?? "designer",
+        design_model: input.brief.design_render_spec ? DESIGN_MODEL : null,
+        image_model: resolveAiMode() === "mock" ? "mock" : getOpenAiImageModel(input.renderMode),
         parent_render_id: input.parentRenderId ?? null,
         review_attempt: input.attempt,
         repair_of_render_id: input.repairOfRenderId ?? null,
@@ -433,14 +451,28 @@ export function repairFindings(review: FinishedImageReview) {
 
 function renderPromptFromBrief(brief: AutopilotBrief, outcome: string | null) {
   return [
+    ...(brief.design_render_spec ? [renderSpecPrompt(brief.design_render_spec)] : []),
     "Edit this real room photo in place. Preserve the walls, openings, windows, floor plane, ceiling, and camera angle exactly.",
     `Owner outcome: ${outcome ?? brief.room_summary}`,
     `Design direction: ${brief.design_direction}`,
     `Functions and zones: ${brief.functions_and_zones.join("; ")}`,
     `Materials, palette, and lighting: ${brief.palette_materials_lighting.join("; ")}`,
     `Preservation constraints: ${brief.preservation_constraints.join("; ")}`,
+    `Fixed architecture: ${brief.fixed_architecture.join("; ")}`,
+    `Keep or remove: ${brief.keep_or_remove.join("; ")}`,
     `Do not: ${brief.negative_instructions.join("; ")}`
   ].join("\n");
+}
+
+export async function loadRoomRenderContext(roomId: string) {
+  const supabase = createServerSupabaseClient();
+  const [photos, memories] = await Promise.all([
+    supabase.from("photos").select("*").eq("room_id", roomId).order("created_at").limit(10),
+    supabase.from("design_memories").select("memory_type, content").eq("scope", "room").eq("scope_id", roomId).order("created_at")
+  ]);
+  if (photos.error) throw photos.error;
+  if (memories.error) throw memories.error;
+  return { photos: photos.data ?? [], roomMemory: memories.data ?? [] };
 }
 
 function renderRepairPromptFromReview(

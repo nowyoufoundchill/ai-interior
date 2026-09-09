@@ -3,10 +3,13 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { uploadRoomPhoto } from "@/lib/storage/room-photo-upload";
+import { RenderModeSelect } from "@/components/rooms/render-mode-select";
+import type { RenderMode } from "@/lib/ai/render-contract";
 
 export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
   const router = useRouter();
   const [photo, setPhoto] = useState<File | null>(null);
+  const [renderMode, setRenderMode] = useState<RenderMode>("designer");
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
   const [uploadedPhotoId, setUploadedPhotoId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,7 +71,7 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
       const designResponse = await fetch(`/api/rooms/${roomId}/first-design`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_photo_id: photoId })
+        body: JSON.stringify({ source_photo_id: photoId, render_mode: renderMode })
       });
       if (!designResponse.ok) {
         const designPayload = await designResponse.json().catch(() => ({}));
@@ -99,6 +102,7 @@ export function RoomAutopilotIntake({ homeId }: { homeId: string }) {
       </label>
       {error ? <p id="autopilot-intake-error" role="alert" className="text-sm text-atelier-clay">{error}</p> : null}
       <p role="status" aria-live="polite" className="sr-only">{isSubmitting ? "Saving your room and starting its design." : ""}</p>
+      <RenderModeSelect value={renderMode} onChange={setRenderMode} disabled={isSubmitting} />
       <button data-testid="autopilot-intake-submit" type="submit" className="atelier-btn w-fit" disabled={isSubmitting}>
         {isSubmitting ? "Starting your room" : "Design my room"}
       </button>

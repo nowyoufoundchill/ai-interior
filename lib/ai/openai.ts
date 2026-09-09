@@ -1,3 +1,5 @@
+import { ARCHITECTURE_LOCK, type RenderMode } from "./render-contract";
+
 type InputContent =
   | { type: "input_text"; text: string }
   | { type: "input_image"; image_url: string; detail?: "low" | "high" | "original" | "auto" };
@@ -12,7 +14,9 @@ type ResponseItem = {
 };
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const DEFAULT_MODEL = "gpt-5.5";
+const DEFAULT_MODEL = "gpt-5.6-sol";
+export const DESIGN_MODEL = "gpt-5.6-sol";
+export const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst-2026-09-08";
 const DEFAULT_TIMEOUT_MS = 120000;
 
 export function isOpenAiConfigured() {
@@ -21,6 +25,19 @@ export function isOpenAiConfigured() {
 
 export function getOpenAiModel(override?: string) {
   return override || process.env.OPENAI_MODEL || DEFAULT_MODEL;
+}
+
+export function getOpenAiImageModel(mode: RenderMode = "designer") {
+  return mode === "concept"
+    ? process.env.OPENAI_CONCEPT_IMAGE_MODEL || "gpt-image-2.5-flare"
+    : process.env.OPENAI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
+}
+
+export function imageFailureMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && /organization.*verif/i.test(error.message)) {
+    return "Image rendering requires OpenAI organization verification. Your room direction is saved. Verify the organization in OpenAI settings, then try again.";
+  }
+  return fallback;
 }
 
 export async function runOpenAiStructuredResponse(input: {
@@ -100,35 +117,57 @@ export async function runOpenAiStructuredResponse(input: {
 
 export async function runOpenAiImageGeneration(input: {
   prompt: string;
-  model?: string;
   sourceImageUrl?: string;
+  architectureImageUrl?: string;
+  renderMode?: RenderMode;
 }) {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
-    return null;
+    throw new Error("OPENAI_API_KEY is not configured.");
   }
 
-  const content: InputContent[] = [{ type: "input_text", text: input.prompt }];
-  if (input.sourceImageUrl) {
-    content.push({ type: "input_image", image_url: input.sourceImageUrl, detail: "high" });
+  // This boundary only edits real rooms. Never silently generate a replacement room.
+  if (!input.sourceImageUrl) throw new Error("A source room image is required for image editing.");
+  const modelName = getOpenAiImageModel(input.renderMode);
+  const quality = process.env.OPENAI_IMAGE_QUALITY || "high";
+  if (!["low", "medium", "high", "xhigh", "max", "auto"].includes(quality)) {
+    throw new Error("OPENAI_IMAGE_QUALITY must be low, medium, high, xhigh, max, or auto.");
   }
-
+  const sourceUrls = [...new Set([input.sourceImageUrl, input.architectureImageUrl].filter((url): url is string => Boolean(url)))];
+  const prompt = [
+    ARCHITECTURE_LOCK,
+    sourceUrls.length > 1
+      ? "Image 1 is the current design to edit. Image 2 is the original room photograph: use it only as the architectural source of truth. Preserve unrelated design choices in image 1."
+      : "Image 1 is the room photograph to edit in place.",
+    input.prompt
+  ].join("\n\n");
   const requestBody = {
-    model: getOpenAiModel(input.model),
-    input: [{ role: "user", content }],
-    tools: [{ type: "image_generation" }],
-    store: false
+    model: modelName, prompt, quality, size: "auto", output_format: "png", n: 1,
+    source_image_urls: sourceUrls
   };
-
-  const response = await fetch(OPENAI_RESPONSES_URL, {
+  const form = new FormData();
+  form.set("model", modelName);
+  form.set("prompt", prompt);
+  form.set("quality", quality);
+  form.set("size", "auto");
+  form.set("output_format", "png");
+  form.set("n", "1");
+  for (const [index, url] of sourceUrls.entries()) {
+    const imageResponse = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!imageResponse.ok) throw new Error(`Source room image could not be loaded (${imageResponse.status}).`);
+    const blob = await imageResponse.blob();
+    const extension = ({ "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as Record<string, string>)[blob.type];
+    if (!extension || !blob.size || blob.size > 50 * 1024 * 1024) {
+      throw new Error("Source room image must be a non-empty PNG, JPEG, or WebP under 50 MB.");
+    }
+    form.append("image[]", blob, `room-${index + 1}.${extension}`);
+  }
+  const response = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(requestBody),
-    signal: AbortSignal.timeout(Number(process.env.OPENAI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS))
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+    signal: AbortSignal.timeout(Number(process.env.OPENAI_IMAGE_TIMEOUT_MS ?? 240000))
   });
 
   const payload = await response.json().catch(() => null);
@@ -138,19 +177,11 @@ export async function runOpenAiImageGeneration(input: {
     throw new Error(message);
   }
 
-  if (typeof payload !== "object" || payload === null || !Array.isArray((payload as { output?: unknown }).output)) {
-    return {
-      imageBase64: null,
-      modelName: getOpenAiModel(input.model),
-      requestBody,
-      responsePayload: payload
-    };
-  }
-
-  const output = (payload as { output: ResponseItem[] }).output.find((item) => item.type === "image_generation_call" && typeof item.result === "string");
+  const imageBase64 = payload?.data?.[0]?.b64_json;
+  if (typeof imageBase64 !== "string" || !imageBase64) throw new Error("OpenAI image edit returned no image.");
   return {
-    imageBase64: output?.result ?? null,
-    modelName: getOpenAiModel(input.model),
+    imageBase64,
+    modelName,
     requestBody,
     responsePayload: payload
   };

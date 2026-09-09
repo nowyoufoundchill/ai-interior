@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import path from "node:path";
 
 type PromptMetadata = {
   version: string;
@@ -15,6 +14,9 @@ export type VersionedPrompt = PromptMetadata & {
 };
 
 const PROMPT_FILE_URLS: Record<string, URL> = {
+  "prompts/renders/design-render-spec.v1.md": new URL("../../prompts/renders/design-render-spec.v1.md", import.meta.url),
+  "prompts/critic/review-finished-image.v1.md": new URL("../../prompts/critic/review-finished-image.v1.md", import.meta.url),
+  "prompts/implementation/compile-room-package.v1.md": new URL("../../prompts/implementation/compile-room-package.v1.md", import.meta.url),
   "prompts/diagnosis/room-diagnosis.v1.md": new URL("../../prompts/diagnosis/room-diagnosis.v1.md", import.meta.url),
   "prompts/diagnosis/room-diagnosis.v2.md": new URL("../../prompts/diagnosis/room-diagnosis.v2.md", import.meta.url),
   "prompts/concepts/generate-room-concepts.v1.md": new URL("../../prompts/concepts/generate-room-concepts.v1.md", import.meta.url),
@@ -31,7 +33,9 @@ const PROMPT_FILE_URLS: Record<string, URL> = {
 };
 
 export async function loadPrompt(relativePath: string): Promise<VersionedPrompt> {
-  const absolutePath = await resolvePromptPath(relativePath);
+  const bundledUrl = PROMPT_FILE_URLS[relativePath];
+  if (!bundledUrl) throw new Error(`Unregistered prompt: ${relativePath}`);
+  const absolutePath = fileURLToPath(bundledUrl);
   const file = await readFile(absolutePath, "utf8");
   const match = file.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
 
@@ -72,20 +76,4 @@ function parseFrontmatter(frontmatter: string): PromptMetadata {
   }
 
   return metadata;
-}
-
-async function resolvePromptPath(relativePath: string) {
-  const workspacePath = path.resolve(process.cwd(), relativePath);
-
-  try {
-    await readFile(workspacePath, "utf8");
-    return workspacePath;
-  } catch {
-    const bundledUrl = PROMPT_FILE_URLS[relativePath];
-    if (bundledUrl) {
-      return fileURLToPath(bundledUrl);
-    }
-  }
-
-  return workspacePath;
 }

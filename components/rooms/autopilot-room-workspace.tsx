@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import type { GenerationJob, ImplementationPackage, Photo, Render, Room } from "@/types/database";
 import type { ImplementationPackagePlan } from "@/lib/schemas";
 import { uploadRoomPhoto } from "@/lib/storage/room-photo-upload";
+import { RenderModeSelect } from "@/components/rooms/render-mode-select";
+import type { RenderMode } from "@/lib/ai/render-contract";
 
 type Props = { room: Room; photos: Photo[]; renders: Render[]; generationJobs: GenerationJob[]; implementationPackages: ImplementationPackage[] };
 const ACTIVE = new Set(["queued", "planning", "validating", "generating", "persisting"]);
@@ -24,6 +26,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
   const currentPackage = implementationPackages.find((item) => item.status === "current" && item.accepted_render_id === current?.id);
   const packagePlan = currentPackage?.package as unknown as ImplementationPackagePlan | undefined;
   const [busy, setBusy] = useState(false);
+  const [renderMode, setRenderMode] = useState<RenderMode>("designer");
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"before" | "after">("after");
@@ -50,7 +53,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
   async function startDesign() {
     if (!source) return;
     setBusy(true); setError(null);
-    const response = await fetch(`/api/rooms/${room.id}/first-design`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_photo_id: source.id }) });
+    const response = await fetch(`/api/rooms/${room.id}/first-design`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_photo_id: source.id, render_mode: renderMode }) });
     if (!response.ok) setError((await response.json().catch(() => ({}))).error ?? "We couldn't start your room design.");
     else router.refresh();
     setBusy(false);
@@ -98,7 +101,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
       const response = await fetch(`/api/rooms/${room.id}/visual-revision`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: revisionText, request_id: revisionRequestId.current })
+        body: JSON.stringify({ message: revisionText, request_id: revisionRequestId.current, render_mode: renderMode })
       });
       if (!response.ok) {
         setError((await response.json().catch(() => ({}))).error ?? "We couldn't start that revision.");
@@ -228,6 +231,7 @@ export function AutopilotRoomWorkspace({ room, photos, renders, generationJobs, 
         </div>
         {current && !isAccepted ? <button data-testid="accept-design-submit" className="atelier-btn shrink-0" onClick={acceptDesign} disabled={busy}>Keep this design</button> : isAccepted && !packagePlan && !activePackageJob ? <button data-testid="implementation-package-submit" className="atelier-btn shrink-0" onClick={createRoomPlan} disabled={busy}>{failedPackageJob ? "Try room plan again" : "Create room plan"}</button> : !current && source && !activeJob ? <button data-testid="first-design-submit" className="atelier-btn shrink-0" onClick={startDesign} disabled={busy}>{busy ? "Starting your design" : failedJob ? "Try again" : "Design my room"}</button> : null}
       </section>
+      {source ? <RenderModeSelect value={renderMode} onChange={setRenderMode} disabled={busy || Boolean(activeJob)} /> : null}
       {current ? (
         <form className="atelier-card grid gap-3 p-5" onSubmit={reviseDesign}>
           <div>

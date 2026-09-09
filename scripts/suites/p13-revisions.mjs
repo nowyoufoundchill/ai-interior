@@ -58,9 +58,13 @@ async function main() {
     await firstResponse;
     let state = await pollState(roomId, (value) => value.renders.some((render) => render.status === "candidate"));
     const initialCandidate = state.renders.find((render) => render.status === "candidate");
+    reporter.assert(Boolean(initialCandidate?.critique?.design_render_spec), "first design persists its structured render spec");
+    reporter.assert(initialCandidate?.critique?.render_mode === "designer", "Designer Render is the default");
     reporter.assert(Boolean(initialCandidate), "precondition: browser starts one reviewed first design", state.renders);
     await page.reload({ waitUntil: "networkidle" });
     reporter.assert(await page.getByTestId("current-design").getAttribute("data-render-id") === initialCandidate?.id, "first design survives reload");
+    await page.getByText("Render options · Designer Render", { exact: true }).click();
+    await page.getByRole("combobox", { name: "Render mode" }).selectOption("concept");
 
     for (const [index, message] of scenarios.entries()) {
       state = await getRoomState(roomId);
@@ -88,6 +92,9 @@ async function main() {
       const newRevisions = state.revisions.slice(before.revisionCount);
       const newJobs = state.generation_jobs.slice(before.jobCount);
       const current = state.renders.find((render) => render.status === "candidate");
+      reporter.assert(current?.critique?.parent_render_id === before.candidate?.id, `scenario ${index + 1}: persisted ancestry points to the actual parent`);
+      reporter.assert(current?.critique?.design_render_spec?.design_changes?.includes(message), `scenario ${index + 1}: saved spec contains the requested edit`);
+      reporter.assert(current?.critique?.render_mode === (index === 0 ? "concept" : "designer"), `scenario ${index + 1}: selected render mode reaches persisted render`);
       reporter.assert(response.ok() && submissions === 1, `scenario ${index + 1}: one browser submission starts the revision`, { status: response.status(), submissions });
       reporter.assert(
         newRenders.length === 1 && newRevisions.length === 1 && newJobs.length === 1,

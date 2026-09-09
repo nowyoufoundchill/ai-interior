@@ -24,6 +24,7 @@ import {
   createOrGetActiveJob,
   failJob,
   getJob,
+  heartbeat,
   isStale,
   reclaimIfStale,
   requeueJob,
@@ -73,6 +74,16 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
     return { ran: false, job: await getJob(jobId) };
   }
 
+  // An image edit can outlast the stale-job threshold. Keep this claim alive
+  // while the provider is working so polling cannot start a duplicate paid edit.
+  let heartbeatPending = false;
+  const heartbeatTimer = setInterval(() => {
+    if (heartbeatPending) return;
+    heartbeatPending = true;
+    void heartbeat(jobId, undefined, claimed.attempt_count)
+      .catch(() => logStructured("job_heartbeat_failed", { job_id: jobId }))
+      .finally(() => { heartbeatPending = false; });
+  }, 20000);
   try {
     switch (claimed.job_type) {
       case "diagnosis": {
@@ -128,6 +139,8 @@ export async function runJobNow(jobId: string): Promise<RunResult> {
       detail
     });
     return { ran: true, job };
+  } finally {
+    clearInterval(heartbeatTimer);
   }
 }
 

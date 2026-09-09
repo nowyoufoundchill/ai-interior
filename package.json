@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "suite:openai-render-contract": "node scripts/suites/openai-render-contract.mjs",
     "verify:live": "node scripts/verify-live.mjs",
     "simulate:batch": "node scripts/simulate-workflow-batch.mjs",
     "evaluate:batch": "node scripts/evaluate-workflow-batch.mjs",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { renderModeSchema } from "@/lib/ai/render-contract";
 import { classifyDirectVisualRevision } from "@/lib/ai/proposals";
 import { scheduleJob } from "@/lib/ai/jobs/runtime";
 import { ACTIVE_STATUSES, createOrGetActiveJob, JobsTableMissingError, toOwnerSafeJob } from "@/lib/ai/jobs/service";
@@ -8,6 +9,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await params;
   const body = await request.json().catch(() => ({}));
+  const mode = renderModeSchema.safeParse(body.render_mode ?? "designer");
+  if (!mode.success) return NextResponse.json({ error: "Choose Designer Render or Concept." }, { status: 400 });
   const message = typeof body.message === "string" ? body.message.trim() : "";
   const requestId = typeof body.request_id === "string" ? body.request_id : "";
   if (!requestId || requestId.length > 100) {
@@ -69,6 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       jobType: "render",
       requestPayload: {
         operation: "visual_revision",
+        render_mode: mode.data,
         revision_request_id: requestId,
         parent_render_id: parent.id,
         source_photo_id: parent.source_photo_id,

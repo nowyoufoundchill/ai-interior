@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { designRenderSpecSchema } from "@/lib/ai/render-contract";
 
 export const existingItemSchema = z.object({
   item: z.string(),
@@ -42,6 +43,8 @@ export const briefInterpretationSchema = z.object({
 });
 
 export const autopilotBriefSchema = z.object({
+  // Older saved briefs remain readable; new compiles require this field.
+  design_render_spec: designRenderSpecSchema.optional(),
   room_summary: z.string(),
   design_direction: z.string(),
   functions_and_zones: z.array(z.string()),
