@@ -1,3 +1,4 @@
+import { normalizeSourceImageBytes } from "./image-normalize";
 import { ARCHITECTURE_LOCK, type RenderMode } from "./render-contract";
 
 type InputContent =
@@ -36,6 +37,9 @@ export function getOpenAiImageModel(mode: RenderMode = "designer") {
 export function imageFailureMessage(error: unknown, fallback: string) {
   if (error instanceof Error && /organization.*verif/i.test(error.message)) {
     return "Image rendering requires OpenAI organization verification. Your room direction is saved. Verify the organization in OpenAI settings, then try again.";
+  }
+  if (error instanceof Error && /invalid image file|invalid_image_file/i.test(error.message)) {
+    return "That room photo could not be read by the image service. Your room direction is saved. Try again, or upload the photo again from your phone.";
   }
   return fallback;
 }
@@ -142,10 +146,6 @@ export async function runOpenAiImageGeneration(input: {
       : "Image 1 is the room photograph to edit in place.",
     input.prompt
   ].join("\n\n");
-  const requestBody = {
-    model: modelName, prompt, quality, size: "auto", output_format: "png", n: 1,
-    source_image_urls: sourceUrls
-  };
   const form = new FormData();
   form.set("model", modelName);
   form.set("prompt", prompt);
@@ -153,6 +153,7 @@ export async function runOpenAiImageGeneration(input: {
   form.set("size", "auto");
   form.set("output_format", "png");
   form.set("n", "1");
+  const normalizations: string[] = [];
   for (const [index, url] of sourceUrls.entries()) {
     const imageResponse = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!imageResponse.ok) throw new Error(`Source room image could not be loaded (${imageResponse.status}).`);
@@ -161,8 +162,16 @@ export async function runOpenAiImageGeneration(input: {
     if (!extension || !blob.size || blob.size > 50 * 1024 * 1024) {
       throw new Error("Source room image must be a non-empty PNG, JPEG, or WebP under 50 MB.");
     }
-    form.append("image[]", blob, `room-${index + 1}.${extension}`);
+    // Phone HDR captures arrive as multi-picture JPEGs the edit endpoint rejects.
+    const normalized = normalizeSourceImageBytes(new Uint8Array(await blob.arrayBuffer()));
+    for (const change of normalized.changes) normalizations.push(`image_${index + 1}:${change}`);
+    form.append("image[]", new Blob([normalized.bytes], { type: blob.type }), `room-${index + 1}.${extension}`);
   }
+  const requestBody = {
+    model: modelName, prompt, quality, size: "auto", output_format: "png", n: 1,
+    source_image_urls: sourceUrls,
+    source_image_normalizations: normalizations
+  };
   const response = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },

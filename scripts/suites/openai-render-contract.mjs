@@ -7,8 +7,10 @@ import ts from "typescript";
 // Compile only the pure provider boundary; no database, Next server, or paid calls.
 const output = path.resolve("test-runs/openai-render-contract");
 mkdirSync(output, { recursive: true });
-for (const name of ["render-contract", "openai"]) {
-  const source = readFileSync(`lib/ai/${name}.ts`, "utf8").replace('"./render-contract"', '"./render-contract.cjs"');
+for (const name of ["render-contract", "image-normalize", "openai"]) {
+  const source = readFileSync(`lib/ai/${name}.ts`, "utf8")
+    .replace('"./render-contract"', '"./render-contract.cjs"')
+    .replace('"./image-normalize"', '"./image-normalize.cjs"');
   writeFileSync(path.join(output, `${name}.cjs`), ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText);
@@ -16,6 +18,25 @@ for (const name of ["render-contract", "openai"]) {
 const require = createRequire(import.meta.url);
 const api = require(path.join(output, "openai.cjs"));
 const { ARCHITECTURE_LOCK, renderModeSchema } = require(path.join(output, "render-contract.cjs"));
+const { normalizeSourceImageBytes } = require(path.join(output, "image-normalize.cjs"));
+
+// A phone HDR capture: JFIF, an APP2 MPF index, a primary scan, then a second
+// appended image. Shaped exactly like the owner's failing IMG-1221.jpeg.
+function segment(marker, payload) {
+  return Buffer.concat([Buffer.from([0xff, marker]), Buffer.from([(payload.length + 2) >> 8, (payload.length + 2) & 0xff]), payload]);
+}
+const primaryScan = Buffer.concat([segment(0xda, Buffer.from([0x01, 0x01, 0x00])), Buffer.from([0x12, 0xff, 0x00, 0x34]), Buffer.from([0xff, 0xd9])]);
+const appendedGainMap = Buffer.concat([Buffer.from([0xff, 0xd8]), segment(0xe0, Buffer.from("JFIF\0", "latin1")), Buffer.from([0xff, 0xd9])]);
+const mpfSegment = segment(0xe2, Buffer.from("MPF\0index", "latin1"));
+const multiPictureJpeg = Buffer.concat([
+  Buffer.from([0xff, 0xd8]),
+  segment(0xe0, Buffer.from("JFIF\0", "latin1")),
+  segment(0xe1, Buffer.from("Exif\0\0orientation", "latin1")),
+  mpfSegment,
+  segment(0xe2, Buffer.from("ICC_PROFILE\0colour", "latin1")),
+  primaryScan,
+  appendedGainMap
+]);
 const originalFetch = globalThis.fetch;
 const envNames = ["OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_CONCEPT_IMAGE_MODEL", "OPENAI_IMAGE_QUALITY"];
 const originalEnv = Object.fromEntries(envNames.map((key) => [key, process.env[key]]));
@@ -97,6 +118,45 @@ try {
   await test("Organization verification has an actionable saved-work error", async () => {
     assert.match(api.imageFailureMessage(new Error("Your organization must be verified to use this model"), "fallback"), /verification.*saved/i);
     assert.equal(api.imageFailureMessage(new Error("timeout"), "fallback"), "fallback");
+  });
+  await test("Unreadable source photo has an actionable saved-work error", async () => {
+    const message = api.imageFailureMessage(new Error("Invalid image file or mode for image 1, please check your image file."), "fallback");
+    assert.match(message, /room photo could not be read/i);
+    assert.match(message, /saved/i);
+  });
+  await test("Phone multi-picture JPEG drops the MPF index and the appended image", () => {
+    const { bytes, changes } = normalizeSourceImageBytes(new Uint8Array(multiPictureJpeg));
+    const out = Buffer.from(bytes);
+    assert.deepEqual(changes.sort(), ["dropped_app2_mpf_index", `dropped_appended_image_bytes:${appendedGainMap.length}`]);
+    assert.equal(out.includes(Buffer.from("MPF\0", "latin1")), false);
+    // EXIF orientation, the ICC profile and every scan byte survive untouched.
+    assert.ok(out.includes(Buffer.from("Exif\0\0orientation", "latin1")));
+    assert.ok(out.includes(Buffer.from("ICC_PROFILE\0colour", "latin1")));
+    assert.ok(out.includes(primaryScan));
+    assert.equal(out.length, multiPictureJpeg.length - appendedGainMap.length - mpfSegment.length);
+  });
+  await test("Ordinary JPEG, PNG and malformed bytes are returned untouched", () => {
+    const plainJpeg = Buffer.concat([Buffer.from([0xff, 0xd8]), segment(0xe0, Buffer.from("JFIF\0", "latin1")), primaryScan]);
+    for (const input of [plainJpeg, png, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]), Buffer.alloc(0)]) {
+      const { bytes, changes } = normalizeSourceImageBytes(new Uint8Array(input));
+      assert.deepEqual(changes, []);
+      assert.deepEqual(Buffer.from(bytes), input);
+    }
+  });
+  await test("The edit request uploads normalized bytes and records what changed", async () => {
+    process.env.OPENAI_API_KEY = "contract-test-key";
+    delete process.env.OPENAI_IMAGE_QUALITY;
+    let uploaded = null;
+    globalThis.fetch = async (url, options) => {
+      if (url.startsWith("https://test.local/")) return new Response(multiPictureJpeg, { headers: { "Content-Type": "image/jpeg" } });
+      uploaded = Buffer.from(await options.body.getAll("image[]")[0].arrayBuffer());
+      return imageResult();
+    };
+    const result = await api.runOpenAiImageGeneration({ prompt: "a room", sourceImageUrl: "https://test.local/phone.jpg" });
+    assert.equal(uploaded.includes(Buffer.from("MPF\0", "latin1")), false);
+    assert.ok(uploaded.length < multiPictureJpeg.length);
+    assert.deepEqual(result.requestBody.source_image_normalizations, ["image_1:dropped_app2_mpf_index", `image_1:dropped_appended_image_bytes:${appendedGainMap.length}`]);
+    assert.equal(result.requestBody.quality, "high");
   });
 } finally {
   globalThis.fetch = originalFetch;
